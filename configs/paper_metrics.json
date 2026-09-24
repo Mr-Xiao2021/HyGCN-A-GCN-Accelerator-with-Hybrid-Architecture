@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "reference_version": "hygcn-arxiv-2001.02514v1-relative-metrics",
+  "tolerance": 0.20,
+  "datasets": ["cora", "citeseer", "pubmed"],
+  "metrics": {
+    "sparsity_speedup": {
+      "reference": 1.10,
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "source": "HyGCN paper Section V-D dynamic sparsity elimination average speedup"
+    },
+    "sparsity_input_dram_ratio": {
+      "reference": 0.60,
+      "unit": "ratio",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "source": "HyGCN paper Section V-D about 40% DRAM access reduction"
+    },
+    "pipeline_speedup": {
+      "reference": 1.10,
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "source": "HyGCN paper Section V-D inter-engine pipeline average speedup"
+    },
+    "pipeline_dram_ratio": {
+      "reference": 0.50,
+      "unit": "ratio",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "source": "HyGCN paper Section V-D inter-engine pipeline about 50% DRAM access reduction"
+    },
+    "coordination_speedup": {
+      "reference": 1.10,
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "source": "HyGCN paper Section V-D memory access coordination average speedup"
+    },
+    "coordination_bandwidth_gain": {
+      "reference": 1.10,
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "source": "HyGCN paper Section V-D memory bandwidth utilization improvement"
+    }
+  }
+}

@@ -5,6 +5,19 @@
 #include <cmath>
 #include "dataflow/event.h"
 
+namespace {
+
+int TransactionCount(int bytes, int block_size) {
+    if (block_size <= 0) {
+        throw std::invalid_argument("event block size must be positive");
+    }
+    if (bytes <= 0) {
+        throw std::invalid_argument("event byte count must be positive");
+    }
+    return static_cast<int>(std::ceil(static_cast<double>(bytes) / block_size));
+}
+
+}  // namespace
 
 // todo add capacity limitation for event queue
 Event::Event(uint64_t &addr,
@@ -16,7 +29,7 @@ Event::Event(uint64_t &addr,
         dir_type(dir_type),
         event_type(event_type),
         data_type(data_type),
-        num_trans(std::ceil((double)bytes / sz_block)),
+        num_trans(TransactionCount(bytes, sz_block)),
         trans_cnt(0),
         confirm_cnt(0) {
     static std::unordered_map<EventType, std::string> type_map = {{EventType::WRITE,            "WRITE"},

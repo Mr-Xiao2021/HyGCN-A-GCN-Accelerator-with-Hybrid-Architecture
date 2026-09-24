@@ -9,6 +9,8 @@
 #include <unordered_map>
 #include <memory>
 #include <cassert>
+#include <limits>
+#include <stdexcept>
 
 enum class EventDirType {
     EDRAM, // aggr
@@ -50,11 +52,29 @@ public:
     }
 
     void ConfirmTrans() {
+        if (confirm_cnt >= num_trans || confirm_cnt >= trans_cnt) {
+            throw std::logic_error("event transaction confirmation overflow");
+        }
         confirm_cnt++;
     }
 
     void IssueTrans() {
+        if (trans_cnt >= num_trans) {
+            throw std::logic_error("event transaction issue overflow");
+        }
         trans_cnt++;
+    }
+
+    void ValidateAddressRange(uint64_t capacity) const {
+        if (address >= capacity || static_cast<uint64_t>(bytes) > capacity - address) {
+            throw std::out_of_range("event address range exceeds capacity");
+        }
+    }
+
+    void ValidateComplete() const {
+        if (!AllTransIssued() || !AllTransConfirmed()) {
+            throw std::logic_error("event has unfinished transactions");
+        }
     }
 
     const uint64_t address;

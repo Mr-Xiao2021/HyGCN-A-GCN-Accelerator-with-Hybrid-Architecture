@@ -5,6 +5,7 @@
 #ifndef DRAMSIM3_SPM_H
 #define DRAMSIM3_SPM_H
 
+#include <stdexcept>
 #include <vector>
 #include <iostream>
 #include <set>
@@ -59,10 +60,16 @@ public:
     }
 
     void AddEvents(int num) {
+        if (num < 0) {
+            throw std::invalid_argument("SPMA event count must be non-negative");
+        }
         event_cnt_ = num;
     }
 
     void ConfirmEvent() {
+        if (event_cnt_ <= 0) {
+            throw std::logic_error("SPMA event counter underflow");
+        }
         event_cnt_--;
     }
 
@@ -137,10 +144,16 @@ public:
     }
 
     void AddEvents(int num) {
+        if (num < 0) {
+            throw std::invalid_argument("SPM event count must be non-negative");
+        }
         event_cnt_ = num;
     }
 
     void ConfirmEvent() {
+        if (event_cnt_ <= 0) {
+            throw std::logic_error("SPM event counter underflow");
+        }
         event_cnt_--;
     }
 

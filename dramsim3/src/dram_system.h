@@ -4,9 +4,6 @@
 #include <fstream>
 #include <string>
 #include <vector>
-#include "thread_pool/fixed_thread_pool.hpp"
-
-
 #include "common.h"
 #include "configuration.h"
 #include "controller.h"

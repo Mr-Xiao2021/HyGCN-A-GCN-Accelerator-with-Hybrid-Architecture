@@ -6,7 +6,7 @@
 #include <functional>
 HyGCN::HyGCN(const std::shared_ptr<HyConfig>& hy_config): hy_config(hy_config) {
 
-    dram_config = std::make_shared<dramsim3::Config>("configs/HBM1_8Gb_x128.ini", ".");
+    dram_config = std::make_shared<dramsim3::Config>("configs/HBM1_4Gb_x128.ini", ".");
 
     auto callback_func = std::bind(&HyGCN::MemCallback, std::ref(*this), std::placeholders::_1);
 

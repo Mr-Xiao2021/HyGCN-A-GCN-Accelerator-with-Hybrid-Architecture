@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "engine": "legacy",
+  "model": "gcn",
+  "seed": 1,
+  "datasets": {
+    "cora": {
+      "summary": {
+        "total_cycles": 1481120
+      },
+      "layers": [
+        {
+          "layer": 0,
+          "cycles": 1393433,
+          "dram_edge_read": 7864320,
+          "dram_input_read": 56931840,
+          "dram_weight_read": 11010048,
+          "dram_output_write": 8143872
+        },
+        {
+          "layer": 1,
+          "cycles": 87687,
+          "dram_edge_read": 16384,
+          "dram_input_read": 2522112,
+          "dram_weight_read": 32768,
+          "dram_output_write": 173312
+        }
+      ]
+    },
+    "citeseer": {
+      "summary": {
+        "total_cycles": 5363407
+      },
+      "layers": [
+        {
+          "layer": 0,
+          "cycles": 5269219,
+          "dram_edge_read": 25165824,
+          "dram_input_read": 167381504,
+          "dram_weight_read": 92405760,
+          "dram_output_write": 25496576
+        },
+        {
+          "layer": 1,
+          "cycles": 94188,
+          "dram_edge_read": 16384,
+          "dram_input_read": 2921984,
+          "dram_weight_read": 32768,
+          "dram_output_write": 212928
+        }
+      ]
+    }
+  }
+}
