@@ -44,8 +44,8 @@ cmake --build build --target paper_benchmark
 ```
 
 `legacy_regression` 复跑 GCN+Cora/Citeseer 并与版本化快照逐项比较。
-`paper_benchmark` 运行 Cora、Citeseer、PubMed 的优化版和三组成对消融，随后执行论文相对指标
-`±20%` 校验。报告写入 `res/paper/benchmark_report.json` 和
+`paper_benchmark` 运行 Cora、Citeseer、PubMed 的优化版和三组成对消融，随后按论文公开的逐数据集范围与跨数据集平均值执行
+`±20%` 校验。没有可靠数字化参考的指标只作为诊断项。报告写入 `res/paper/benchmark_report.json` 和
 `res/paper/validation_report.md`。
 
 实现范围、指标定义和声明边界见 [docs/paper-reproduction.md](docs/paper-reproduction.md)。

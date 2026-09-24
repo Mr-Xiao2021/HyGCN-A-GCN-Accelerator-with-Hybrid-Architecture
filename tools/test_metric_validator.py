@@ -6,12 +6,12 @@ import tempfile
 from pathlib import Path
 
 
-def run_case(root, reference, aggregate, expected_returncode, name, directory):
+def run_case(root, reference, aggregate, per_dataset, expected_returncode, name, directory):
     report = {
         "schema_version": 1,
         "datasets": reference["datasets"],
         "aggregate": aggregate,
-        "per_dataset": {},
+        "per_dataset": per_dataset,
     }
     report_path = directory / f"{name}.json"
     output_path = directory / f"{name}.md"
@@ -42,19 +42,33 @@ def main():
     root = Path(__file__).resolve().parents[1]
     with (root / "configs/paper_metrics.json").open(encoding="utf-8") as stream:
         reference = json.load(stream)
-    valid = {name: definition["reference"] for name, definition in reference["metrics"].items()}
+    valid = {
+        name: definition["reference"]
+        for name, definition in reference["metrics"].items()
+        if definition["validation"] == "aggregate_relative_error"
+    }
+    per_dataset = {}
+    for dataset in reference["datasets"]:
+        per_dataset[dataset] = {"metrics": {}}
+        for name, definition in reference["metrics"].items():
+            if definition["validation"] == "per_dataset_range":
+                per_dataset[dataset]["metrics"][name] = (
+                    definition["reference_min"] + definition["reference_max"]
+                ) / 2
+            elif definition["validation"] == "diagnostic_only":
+                per_dataset[dataset]["metrics"][name] = 0.75
     with tempfile.TemporaryDirectory(prefix="hygcn-validator-") as temp:
         directory = Path(temp)
-        run_case(root, reference, valid, 0, "valid", directory)
+        run_case(root, reference, valid, per_dataset, 0, "valid", directory)
         missing = dict(valid)
-        missing.pop("pipeline_speedup")
-        run_case(root, reference, missing, 1, "missing", directory)
+        missing.pop("coordination_speedup")
+        run_case(root, reference, missing, per_dataset, 1, "missing", directory)
         non_finite = dict(valid)
-        non_finite["pipeline_speedup"] = float("nan")
-        run_case(root, reference, non_finite, 1, "non-finite", directory)
-        out_of_range = dict(valid)
-        out_of_range["pipeline_speedup"] = 2.0
-        run_case(root, reference, out_of_range, 1, "out-of-range", directory)
+        non_finite["coordination_speedup"] = float("nan")
+        run_case(root, reference, non_finite, per_dataset, 1, "non-finite", directory)
+        out_of_range = json.loads(json.dumps(per_dataset))
+        out_of_range[reference["datasets"][0]]["metrics"]["pipeline_speedup"] = 4.0
+        run_case(root, reference, valid, out_of_range, 1, "out-of-range", directory)
     print("metric_validator_selftest=PASS")
     return 0
 

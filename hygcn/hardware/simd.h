@@ -6,6 +6,7 @@
 #define DRAMSIM3_SIMD_H
 
 #include <cassert>
+#include <cstdint>
 #include <iostream>
 
 class SIMD {

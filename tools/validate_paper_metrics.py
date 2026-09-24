@@ -19,6 +19,23 @@ def load_json(path):
         return json.load(stream)
 
 
+def relative_error(measured, expected):
+    if measured is None or not isinstance(measured, (int, float)):
+        return math.inf
+    if not math.isfinite(measured) or expected == 0:
+        return math.inf
+    return abs(measured - expected) / abs(expected)
+
+
+def range_error(measured, lower, upper):
+    if measured is None or not isinstance(measured, (int, float)) or not math.isfinite(measured):
+        return math.inf
+    if lower <= measured <= upper:
+        return 0.0
+    boundary = lower if measured < lower else upper
+    return abs(measured - boundary) / abs(boundary)
+
+
 def main():
     args = parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -36,66 +53,75 @@ def main():
     report = load_json(report_path)
     tolerance = float(reference["tolerance"])
     aggregate = report.get("aggregate", {})
+    per_dataset = report.get("per_dataset", {})
     rows = []
+    diagnostics = []
     failed = False
+
     for name, definition in reference["metrics"].items():
-        measured = aggregate.get(name)
-        expected = float(definition["reference"])
-        if measured is None or not math.isfinite(measured) or expected == 0:
-            error = math.inf
-            passed = False
-        else:
-            error = abs(measured - expected) / abs(expected)
+        validation = definition["validation"]
+        required = definition["required"]
+        if validation == "aggregate_relative_error":
+            measured = aggregate.get(name)
+            expected = float(definition["reference"])
+            error = relative_error(measured, expected)
             passed = error <= tolerance
-        failed = failed or not passed
-        rows.append((name, expected, measured, error, passed, definition["source"]))
+            failed = failed or (required and not passed)
+            rows.append((name, "aggregate", f"{expected:.6f}", measured, error, passed,
+                         definition["source"]))
+        elif validation == "per_dataset_range":
+            lower = float(definition["reference_min"])
+            upper = float(definition["reference_max"])
+            for dataset in reference["datasets"]:
+                measured = per_dataset.get(dataset, {}).get("metrics", {}).get(name)
+                error = range_error(measured, lower, upper)
+                passed = error <= tolerance
+                failed = failed or (required and not passed)
+                rows.append((name, dataset, f"{lower:.6f}-{upper:.6f}", measured, error,
+                             passed, definition["source"]))
+        elif validation == "diagnostic_only":
+            for dataset in reference["datasets"]:
+                measured = per_dataset.get(dataset, {}).get("metrics", {}).get(name)
+                diagnostics.append((name, dataset, measured, definition["source"]))
+        else:
+            raise ValueError(f"unsupported validation rule for {name}: {validation}")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as stream:
         stream.write("# HyGCN Paper Metric Validation\n\n")
         stream.write(f"Tolerance: {tolerance:.0%}\n\n")
         stream.write(
-            "Acceptance rule: arithmetic mean across Cora, Citeseer, and PubMed. "
-            "Per-dataset values below are diagnostics because the cited paper values are averages.\n\n"
+            "Range metrics are checked per dataset. Paper-reported averages are checked "
+            "only after applying the declared aggregation rule. Diagnostic-only metrics "
+            "do not affect acceptance.\n\n"
         )
-        stream.write("| Metric | Reference | Measured | Relative error | Status |\n")
-        stream.write("|---|---:|---:|---:|---|\n")
-        for name, expected, measured, error, passed, _ in rows:
+        stream.write("| Metric | Scope | Reference | Measured | Relative error | Status |\n")
+        stream.write("|---|---|---:|---:|---:|---|\n")
+        for name, scope, expected, measured, error, passed, _ in rows:
             measured_text = "missing" if measured is None else f"{measured:.6f}"
             error_text = "invalid" if not math.isfinite(error) else f"{error:.2%}"
             stream.write(
-                f"| {name} | {expected:.6f} | {measured_text} | {error_text} | "
+                f"| {name} | {scope} | {expected} | {measured_text} | {error_text} | "
                 f"{'PASS' if passed else 'FAIL'} |\n"
             )
-        stream.write("\n## Per-Dataset Diagnostics\n\n")
-        stream.write("| Dataset | Metric | Measured | Relative error vs average | Diagnostic |\n")
-        stream.write("|---|---|---:|---:|---|\n")
-        for dataset in report.get("datasets", []):
-            dataset_metrics = report.get("per_dataset", {}).get(dataset, {}).get("metrics", {})
-            for name, definition in reference["metrics"].items():
-                measured = dataset_metrics.get(name)
-                expected = float(definition["reference"])
-                if measured is None or not math.isfinite(measured):
-                    error = math.inf
-                else:
-                    error = abs(measured - expected) / abs(expected)
-                measured_text = "missing" if measured is None else f"{measured:.6f}"
-                error_text = "invalid" if not math.isfinite(error) else f"{error:.2%}"
-                diagnostic = "IN-RANGE" if error <= tolerance else "OUTLIER"
-                stream.write(
-                    f"| {dataset} | {name} | {measured_text} | {error_text} | {diagnostic} |\n"
-                )
+        stream.write("\n## Diagnostic-Only Metrics\n\n")
+        stream.write("| Metric | Dataset | Measured | Reason |\n")
+        stream.write("|---|---|---:|---|\n")
+        for name, dataset, measured, source in diagnostics:
+            measured_text = "missing" if measured is None else f"{measured:.6f}"
+            stream.write(f"| {name} | {dataset} | {measured_text} | {source} |\n")
         stream.write("\n## Scope\n\n")
-        stream.write("Validated: relative microarchitectural effects for GCN.\n\n")
         stream.write(
-            "Not validated: absolute CPU/GPU speedup, DiffPool, or complete chip energy/area.\n"
+            "This is a request-level GCN mechanism check. It is not a cycle-accurate "
+            "Ramulator reproduction and does not validate CPU/GPU speedup, DiffPool, "
+            "area, or complete chip energy.\n"
         )
 
-    for name, expected, measured, error, passed, source in rows:
+    for name, scope, expected, measured, error, passed, source in rows:
         measured_text = "missing" if measured is None else f"{measured:.6f}"
         error_text = "invalid" if not math.isfinite(error) else f"{error:.2%}"
         print(
-            f"{name}: reference={expected:.6f} measured={measured_text} "
+            f"{name}[{scope}]: reference={expected} measured={measured_text} "
             f"error={error_text} {'PASS' if passed else 'FAIL'} ({source})"
         )
     print(f"validation_report={output_path}")

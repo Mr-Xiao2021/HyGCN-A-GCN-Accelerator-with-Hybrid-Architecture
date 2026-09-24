@@ -55,3 +55,13 @@
 - [x] 7.2 执行 GCN+Cora/Citeseer/PubMed 完整论文配置消融套件，确认结果文件、运行清单和缓存均可重复使用
 - [x] 7.3 执行论文 ±20% 校验目标，确认所有强制指标通过并保存最终汇总报告
 - [x] 7.4 运行 `openspec validate reproduce-hygcn-paper-performance --strict`，确认规格、实现任务状态和变更关系全部有效
+
+## 8. 独立审查整改
+
+- [x] 8.1 修复 `simd.h` 缺少 `<cstdint>` 导致的干净 Release 构建失败，并从新构建目录验证
+- [x] 8.2 删除协调效率、固定流水重叠率和经验 spill 系数，改用 channel/bank/row-buffer 请求时序与 batch 事件流水
+- [x] 8.3 让稀疏邻居生成真实离散地址并仅合并连续顶点请求，保证流量统计与地址映射语义一致
+- [x] 8.4 按 Aggregation Buffer ping-pong 半区生成分区，并让 ready、consume、reclaim 与容量 backpressure 进入时间线
+- [x] 8.5 修正 independent 模式权重只从 HBM 装载一次、随后由 Weight Buffer 跨 batch/模块复用
+- [x] 8.6 重建论文指标清单：范围逐数据集检查、正文平均值聚合检查、无可靠值指标降为诊断项
+- [x] 8.7 增加协调器 row-conflict 单测并复跑干净构建、默认 CTest、完整三数据集成对消融和严格 OpenSpec 校验

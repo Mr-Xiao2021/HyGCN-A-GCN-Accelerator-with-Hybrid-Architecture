@@ -106,6 +106,27 @@ void TestPartitionAndSparsity() {
     Check(sparse[0].unique_neighbors.size() == 8 && sparse[0].edge_bytes == 128 &&
               sparse[0].input_bytes == 512,
           "golden shard records exact neighbors and encoded bytes");
+
+    auto non_contiguous = SmallGraph();
+    non_contiguous.num_edge = non_contiguous.num_vertex * 4;
+    for (auto& adjacency : non_contiguous.r_adj) {
+        adjacency = {0, 2, 4, 6};
+    }
+    FeatureFlags sparse_flags;
+    FeatureFlags dense_flags;
+    dense_flags.sparsity_elimination = false;
+    const auto sparse_result = simulator.Run(
+        non_contiguous, "gcn", "non-contiguous", 1, sparse_flags, 0);
+    const auto dense_result = simulator.Run(
+        non_contiguous, "gcn", "non-contiguous", 1, dense_flags, 0);
+    const auto input_index = static_cast<std::size_t>(RequestClass::INPUT);
+    Check(sparse_result.layers[0].request_counts[input_index] == 4,
+          "non-contiguous neighbors issue four real address runs");
+    Check(dense_result.layers[0].request_counts[input_index] == 1,
+          "dense interval baseline issues one contiguous input request");
+    Check(sparse_result.layers[0].request_bytes[input_index] ==
+              sparse_result.layers[0].input_dram_bytes,
+          "sparse input request addresses and traffic use the same byte accounting");
 }
 
 Graph EdgeBoundaryGraph(int neighbors) {
@@ -125,7 +146,7 @@ void TestEdgeChunkBoundaries() {
     auto config = ArchitectureConfig::Load("configs/HYGCN_SMOKE.ini");
     config.block_size = 4;
     config.edge_buffer_bytes = 60;
-    config.partition_vertices = 1;
+    config.aggregation_buffer_bytes = 128;
     config.Validate();
     PaperSimulator simulator(config);
 
@@ -176,9 +197,9 @@ void TestSystolicModel() {
         8, 4, 128, 8, ideal_schedule_config, CombinationMode::INDEPENDENT);
     const auto cooperative_schedule = PaperSimulator::BuildCombinationSchedule(
         8, 4, 128, 8, ideal_schedule_config, CombinationMode::COOPERATIVE);
-    Check(independent_schedule.weight_load_bytes == 8 * 2048 &&
+    Check(independent_schedule.weight_load_bytes == 2048 &&
               independent_schedule.weight_cascade_bytes == 0,
-          "independent hand case loads one weight copy per active module");
+          "independent hand case loads weights once from HBM and reuses the weight buffer");
     Check(cooperative_schedule.weight_load_bytes == 2048 &&
               cooperative_schedule.weight_cascade_bytes == 7 * 2048 &&
               cooperative_schedule.output_columns_per_module == 16,
@@ -228,12 +249,32 @@ void TestCoordinator() {
           "current batch output precedes next batch edge");
 
     const auto uncoordinated = MemoryCoordinatorModel::Order(requests, false);
-    Check(uncoordinated[0].request_class == RequestClass::EDGE &&
-              uncoordinated[1].request_class == RequestClass::EDGE,
-          "uncoordinated baseline uses global class priority");
+    Check(uncoordinated[0].sequence == 0 && uncoordinated[1].sequence == 1,
+          "uncoordinated baseline preserves FIFO request order");
     ExpectThrows([] {
         MemoryCoordinatorModel::Order({{0, RequestClass::EDGE, 0, 0, 0, 0}}, true);
     }, "zero-byte memory requests are rejected");
+
+    auto config = ArchitectureConfig::Load("configs/HYGCN_SMOKE.ini");
+    config.hbm_channels = 1;
+    config.hbm_banks_per_channel = 1;
+    config.hbm_row_bytes = 256;
+    config.block_size = 64;
+    config.Validate();
+    const std::vector<MemoryRequest> alternating = {
+        {1, RequestClass::EDGE, 64, 256, 0, 0},
+        {0, RequestClass::OUTPUT, 64, 0, 0, 1},
+        {1, RequestClass::INPUT, 64, 320, 0, 2},
+        {0, RequestClass::INPUT, 64, 64, 0, 3},
+        {1, RequestClass::OUTPUT, 64, 384, 0, 4},
+        {0, RequestClass::EDGE, 64, 128, 0, 5},
+    };
+    const auto fifo_timing = MemoryCoordinatorModel::Simulate(alternating, config, false);
+    const auto coordinated_timing = MemoryCoordinatorModel::Simulate(alternating, config, true);
+    Check(coordinated_timing.cycles < fifo_timing.cycles,
+          "coordinator ordering reduces row conflicts in the request timing model");
+    Check(coordinated_timing.row_buffer_hits > fifo_timing.row_buffer_hits,
+          "coordinator timing reports additional row-buffer hits");
 }
 
 void TestAggregationBuffer() {
@@ -333,7 +374,9 @@ void TestSimulationDeterminism() {
               "aggregation buffer reads and writes are conserved");
         Check(layer.ae_finish_cycle <= layer.cycles && layer.ce_finish_cycle <= layer.cycles,
               "engine finish cycles remain inside the layer runtime");
-        Check(layer.channel_blocks.size() == 8 && layer.bank_blocks.size() == 16,
+        Check(layer.channel_blocks.size() == static_cast<std::size_t>(config.hbm_channels) &&
+                  layer.bank_blocks.size() ==
+                      static_cast<std::size_t>(config.hbm_banks_per_channel),
               "HBM mapping distributions are reported");
     }
 
@@ -365,7 +408,7 @@ void TestPolicyMatrix() {
                 if (pipeline == PipelineMode::SEQUENTIAL) {
                     Check(layer.ce_start_cycle >= layer.ae_finish_cycle,
                           "sequential CE starts after AE finishes");
-                } else {
+                } else if (layer.batches > 1) {
                     Check(layer.ce_start_cycle <= layer.ae_finish_cycle,
                           "pipelined CE starts no later than AE completion");
                 }
@@ -386,9 +429,9 @@ void TestPolicyMatrix() {
         Check(independent.layers[layer].output_dram_bytes ==
                   cooperative.layers[layer].output_dram_bytes,
               "combination policies preserve output bytes");
-        Check(independent.layers[layer].weight_dram_bytes >=
+        Check(independent.layers[layer].weight_dram_bytes ==
                   cooperative.layers[layer].weight_dram_bytes,
-              "cooperative mode does not increase weight traffic");
+              "both combination policies load weights once from HBM");
     }
 }
 
@@ -422,7 +465,9 @@ void TestFeatureDispersionAndAddressBounds() {
 }
 
 void TestPipelineBatching() {
-    const auto config = ArchitectureConfig::Load("configs/HYGCN_SMOKE.ini");
+    auto config = ArchitectureConfig::Load("configs/HYGCN_SMOKE.ini");
+    config.aggregation_buffer_bytes = 1024;
+    config.Validate();
     PaperSimulator simulator(config);
     Graph graph;
     graph.num_vertex = 40;

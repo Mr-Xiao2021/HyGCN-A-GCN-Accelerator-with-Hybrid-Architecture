@@ -32,8 +32,8 @@ def main():
     with path.open(encoding="utf-8") as stream:
         manifest = json.load(stream)
 
-    if manifest.get("schema_version") != 1 or not manifest.get("reference_version"):
-        raise ValueError("reference manifest requires schema_version=1 and reference_version")
+    if manifest.get("schema_version") != 2 or not manifest.get("reference_version"):
+        raise ValueError("reference manifest requires schema_version=2 and reference_version")
     tolerance = manifest.get("tolerance")
     if not isinstance(tolerance, (int, float)) or not math.isfinite(tolerance) or tolerance != 0.20:
         raise ValueError("reference manifest tolerance must be 0.20")
@@ -43,14 +43,33 @@ def main():
     if set(metrics) != REQUIRED_METRICS:
         raise ValueError("reference manifest does not contain the required metric set")
     for name, definition in metrics.items():
-        value = definition.get("reference")
-        if not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
-            raise ValueError(f"{name} has an invalid reference value")
-        for field in ("unit", "source", "aggregation"):
+        if not isinstance(definition.get("required"), bool):
+            raise ValueError(f"{name} is missing required flag")
+        for field in ("validation", "unit", "source", "aggregation"):
             if not isinstance(definition.get(field), str) or not definition[field].strip():
                 raise ValueError(f"{name} is missing {field}")
-        if definition["aggregation"] != "arithmetic_mean_over_datasets":
-            raise ValueError(f"{name} uses an unsupported aggregation rule")
+        validation = definition["validation"]
+        if validation == "aggregate_relative_error":
+            value = definition.get("reference")
+            if not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+                raise ValueError(f"{name} has an invalid aggregate reference")
+            if definition["aggregation"] != "arithmetic_mean_over_datasets":
+                raise ValueError(f"{name} must use arithmetic mean aggregation")
+        elif validation == "per_dataset_range":
+            lower = definition.get("reference_min")
+            upper = definition.get("reference_max")
+            if (not isinstance(lower, (int, float)) or
+                    not isinstance(upper, (int, float)) or
+                    not math.isfinite(lower) or not math.isfinite(upper) or
+                    lower <= 0 or upper < lower):
+                raise ValueError(f"{name} has an invalid reference range")
+            if definition["aggregation"] != "per_dataset":
+                raise ValueError(f"{name} range validation must be per-dataset")
+        elif validation == "diagnostic_only":
+            if definition["required"]:
+                raise ValueError(f"{name} diagnostic-only metric cannot be required")
+        else:
+            raise ValueError(f"{name} uses unsupported validation {validation}")
     print(f"reference_manifest=PASS path={path}")
     return 0
 

@@ -2,7 +2,7 @@
 
 ## Context
 
-参见 `proposal.md`。当前系统是以事件队列驱动的 C++17 周期模拟器：AE、CE、DRAMSim3 和简化 eDRAM 每周期推进，但硬件参数、流量计算和周期模型与论文配置不一致，运行入口也无法独立控制优化开关。现有实现适合增量改造，不需要重写为 RTL 或更换 DRAM 后端。
+参见 `proposal.md`。系统保留 legacy 事件驱动路径，并为论文实验提供 C++17 请求级解析路径。论文路径显式推进 AE/CE batch 时间线，并使用 channel/bank/row-buffer 请求时序模型评估 HBM 排队、地址映射和行命中；它不冒充 Ramulator 或 RTL 级 cycle-accurate 模拟。
 
 关键约束：
 
@@ -47,19 +47,19 @@
 
 该设计同时解决 Edge 字节误用 Weight 大小的问题，并允许测试 Window Sliding & Shrinking 的输出。
 
-### 4. 使用带阶段指针的有界 Aggregation Buffer
+### 4. 使用带阶段指针和时间线的有界 Aggregation Buffer
 
-保留环形缓冲思想，但将 allocated、ready、consuming、reclaim 四个阶段及字节范围显式化。latency-aware 在形成最小合法 batch 时启动 CE；energy-aware 等待目标 batch 或容量边界；sequential 等待当前层 AE 完成。所有模式共享相同的数据依赖检查。
+保留环形缓冲思想，将 allocated、ready、consuming、reclaim 四个阶段、字节范围和发生周期显式化。latency-aware 在一个分区 batch ready 后启动 CE；energy-aware 聚合多个分区直到目标顶点数或容量边界；sequential 等待当前层 AE 完成并按一次写出、一次读回计算中间流量。AE 在容量不足时等待最早可回收 batch，CE 完成后才释放对应空间。
 
 相比硬编码双半区，这一设计可覆盖论文的 ping-pong 行为，同时兼容不同 batch 大小和后续扩展。
 
-### 5. Coordinator 使用 batch 标签与分层仲裁
+### 5. Coordinator 使用 batch 仲裁、低位交织映射和请求级 HBM 时序
 
-每个 DRAM 事件携带 batch ID 与请求类别。仲裁先选择最早未完成 batch，再在 batch 内按 Edge、Input、Weight、Output 排序；同优先级保持 FIFO。DRAMSim3 继续负责通道、bank、行缓冲与时序，模拟器额外统计请求等待和映射分布。
+每个 DRAM 请求携带 batch ID、请求类别、地址、字节数与入队周期。协调模式先选择最早 batch，再按 Edge、Input、Weight、Output 排序，并用 cache-line 低位交织到 channel/bank；对照模式保留 FIFO 与传统 row-first 映射。请求级模型跟踪每个 channel 的发射周期、每个 bank 的可用周期和 open row，行命中/未命中延迟、队列等待和完成周期进入 AE ready 时间与层总周期。
 
 该规则对应论文“当前批次低优先级请求先于后续批次高优先级请求”的描述，避免现有全局严格优先级造成跨批次饥饿。
 
-### 6. 以成对消融校准，不直接校准绝对周期
+### 6. 以成对消融验证论文公开范围和平均值
 
 基准工具为每个机制运行优化版与唯一开关关闭版，计算：
 
@@ -67,15 +67,15 @@
 - `dram_ratio = optimized_dram_bytes / baseline_dram_bytes`
 - `bandwidth_gain = optimized_bandwidth_util / baseline_bandwidth_util`
 
-第一阶段参考论文正文明确给出的平均值：稀疏消除 1.1× 与 0.60× DRAM、流水 1.1× 与 0.50× DRAM、协调器 1.1× 与 1.1× 带宽利用率。每项独立执行 ±20% 检查，并保留逐数据集结果防止平均值掩盖异常。
+参考清单区分三种证据：论文给出的逐数据集范围、论文正文给出的跨数据集平均值、以及只能从图中读取但尚未完成可追踪数字化的诊断项。稀疏加速按 1.1-3.0x 逐数据集检查；流水加速按 27%-53% 时间下降换算为 1.369863-2.127660x，流水 DRAM 比率按 0.50-0.73 逐数据集检查；协调器按正文平均 3.70x 加速和 4.00x 带宽提升检查。Fig. 15(b) 的稀疏输入 DRAM 比率在完成数字化前不参与强制门禁。
 
 绝对周期仍被记录并用于回归，但没有可靠论文绝对值时不作为论文验收门槛。
 
-### 7. 区分结构参数与校准参数
+### 7. 区分结构参数与时序参数
 
-结构参数来自论文，不允许基准脚本修改。允许校准的参数仅限论文未给出的实现细节，例如 eDRAM 固定访问延迟、控制器发射宽度和最小 energy-aware batch；这些参数必须集中在配置中、带单位和取值范围，并出现在运行清单中。
+结构参数来自论文，不允许基准脚本修改。论文未给出的 HBM row hit/miss 延迟、row 大小、channel/bank 数和最小 energy-aware batch 集中在配置中，具有明确单位并写入运行清单。协调开关不得选择预设效率，流水开关不得选择固定重叠率，sequential 不得使用经验 spill 系数。
 
-禁止在结果生成阶段乘全局“论文修正系数”。为降低过拟合，Cora/Citeseer 用于迭代，PubMed 作为保留验证集；三者最终都必须通过强制指标聚合规则。
+禁止在结果生成阶段乘全局“论文修正系数”或按数据集写特例。Cora、Citeseer、PubMed 必须使用同一结构和时序参数执行成对消融。
 
 ### 8. 参数化 CLI 与结构化输出
 
@@ -93,7 +93,7 @@
 ## Risks / Trade-offs
 
 - [论文图表缺少完整原始数据] → 优先采用正文明确给出的平均值；图中读取值只作为非强制诊断，并在参考清单标注来源和提取方式。
-- [DRAMSim3 与论文 Ramulator 存在模型差异] → 固定 HBM 配置并记录有效理论带宽；论文验收优先比较同一后端的相对变化。
+- [请求级模型与论文 Ramulator 存在精度差异] → 固定并记录 channel/bank/row 与延迟参数，报告明确标记为请求级复现；后续可用 DRAMSim3/Ramulator trace 对照校准时序参数。
 - [模块级组合模型低估细粒度冲突] → 将模块占用、tile、填充和写回分别计数，并用单元测试覆盖边界矩阵尺寸。
 - [为满足指标而过拟合三个数据集] → 限制可校准参数、保留 PubMed 验证集、同时报告逐数据集和平均结果。
 - [完整配置运行时间较长] → 默认测试使用 smoke 配置，完整论文套件显式触发并支持按实验缓存。

@@ -1,44 +1,58 @@
 {
-  "schema_version": 1,
-  "reference_version": "hygcn-arxiv-2001.02514v1-relative-metrics",
+  "schema_version": 2,
+  "reference_version": "hygcn-hpca2020-fig15-17-review-corrected",
   "tolerance": 0.20,
   "datasets": ["cora", "citeseer", "pubmed"],
   "metrics": {
     "sparsity_speedup": {
-      "reference": 1.10,
+      "required": true,
+      "validation": "per_dataset_range",
+      "reference_min": 1.10,
+      "reference_max": 3.00,
       "unit": "x",
-      "aggregation": "arithmetic_mean_over_datasets",
-      "source": "HyGCN paper Section V-D dynamic sparsity elimination average speedup"
+      "aggregation": "per_dataset",
+      "source": "HyGCN HPCA 2020 Section 5.3 and Figure 15: reported dataset range 1.1x-3.0x"
     },
     "sparsity_input_dram_ratio": {
-      "reference": 0.60,
+      "required": false,
+      "validation": "diagnostic_only",
       "unit": "ratio",
-      "aggregation": "arithmetic_mean_over_datasets",
-      "source": "HyGCN paper Section V-D about 40% DRAM access reduction"
+      "aggregation": "per_dataset",
+      "source": "HyGCN HPCA 2020 Figure 15(b); exact bar values require traceable figure digitization"
     },
     "pipeline_speedup": {
-      "reference": 1.10,
+      "required": true,
+      "validation": "per_dataset_range",
+      "reference_min": 1.369863,
+      "reference_max": 2.127660,
       "unit": "x",
-      "aggregation": "arithmetic_mean_over_datasets",
-      "source": "HyGCN paper Section V-D inter-engine pipeline average speedup"
+      "aggregation": "per_dataset",
+      "source": "HyGCN HPCA 2020 Section 5.3 and Figure 16: 27%-53% execution-time reduction"
     },
     "pipeline_dram_ratio": {
-      "reference": 0.50,
+      "required": true,
+      "validation": "per_dataset_range",
+      "reference_min": 0.50,
+      "reference_max": 0.73,
       "unit": "ratio",
-      "aggregation": "arithmetic_mean_over_datasets",
-      "source": "HyGCN paper Section V-D inter-engine pipeline about 50% DRAM access reduction"
+      "aggregation": "per_dataset",
+      "source": "HyGCN HPCA 2020 Section 5.3 and Figure 16: DRAM access ratio range 0.50-0.73"
     },
     "coordination_speedup": {
-      "reference": 1.10,
+      "required": true,
+      "validation": "aggregate_relative_error",
+      "reference": 3.70,
       "unit": "x",
       "aggregation": "arithmetic_mean_over_datasets",
-      "source": "HyGCN paper Section V-D memory access coordination average speedup"
+      "source": "HyGCN HPCA 2020 Section 5.3 and Figure 17: average 73% execution-time reduction"
     },
     "coordination_bandwidth_gain": {
-      "reference": 1.10,
+      "required": true,
+      "validation": "aggregate_relative_error",
+      "reference": 4.00,
       "unit": "x",
       "aggregation": "arithmetic_mean_over_datasets",
-      "source": "HyGCN paper Section V-D memory bandwidth utilization improvement"
+      "source": "HyGCN HPCA 2020 Section 5.3 and Figure 17: average 4x bandwidth utilization"
     }
   }
 }

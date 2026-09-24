@@ -66,7 +66,7 @@
 - **THEN** CE 仅在当前聚合阶段全部完成后启动，作为流水加速比的基线
 
 ### Requirement: Batch-aware 访存协调
-Memory Access Coordinator SHALL 支持 Edge、Input、Weight、Output 四类 HBM 请求及 Aggregation Buffer 请求。对于同一 batch，优先级 MUST 为 Edge、Input、Weight、Output；当前 batch 的低优先级请求 MUST 先于后续 batch 的高优先级请求完成发射。系统 SHALL 报告各类队列等待、HBM 接收阻塞、有效带宽和地址映射分布。
+Memory Access Coordinator SHALL 支持 Edge、Input、Weight、Output 四类 HBM 请求及 Aggregation Buffer 请求。对于同一 batch，优先级 MUST 为 Edge、Input、Weight、Output；当前 batch 的低优先级请求 MUST 先于后续 batch 的高优先级请求完成发射。协调模式 MUST 使用 cache-line 低位交织到 channel/bank，并以 row-buffer hit/miss、channel 发射与 bank 可用周期计算完成时间；协调关闭时 MUST 保留 FIFO 与传统 row-first 映射作为对照。系统 SHALL 报告各类队列等待、HBM 阻塞、行命中/未命中、有效带宽和地址映射分布。
 
 #### Scenario: 同批次优先级
 - **WHEN** 同一 batch 同时存在 Edge、Input、Weight 和 Output 请求
@@ -75,6 +75,10 @@ Memory Access Coordinator SHALL 支持 Edge、Input、Weight、Output 四类 HBM
 #### Scenario: 跨批次公平性
 - **WHEN** 当前 batch 存在 Output 请求且后续 batch 到达 Edge 请求
 - **THEN** 当前 batch 的 Output 请求不会被后续 batch 的 Edge 请求无限推迟
+
+#### Scenario: 协调时序进入关键路径
+- **WHEN** 两组请求产生不同的 row-buffer 冲突与 channel/bank 并行度
+- **THEN** 协调开关产生不同的请求完成周期，且该差异反馈到 AE ready、总周期和带宽利用率，而不是来自预设效率常数
 
 ### Requirement: 地址与流量统计正确性
 所有内存请求 SHALL 使用对应数据对象的实际字节数，顶点输出地址 MUST 按顶点步长与输出分块计算。系统 MUST 检测区域越界、重叠、负事件计数和未完成事务，并在错误时以非零状态终止。

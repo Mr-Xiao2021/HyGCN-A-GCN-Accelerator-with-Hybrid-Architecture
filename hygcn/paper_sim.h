@@ -46,20 +46,18 @@ struct ArchitectureConfig {
 
     uint64_t hbm_capacity_bytes = 0;
     double hbm_bandwidth_gbps = 0.0;
-    double coordinated_efficiency = 0.0;
-    double uncoordinated_efficiency = 0.0;
+    int hbm_channels = 0;
+    int hbm_banks_per_channel = 0;
+    uint64_t hbm_row_bytes = 0;
+    int hbm_row_hit_cycles = 0;
+    int hbm_row_miss_cycles = 0;
     int edram_latency_cycles = 0;
     int edram_transactions_per_cycle = 0;
 
     double simd_efficiency = 0.0;
     double independent_array_efficiency = 0.0;
     double cooperative_array_efficiency = 0.0;
-    double memory_hidden_fraction = 0.0;
-    double latency_overlap_fraction = 0.0;
-    double energy_overlap_fraction = 0.0;
     int energy_batch_vertices = 0;
-    int partition_vertices = 0;
-    double sequential_spill_factor = 0.0;
 
     static ArchitectureConfig Load(const std::string& path);
     void Validate() const;
@@ -108,6 +106,21 @@ struct MemoryRequest {
 };
 
 struct AddressDistribution {
+    std::vector<uint64_t> channel_blocks;
+    std::vector<uint64_t> bank_blocks;
+};
+
+struct MemoryTimingResult {
+    uint64_t cycles = 0;
+    uint64_t queue_wait_cycles = 0;
+    uint64_t blocked_cycles = 0;
+    uint64_t row_buffer_hits = 0;
+    uint64_t row_buffer_misses = 0;
+    std::array<uint64_t, 4> request_counts{};
+    std::array<uint64_t, 4> request_bytes{};
+    std::array<uint64_t, 4> request_wait_cycles{};
+    std::array<uint64_t, 4> class_completion_cycles{};
+    std::map<int, std::array<uint64_t, 4>> batch_completion_cycles;
     std::vector<uint64_t> channel_blocks;
     std::vector<uint64_t> bank_blocks;
 };
@@ -187,6 +200,9 @@ class MemoryCoordinatorModel {
 public:
     static std::vector<MemoryRequest> Order(std::vector<MemoryRequest> requests,
                                             bool coordinated);
+    static MemoryTimingResult Simulate(const std::vector<MemoryRequest>& requests,
+                                       const ArchitectureConfig& architecture,
+                                       bool coordinated);
 };
 
 struct LayerMetrics {
@@ -211,6 +227,8 @@ struct LayerMetrics {
     uint64_t memory_service_cycles = 0;
     uint64_t queue_wait_cycles = 0;
     uint64_t hbm_blocked_cycles = 0;
+    uint64_t row_buffer_hits = 0;
+    uint64_t row_buffer_misses = 0;
     uint64_t ae_finish_cycle = 0;
     uint64_t ce_start_cycle = 0;
     uint64_t ce_finish_cycle = 0;
