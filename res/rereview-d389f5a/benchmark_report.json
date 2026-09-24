@@ -1,0 +1,155 @@
+{
+  "aggregate": {
+    "coordination_bandwidth_gain": 4.090035963478979,
+    "coordination_speedup": 3.2621726438074745,
+    "pipeline_dram_ratio": 0.5446803085729663,
+    "pipeline_speedup": 1.608017530450317,
+    "sparsity_input_dram_ratio": 0.6377031268422534,
+    "sparsity_speedup": 1.626741403037066
+  },
+  "cache_validation": "input and configuration digests plus complete run manifest",
+  "datasets": [
+    "cora",
+    "citeseer",
+    "pubmed"
+  ],
+  "per_dataset": {
+    "citeseer": {
+      "metrics": {
+        "coordination_bandwidth_gain": 3.5622072222315544,
+        "coordination_speedup": 3.200483951158351,
+        "pipeline_dram_ratio": 0.5694974423949158,
+        "pipeline_speedup": 1.6544805794183284,
+        "sparsity_input_dram_ratio": 0.4399982824509425,
+        "sparsity_speedup": 2.0831554607820744
+      },
+      "raw": {
+        "coordination_baseline": {
+          "bandwidth_utilization": 0.03557661955956338,
+          "total_cycles": 15481589,
+          "total_dram_bytes": 135204160,
+          "total_input_dram_bytes": 131163136
+        },
+        "optimized": {
+          "bandwidth_utilization": 0.12673129113766105,
+          "total_cycles": 4837265,
+          "total_dram_bytes": 135204160,
+          "total_input_dram_bytes": 131163136
+        },
+        "pipeline_baseline": {
+          "bandwidth_utilization": 0.12598197011311438,
+          "total_cycles": 8003161,
+          "total_dram_bytes": 237409600,
+          "total_input_dram_bytes": 131163136
+        },
+        "sparsity_baseline": {
+          "bandwidth_utilization": 0.12546716572801206,
+          "total_cycles": 10076775,
+          "total_dram_bytes": 302140224,
+          "total_input_dram_bytes": 298099200
+        }
+      },
+      "runs": {
+        "coordination_baseline": "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_coord-off_seed-1.json",
+        "optimized": "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_coord-on_seed-1.json",
+        "pipeline_baseline": "paper_paper_gcn_citeseer_sequential_independent_sparse-on_coord-on_seed-1.json",
+        "sparsity_baseline": "paper_paper_gcn_citeseer_latency-aware_independent_sparse-off_coord-on_seed-1.json"
+      }
+    },
+    "cora": {
+      "metrics": {
+        "coordination_bandwidth_gain": 5.335001326283753,
+        "coordination_speedup": 3.5766398183388626,
+        "pipeline_dram_ratio": 0.4873396753277486,
+        "pipeline_speedup": 1.4746861675665281,
+        "sparsity_input_dram_ratio": 0.9133772274427229,
+        "sparsity_speedup": 1.0554615847126292
+      },
+      "raw": {
+        "coordination_baseline": {
+          "bandwidth_utilization": 0.023577463340778884,
+          "total_cycles": 5859305,
+          "total_dram_bytes": 32291392,
+          "total_input_dram_bytes": 29760256
+        },
+        "optimized": {
+          "bandwidth_utilization": 0.12578579819346192,
+          "total_cycles": 1638215,
+          "total_dram_bytes": 32291392,
+          "total_input_dram_bytes": 29760256
+        },
+        "pipeline_baseline": {
+          "bandwidth_utilization": 0.12538475735943821,
+          "total_cycles": 2415853,
+          "total_dram_bytes": 66260544,
+          "total_input_dram_bytes": 29760256
+        },
+        "sparsity_baseline": {
+          "bandwidth_utilization": 0.12541694935711165,
+          "total_cycles": 1729073,
+          "total_dram_bytes": 35113792,
+          "total_input_dram_bytes": 32582656
+        }
+      },
+      "runs": {
+        "coordination_baseline": "paper_paper_gcn_cora_latency-aware_independent_sparse-on_coord-off_seed-1.json",
+        "optimized": "paper_paper_gcn_cora_latency-aware_independent_sparse-on_coord-on_seed-1.json",
+        "pipeline_baseline": "paper_paper_gcn_cora_sequential_independent_sparse-on_coord-on_seed-1.json",
+        "sparsity_baseline": "paper_paper_gcn_cora_latency-aware_independent_sparse-off_coord-on_seed-1.json"
+      }
+    },
+    "pubmed": {
+      "metrics": {
+        "coordination_bandwidth_gain": 3.372899341921629,
+        "coordination_speedup": 3.0093941619252096,
+        "pipeline_dram_ratio": 0.5772038079962346,
+        "pipeline_speedup": 1.6948858443660948,
+        "sparsity_input_dram_ratio": 0.5597338706330947,
+        "sparsity_speedup": 1.7416071636164943
+      },
+      "raw": {
+        "coordination_baseline": {
+          "bandwidth_utilization": 0.040136497054001644,
+          "total_cycles": 13642309,
+          "total_dram_bytes": 137818944,
+          "total_input_dram_bytes": 124312576
+        },
+        "optimized": {
+          "bandwidth_utilization": 0.13537636450048154,
+          "total_cycles": 4533241,
+          "total_dram_bytes": 137818944,
+          "total_input_dram_bytes": 124312576
+        },
+        "pipeline_baseline": {
+          "bandwidth_utilization": 0.13078935500761574,
+          "total_cycles": 7683326,
+          "total_dram_bytes": 238769984,
+          "total_input_dram_bytes": 124312576
+        },
+        "sparsity_baseline": {
+          "bandwidth_utilization": 0.12540641277802653,
+          "total_cycles": 7895125,
+          "total_dram_bytes": 235598656,
+          "total_input_dram_bytes": 222092288
+        }
+      },
+      "runs": {
+        "coordination_baseline": "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_coord-off_seed-1.json",
+        "optimized": "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_coord-on_seed-1.json",
+        "pipeline_baseline": "paper_paper_gcn_pubmed_sequential_independent_sparse-on_coord-on_seed-1.json",
+        "sparsity_baseline": "paper_paper_gcn_pubmed_latency-aware_independent_sparse-off_coord-on_seed-1.json"
+      }
+    }
+  },
+  "reference_file": "configs/paper_metrics.json",
+  "schema_version": 1,
+  "scope": {
+    "not_validated": [
+      "absolute CPU speedup",
+      "absolute GPU speedup",
+      "DiffPool",
+      "complete chip energy and area"
+    ],
+    "validated": "relative microarchitectural effects for GCN"
+  }
+}
