@@ -43,19 +43,19 @@
 
 ### 3. 将图分区产物变为显式数据结构
 
-每个 edge chunk 保存实际编码字节数、目标顶点范围、interval、shard、唯一邻居集合和所属 batch。Edge 请求使用真实编码字节数；稀疏消除关闭时使用完整 interval，开启时使用唯一邻居集合。现有未接入的边压缩代码只作为参考，不直接依赖其当前页面布局。
+每个 edge chunk 保存实际编码字节数、目标顶点范围、interval、shard、唯一邻居集合和所属 batch。Edge 请求使用真实编码字节数；稀疏消除关闭时使用完整 interval，开启时按 Algorithm 4 滑到首个有效行并收缩到末个有效行之后，生成一个连续窗口请求，内部空洞仍计入流量。现有未接入的边压缩代码只作为参考，不直接依赖其当前页面布局。
 
 该设计同时解决 Edge 字节误用 Weight 大小的问题，并允许测试 Window Sliding & Shrinking 的输出。
 
 ### 4. 使用带阶段指针和时间线的有界 Aggregation Buffer
 
-保留环形缓冲思想，将 allocated、ready、consuming、reclaim 四个阶段、字节范围和发生周期显式化。latency-aware 在一个分区 batch ready 后启动 CE；energy-aware 聚合多个分区直到目标顶点数或容量边界；sequential 等待当前层 AE 完成并按一次写出、一次读回计算中间流量。AE 在容量不足时等待最早可回收 batch，CE 完成后才释放对应空间。
+保留环形缓冲思想，将 allocated、ready、consuming、reclaim 四个阶段、字节范围和发生周期显式化。latency-aware 在一个分区 batch ready 后启动 CE；energy-aware 聚合多个分区直到目标顶点数或容量边界；sequential 在 AE producer-ready 后执行一次同地址中间写出和依赖该写完成的一次读回，随后启动 CE。AE 在容量不足时等待最早可回收 batch，CE 完成后才释放对应空间。
 
 相比硬编码双半区，这一设计可覆盖论文的 ping-pong 行为，同时兼容不同 batch 大小和后续扩展。
 
 ### 5. Coordinator 使用 batch 仲裁、低位交织映射和请求级 HBM 时序
 
-每个 DRAM 请求携带 batch ID、请求类别、地址、字节数与入队周期。协调模式先选择最早 batch，再按 Edge、Input、Weight、Output 排序，并用 cache-line 低位交织到 channel/bank；对照模式保留 FIFO 与传统 row-first 映射。请求级模型跟踪每个 channel 的发射周期、每个 bank 的可用周期和 open row，行命中/未命中延迟、队列等待和完成周期进入 AE ready 时间与层总周期。
+每个 DRAM 请求携带 batch ID、请求类别、地址、字节数、producer-ready 与入队周期。六类请求为 Edge、Input、Weight、Output、Intermediate Write 和 Intermediate Read。模型先把请求展平为统一 block 事务流，保证同一地址/事务序列的完成时间不依赖上层请求切分。协调模式先选择最早 batch，再按请求类别排序，并用 cache-line 低位交织到 channel/bank；对照模式保留 FIFO、二路 bank 交织与 row-first 映射。请求级模型跟踪每个 channel 的发射周期、每个 bank 的可用周期和 open row，行命中/未命中延迟、队列等待和完成周期进入 AE ready 时间与层总周期。
 
 该规则对应论文“当前批次低优先级请求先于后续批次高优先级请求”的描述，避免现有全局严格优先级造成跨批次饥饿。
 
@@ -67,7 +67,7 @@
 - `dram_ratio = optimized_dram_bytes / baseline_dram_bytes`
 - `bandwidth_gain = optimized_bandwidth_util / baseline_bandwidth_util`
 
-参考清单区分三种证据：论文给出的逐数据集范围、论文正文给出的跨数据集平均值、以及只能从图中读取但尚未完成可追踪数字化的诊断项。稀疏加速按 1.1-3.0x 逐数据集检查；流水加速按 27%-53% 时间下降换算为 1.369863-2.127660x，流水 DRAM 比率按 0.50-0.73 逐数据集检查；协调器按正文平均 3.70x 加速和 4.00x 带宽提升检查。Fig. 15(b) 的稀疏输入 DRAM 比率在完成数字化前不参与强制门禁。
+参考清单保存 Fig. 15/16 arXiv SVG 的 URL、SHA256、坐标提取方法和逐数据集柱值；Fig. 17 使用论文正文给出的跨数据集平均值。Fig. 15 固定第一层和 AE-only scope，只改变连续窗口稀疏开关；Fig. 16 使用完整层执行；协调器按正文平均 3.70x 加速和 4.00x 带宽提升检查。Input-only 稀疏流量不等同 Fig. 15(b) 的 AE 总流量，仅保留为诊断项。
 
 绝对周期仍被记录并用于回归，但没有可靠论文绝对值时不作为论文验收门槛。
 
@@ -86,13 +86,14 @@
 ### 9. 测试分层
 
 - 单元测试：edge chunk 字节、interval/shard、稀疏邻居集合、输出地址、systolic 周期、batch 仲裁、Aggregation Buffer 边界。
+- 反例测试：连续稀疏窗口黄金用例、请求 fragmentation invariant、Output producer-ready、Intermediate RAW 同地址依赖、单 batch 组合模块并行度。
 - 集成测试：小图在 sequential/latency-aware/energy-aware 与 independent/cooperative 组合下完成且统计守恒。
 - 回归测试：固定 Cora smoke 周期与字节快照。
 - 论文验收：Cora/Citeseer/PubMed 成对消融与 ±20% 报告。
 
 ## Risks / Trade-offs
 
-- [论文图表缺少完整原始数据] → 优先采用正文明确给出的平均值；图中读取值只作为非强制诊断，并在参考清单标注来源和提取方式。
+- [论文图表缺少原始数值表] → 使用版本化 SVG 坐标数字化逐柱参考，保存原图 URL、SHA256、坐标和提取方法；正文平均值仍按声明聚合规则验收。
 - [请求级模型与论文 Ramulator 存在精度差异] → 固定并记录 channel/bank/row 与延迟参数，报告明确标记为请求级复现；后续可用 DRAMSim3/Ramulator trace 对照校准时序参数。
 - [模块级组合模型低估细粒度冲突] → 将模块占用、tile、填充和写回分别计数，并用单元测试覆盖边界矩阵尺寸。
 - [为满足指标而过拟合三个数据集] → 限制可校准参数、保留 PubMed 验证集、同时报告逐数据集和平均结果。

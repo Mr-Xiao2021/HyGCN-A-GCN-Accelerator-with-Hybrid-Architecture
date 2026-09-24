@@ -25,14 +25,14 @@
 - **THEN** 两次结构化结果中的确定性指标完全一致
 
 ### Requirement: 论文参考指标清单
-系统 SHALL 维护版本化的论文参考指标清单，记录指标名称、论文章节或图号、参考值或范围、单位、聚合方式、是否强制和容差。第一阶段 MUST 将论文报告的动态稀疏消除 1.1-3.0×、流水执行时间下降 27%-53%、流水 DRAM 比率 0.50-0.73 作为逐数据集范围，将协调器平均 73% 时间下降（约 3.70×）和平均 4.00× 带宽提升作为聚合指标。没有可追踪数字化值的 Fig. 15(b) 稀疏输入 DRAM 比率 MUST 标记为诊断项，不得伪造平均值参与门禁。
+系统 SHALL 维护版本化的论文参考指标清单，记录指标名称、论文章节或图号、参考值、单位、聚合方式、实验 scope、是否强制和容差。Fig. 15/16 MUST 保存 arXiv SVG 来源 URL、SHA256、坐标提取方法和 Cora/Citeseer/PubMed 的逐数据集柱值，并按逐数据集标量验收；协调器平均 73% 时间下降（约 3.70×）和平均 4.00× 带宽提升 MUST 作为聚合指标。Fig. 15(b) MUST 验收 AE 的 Edge+Input 总 DRAM 比率；Input-only 比率 MUST 标记为诊断项，不得代替论文指标参与门禁。
 
 #### Scenario: 加载参考指标
 - **WHEN** 论文验收工具启动
-- **THEN** 每个指标均能解析出来源、验证类型、参考值或范围、容差、强制标记和参与聚合的数据集集合
+- **THEN** 每个指标均能解析出来源、实验 scope、验证类型、参考值、容差、强制标记和参与聚合的数据集集合，数字化柱值还能追踪到 SVG 哈希和坐标
 
 ### Requirement: ±20% 误差验收
-验收工具 SHALL 对标量参考使用 `abs(measured - reference) / abs(reference)`，对范围参考在范围内记零误差、范围外相对最近边界计算误差。每个强制论文指标 MUST 不高于 20%；任何强制指标缺失、非有限、基线为零或误差超限 MUST 使验收失败并返回非零状态。诊断项 MUST 输出但不得改变退出码。
+验收工具 SHALL 对标量参考使用 `abs(measured - reference) / abs(reference)`。每个强制论文指标 MUST 不高于 20%；任何强制指标缺失、非有限、基线为零或误差超限 MUST 使验收失败并返回非零状态。诊断项 MUST 输出但不得改变退出码。
 
 #### Scenario: 指标通过
 - **WHEN** 测量值相对论文参考值的误差不超过 20%
@@ -54,11 +54,22 @@
 
 #### Scenario: 稀疏消除消融
 - **WHEN** 计算稀疏消除加速与 DRAM 比率
-- **THEN** 两组实验仅在稀疏消除开关上不同
+- **THEN** 两组实验固定同一图、第一层和 AE-only scope，仅在连续窗口稀疏开关上不同，且不包含 Weight、CE、Output 或中间流量
 
 #### Scenario: 流水消融
 - **WHEN** 计算引擎流水加速与 DRAM 比率
 - **THEN** sequential 与目标流水策略使用相同架构参数、输入和组合策略
+
+### Requirement: 因果与请求切分不变量
+同一有序 block 流的内存完成时间、row hit/miss 和 channel/bank 事务计数 MUST 不受上层请求切分影响。Output 请求 MUST 在对应 CE producer-ready 后入队；Intermediate Read MUST 访问对应 Write 的同一地址和字节范围，并等待该 Write 完成。已经进入请求级时间线的 intermediate 流量 MUST NOT 再以解析延迟重复计时。
+
+#### Scenario: 请求切分反例
+- **WHEN** 同一 128 个连续 block 分别封装为一个请求和 128 个请求
+- **THEN** 两次模拟的完成周期、row hit/miss、channel 和 bank 事务计数完全一致
+
+#### Scenario: producer 和 RAW 依赖
+- **WHEN** 执行流水 Output 与 sequential intermediate 流量
+- **THEN** 每个 Output 的入队周期不早于 producer-ready，且每个 Intermediate Read 的地址、字节数和入队周期满足对应 Write 的 RAW 依赖
 
 ### Requirement: 自检与回归
 构建系统 SHALL 注册单元测试、集成 smoke 测试和论文指标验收测试。默认快速测试 MUST 在合理时间内运行且不依赖缺失的大型数据集；完整论文验收 MUST 可单独触发并输出汇总报告。

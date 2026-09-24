@@ -69,6 +69,16 @@ def main():
             failed = failed or (required and not passed)
             rows.append((name, "aggregate", f"{expected:.6f}", measured, error, passed,
                          definition["source"]))
+        elif validation == "per_dataset_relative_error":
+            references = definition["reference"]
+            for dataset in reference["datasets"]:
+                measured = per_dataset.get(dataset, {}).get("metrics", {}).get(name)
+                expected = float(references[dataset])
+                error = relative_error(measured, expected)
+                passed = error <= tolerance
+                failed = failed or (required and not passed)
+                rows.append((name, dataset, f"{expected:.6f}", measured, error,
+                             passed, definition["source"]))
         elif validation == "per_dataset_range":
             lower = float(definition["reference_min"])
             upper = float(definition["reference_max"])
@@ -91,9 +101,9 @@ def main():
         stream.write("# HyGCN Paper Metric Validation\n\n")
         stream.write(f"Tolerance: {tolerance:.0%}\n\n")
         stream.write(
-            "Range metrics are checked per dataset. Paper-reported averages are checked "
-            "only after applying the declared aggregation rule. Diagnostic-only metrics "
-            "do not affect acceptance.\n\n"
+            "Digitized bars are checked against their dataset-specific references. "
+            "Paper-reported averages are checked only after applying the declared "
+            "aggregation rule. Diagnostic-only metrics do not affect acceptance.\n\n"
         )
         stream.write("| Metric | Scope | Reference | Measured | Relative error | Status |\n")
         stream.write("|---|---|---:|---:|---:|---|\n")

@@ -1,42 +1,104 @@
 {
-  "schema_version": 2,
-  "reference_version": "hygcn-hpca2020-fig15-17-review-corrected",
+  "schema_version": 3,
+  "reference_version": "hygcn-hpca2020-fig15-17-svg-digitized-v1",
   "tolerance": 0.20,
   "datasets": ["cora", "citeseer", "pubmed"],
+  "digitization": {
+    "method": "bar height divided by plotted full-scale height from the arXiv SVG coordinates",
+    "coordinate_uncertainty_points": 0.75,
+    "figure_15": {
+      "source_url": "https://arxiv.org/html/2001.02514v1/x15.svg",
+      "sha256": "807e32b119ff28b157c8d61e9c54ee5f61554d2246194a82b6a925d26a6b5f1b",
+      "baseline_y": 200.62,
+      "full_scale_y": 309.75,
+      "execution_time_bar_top_y": {
+        "cora": 301.47,
+        "citeseer": 238.47,
+        "pubmed": 298.47
+      },
+      "dram_access_bar_top_y": {
+        "cora": 296.60,
+        "citeseer": 237.72,
+        "pubmed": 298.47
+      }
+    },
+    "figure_16": {
+      "source_url": "https://arxiv.org/html/2001.02514v1/x16.svg",
+      "sha256": "3e231d91f2d25dacc983178d916402ebfd572d9f532561f4fdfe98a3af06b5ed",
+      "baseline_y": 207.00,
+      "full_scale_y": 316.12,
+      "execution_time_bar_top_y": {
+        "cora": 258.35,
+        "citeseer": 266.22,
+        "pubmed": 286.85
+      },
+      "dram_access_bar_top_y": {
+        "cora": 261.72,
+        "citeseer": 265.47,
+        "pubmed": 286.85
+      }
+    }
+  },
   "metrics": {
     "sparsity_speedup": {
       "required": true,
-      "validation": "per_dataset_range",
-      "reference_min": 1.10,
-      "reference_max": 3.00,
+      "validation": "per_dataset_relative_error",
+      "reference": {
+        "cora": 1.082102,
+        "citeseer": 2.883223,
+        "pubmed": 1.115278
+      },
       "unit": "x",
       "aggregation": "per_dataset",
-      "source": "HyGCN HPCA 2020 Section 5.3 and Figure 15: reported dataset range 1.1x-3.0x"
+      "experiment_scope": "Aggregation Engine cycles only",
+      "source": "HyGCN HPCA 2020 Figure 15(a), digitized from the arXiv SVG"
+    },
+    "sparsity_ae_dram_ratio": {
+      "required": true,
+      "validation": "per_dataset_relative_error",
+      "reference": {
+        "cora": 0.879502,
+        "citeseer": 0.339962,
+        "pubmed": 0.896637
+      },
+      "unit": "ratio",
+      "aggregation": "per_dataset",
+      "experiment_scope": "Aggregation Engine Edge plus Input DRAM bytes",
+      "source": "HyGCN HPCA 2020 Figure 15(b), digitized from the arXiv SVG"
     },
     "sparsity_input_dram_ratio": {
       "required": false,
       "validation": "diagnostic_only",
       "unit": "ratio",
       "aggregation": "per_dataset",
-      "source": "HyGCN HPCA 2020 Figure 15(b); exact bar values require traceable figure digitization"
+      "experiment_scope": "Input-feature DRAM bytes only",
+      "source": "Internal diagnostic; Figure 15(b) validates total Aggregation Engine DRAM access"
     },
     "pipeline_speedup": {
       "required": true,
-      "validation": "per_dataset_range",
-      "reference_min": 1.369863,
-      "reference_max": 2.127660,
+      "validation": "per_dataset_relative_error",
+      "reference": {
+        "cora": 2.125024,
+        "citeseer": 1.842621,
+        "pubmed": 1.366562
+      },
       "unit": "x",
       "aggregation": "per_dataset",
-      "source": "HyGCN HPCA 2020 Section 5.3 and Figure 16: 27%-53% execution-time reduction"
+      "experiment_scope": "full layer execution cycles",
+      "source": "HyGCN HPCA 2020 Figure 16(a), digitized from the arXiv SVG"
     },
     "pipeline_dram_ratio": {
       "required": true,
-      "validation": "per_dataset_range",
-      "reference_min": 0.50,
-      "reference_max": 0.73,
+      "validation": "per_dataset_relative_error",
+      "reference": {
+        "cora": 0.501466,
+        "citeseer": 0.535832,
+        "pubmed": 0.731763
+      },
       "unit": "ratio",
       "aggregation": "per_dataset",
-      "source": "HyGCN HPCA 2020 Section 5.3 and Figure 16: DRAM access ratio range 0.50-0.73"
+      "experiment_scope": "full layer DRAM bytes",
+      "source": "HyGCN HPCA 2020 Figure 16(b), digitized from the arXiv SVG"
     },
     "coordination_speedup": {
       "required": true,
@@ -44,6 +106,7 @@
       "reference": 3.70,
       "unit": "x",
       "aggregation": "arithmetic_mean_over_datasets",
+      "experiment_scope": "full layer execution cycles",
       "source": "HyGCN HPCA 2020 Section 5.3 and Figure 17: average 73% execution-time reduction"
     },
     "coordination_bandwidth_gain": {
@@ -52,6 +115,7 @@
       "reference": 4.00,
       "unit": "x",
       "aggregation": "arithmetic_mean_over_datasets",
+      "experiment_scope": "effective HBM bandwidth utilization",
       "source": "HyGCN HPCA 2020 Section 5.3 and Figure 17: average 4x bandwidth utilization"
     }
   }

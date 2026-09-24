@@ -24,6 +24,7 @@ ctest --test-dir build --output-on-failure
   --profile paper \
   --model gcn \
   --dataset cora \
+  --scope full \
   --layer all \
   --pipeline latency-aware \
   --combination independent \
@@ -34,7 +35,9 @@ ctest --test-dir build --output-on-failure
 ```
 
 每次运行生成 JSON 清单和 CSV 层级统计。JSON 记录代码版本、输入与配置摘要、全部开关、
-AE/CE 时间点、操作数、各级流量、请求等待、HBM 阻塞及 channel/bank 分布。
+AE/CE 时间点、操作数、各级流量、请求等待、producer-ready/入队/发射/完成周期、
+连续输入窗口及 HBM channel/bank 分布。`--scope aggregation --layer 0` 用于 Fig. 15
+同口径的第一层 AE-only 实验，不生成 Weight、CE、Output 或中间流量。
 
 ## 完整验收
 
@@ -44,8 +47,9 @@ cmake --build build --target paper_benchmark
 ```
 
 `legacy_regression` 复跑 GCN+Cora/Citeseer 并与版本化快照逐项比较。
-`paper_benchmark` 运行 Cora、Citeseer、PubMed 的优化版和三组成对消融，随后按论文公开的逐数据集范围与跨数据集平均值执行
-`±20%` 校验。没有可靠数字化参考的指标只作为诊断项。报告写入 `res/paper/benchmark_report.json` 和
-`res/paper/validation_report.md`。
+`paper_benchmark` 运行 Cora、Citeseer、PubMed 的优化版和三组成对消融。Fig. 15/16
+使用版本化 SVG 坐标数字化的逐数据集柱值，Fig. 17 使用论文正文平均值，统一执行
+`±20%` 相对误差校验。报告写入 `res/paper/benchmark_report.json` 和
+`res/paper/validation_report.md`，并显式记录是否发生参数重标定。
 
 实现范围、指标定义和声明边界见 [docs/paper-reproduction.md](docs/paper-reproduction.md)。

@@ -8,6 +8,7 @@ from pathlib import Path
 
 REQUIRED_METRICS = {
     "sparsity_speedup",
+    "sparsity_ae_dram_ratio",
     "sparsity_input_dram_ratio",
     "pipeline_speedup",
     "pipeline_dram_ratio",
@@ -32,20 +33,31 @@ def main():
     with path.open(encoding="utf-8") as stream:
         manifest = json.load(stream)
 
-    if manifest.get("schema_version") != 2 or not manifest.get("reference_version"):
-        raise ValueError("reference manifest requires schema_version=2 and reference_version")
+    if manifest.get("schema_version") != 3 or not manifest.get("reference_version"):
+        raise ValueError("reference manifest requires schema_version=3 and reference_version")
     tolerance = manifest.get("tolerance")
     if not isinstance(tolerance, (int, float)) or not math.isfinite(tolerance) or tolerance != 0.20:
         raise ValueError("reference manifest tolerance must be 0.20")
     if set(manifest.get("datasets", [])) != REQUIRED_DATASETS:
         raise ValueError("reference manifest must cover Cora, Citeseer, and PubMed")
+    digitization = manifest.get("digitization", {})
+    if (not isinstance(digitization.get("method"), str) or
+            not isinstance(digitization.get("coordinate_uncertainty_points"), (int, float))):
+        raise ValueError("reference manifest is missing digitization metadata")
+    for figure in ("figure_15", "figure_16"):
+        evidence = digitization.get(figure, {})
+        for field in ("source_url", "sha256", "baseline_y", "full_scale_y"):
+            if field not in evidence:
+                raise ValueError(f"{figure} is missing {field}")
+        if evidence["full_scale_y"] <= evidence["baseline_y"]:
+            raise ValueError(f"{figure} has an invalid plotted scale")
     metrics = manifest.get("metrics", {})
     if set(metrics) != REQUIRED_METRICS:
         raise ValueError("reference manifest does not contain the required metric set")
     for name, definition in metrics.items():
         if not isinstance(definition.get("required"), bool):
             raise ValueError(f"{name} is missing required flag")
-        for field in ("validation", "unit", "source", "aggregation"):
+        for field in ("validation", "unit", "source", "aggregation", "experiment_scope"):
             if not isinstance(definition.get(field), str) or not definition[field].strip():
                 raise ValueError(f"{name} is missing {field}")
         validation = definition["validation"]
@@ -55,6 +67,15 @@ def main():
                 raise ValueError(f"{name} has an invalid aggregate reference")
             if definition["aggregation"] != "arithmetic_mean_over_datasets":
                 raise ValueError(f"{name} must use arithmetic mean aggregation")
+        elif validation == "per_dataset_relative_error":
+            references = definition.get("reference")
+            if not isinstance(references, dict) or set(references) != REQUIRED_DATASETS:
+                raise ValueError(f"{name} must define one reference per dataset")
+            if any(not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0
+                   for value in references.values()):
+                raise ValueError(f"{name} has an invalid per-dataset reference")
+            if definition["aggregation"] != "per_dataset":
+                raise ValueError(f"{name} relative validation must be per-dataset")
         elif validation == "per_dataset_range":
             lower = definition.get("reference_min")
             upper = definition.get("reference_max")

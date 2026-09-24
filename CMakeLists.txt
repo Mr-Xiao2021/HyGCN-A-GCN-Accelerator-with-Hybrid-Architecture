@@ -65,6 +65,10 @@ if(Python3_Interpreter_FOUND)
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/test_metric_validator.py)
     set_tests_properties(paper_metric_validator_selftest PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
+    add_test(NAME paper_benchmark_scope
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/test_paper_benchmark.py)
+    set_tests_properties(paper_benchmark_scope PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
     add_test(NAME legacy_snapshot_fixture
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/check_legacy_snapshot.py
                     --fixture-only)

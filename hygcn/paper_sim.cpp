@@ -26,6 +26,9 @@ using json = nlohmann::json;
 constexpr uint64_t kGiB = 1024ULL * 1024ULL * 1024ULL;
 constexpr int kDataBytes = 4;
 constexpr int kIndexBytes = 4;
+constexpr uint64_t kPingPongRegions = 2;
+constexpr uint64_t kAggregationResidencyBanksPerRegion = 2;
+constexpr uint64_t kUncoordinatedBankInterleave = 2;
 
 uint64_t CeilDiv(uint64_t value, uint64_t divisor) {
     if (divisor == 0) {
@@ -40,17 +43,6 @@ uint64_t Align(uint64_t value, uint64_t alignment) {
 
 double Clamp(double value, double low, double high) {
     return std::max(low, std::min(value, high));
-}
-
-uint64_t ServiceCycles(uint64_t bytes, double bytes_per_cycle, double efficiency) {
-    if (bytes == 0) {
-        return 0;
-    }
-    const double effective = bytes_per_cycle * efficiency;
-    if (effective <= 0.0) {
-        throw std::runtime_error("invalid effective HBM bandwidth");
-    }
-    return static_cast<uint64_t>(std::ceil(bytes / effective));
 }
 
 std::string Hex64(uint64_t value) {
@@ -91,6 +83,10 @@ std::string RequestClassName(RequestClass request_class) {
             return "weight";
         case RequestClass::OUTPUT:
             return "output";
+        case RequestClass::INTERMEDIATE_WRITE:
+            return "intermediate_write";
+        case RequestClass::INTERMEDIATE_READ:
+            return "intermediate_read";
     }
     throw std::runtime_error("unknown request class");
 }
@@ -110,6 +106,9 @@ json ArchitectureJson(const ArchitectureConfig& architecture) {
         {"weight_buffer_bytes", architecture.weight_buffer_bytes},
         {"output_buffer_bytes", architecture.output_buffer_bytes},
         {"aggregation_buffer_bytes", architecture.aggregation_buffer_bytes},
+        {"input_window_capacity_bytes", architecture.InputWindowCapacityBytes()},
+        {"edge_shard_capacity_bytes", architecture.EdgeShardCapacityBytes()},
+        {"aggregation_shard_capacity_bytes", architecture.AggregationShardCapacityBytes()},
         {"hbm_capacity_bytes", architecture.hbm_capacity_bytes},
         {"hbm_bandwidth_gbps", architecture.hbm_bandwidth_gbps},
         {"hbm_channels", architecture.hbm_channels},
@@ -117,6 +116,7 @@ json ArchitectureJson(const ArchitectureConfig& architecture) {
         {"hbm_row_bytes", architecture.hbm_row_bytes},
         {"hbm_row_hit_cycles", architecture.hbm_row_hit_cycles},
         {"hbm_row_miss_cycles", architecture.hbm_row_miss_cycles},
+        {"uncoordinated_bank_interleave", architecture.UncoordinatedBankInterleave()},
         {"edram_latency_cycles", architecture.edram_latency_cycles},
         {"edram_transactions_per_cycle", architecture.edram_transactions_per_cycle},
         {"simd_efficiency", architecture.simd_efficiency},
@@ -128,13 +128,42 @@ json ArchitectureJson(const ArchitectureConfig& architecture) {
 
 json LayerJson(const LayerMetrics& layer) {
     json request_stats;
-    for (int index = 0; index < 4; ++index) {
+    for (std::size_t index = 0; index < kRequestClassCount; ++index) {
         const auto request_class = static_cast<RequestClass>(index);
         request_stats[RequestClassName(request_class)] = {
             {"count", layer.request_counts[index]},
             {"bytes", layer.request_bytes[index]},
             {"queue_wait_cycles", layer.request_wait_cycles[index]},
         };
+    }
+    json producer_requests = json::array();
+    for (const auto& trace : layer.producer_request_traces) {
+        producer_requests.push_back({
+            {"sequence", trace.sequence},
+            {"batch_id", trace.batch_id},
+            {"request_class", RequestClassName(trace.request_class)},
+            {"address", trace.address},
+            {"bytes", trace.bytes},
+            {"producer_ready_cycle", trace.producer_ready_cycle},
+            {"enqueue_cycle", trace.enqueue_cycle},
+            {"first_issue_cycle", trace.first_issue_cycle},
+            {"completion_cycle", trace.completion_cycle},
+        });
+    }
+    json input_windows = json::array();
+    for (const auto& trace : layer.input_window_traces) {
+        input_windows.push_back({
+            {"batch_id", trace.batch_id},
+            {"interval_start", trace.interval_start},
+            {"interval_end", trace.interval_end},
+            {"window_start", trace.window_start},
+            {"window_end", trace.window_end},
+            {"address", trace.address},
+            {"bytes", trace.bytes},
+            {"transactions", trace.transactions},
+            {"unique_vertices", trace.unique_vertices},
+            {"internal_holes", trace.internal_holes},
+        });
     }
     return {
         {"layer", layer.layer},
@@ -187,6 +216,8 @@ json LayerJson(const LayerMetrics& layer) {
         {"simd_parallel_vertices", layer.simd_parallel_vertices},
         {"array_idle_lane_cycles", layer.array_idle_lane_cycles},
         {"request_stats", request_stats},
+        {"input_window_requests", input_windows},
+        {"producer_dependent_requests", producer_requests},
         {"channel_blocks", layer.channel_blocks},
         {"bank_blocks", layer.bank_blocks},
         {"simd_utilization", layer.simd_utilization},
@@ -262,6 +293,15 @@ void ArchitectureConfig::Validate() const {
     require_positive(weight_buffer_bytes > 0, "weight_buffer_bytes");
     require_positive(output_buffer_bytes > 0, "output_buffer_bytes");
     require_positive(aggregation_buffer_bytes > 0, "aggregation_buffer_bytes");
+    require_positive(input_buffer_bytes % kPingPongRegions == 0,
+                     "input_buffer_bytes ping-pong alignment");
+    require_positive(edge_buffer_bytes % kPingPongRegions == 0,
+                     "edge_buffer_bytes ping-pong alignment");
+    require_positive(
+        aggregation_buffer_bytes %
+                (kPingPongRegions * kAggregationResidencyBanksPerRegion) ==
+            0,
+        "aggregation_buffer_bytes residency alignment");
     require_positive(hbm_capacity_bytes > 0, "hbm_capacity_bytes");
     require_positive(hbm_bandwidth_gbps > 0.0, "hbm_bandwidth_gbps");
     require_positive(hbm_channels > 0, "hbm_channels");
@@ -280,10 +320,36 @@ void ArchitectureConfig::Validate() const {
     require_positive(cooperative_array_efficiency > 0.0 && cooperative_array_efficiency <= 1.0,
                      "cooperative_array_efficiency");
     require_positive(energy_batch_vertices > 0, "energy_batch_vertices");
+    require_positive(InputWindowCapacityBytes() >= static_cast<uint64_t>(block_size),
+                     "input_window_capacity_bytes");
+    require_positive(EdgeShardCapacityBytes() >= static_cast<uint64_t>(block_size),
+                     "edge_shard_capacity_bytes");
+    require_positive(AggregationShardCapacityBytes() >= static_cast<uint64_t>(block_size),
+                     "aggregation_shard_capacity_bytes");
 }
 
 double ArchitectureConfig::HbmBytesPerCycle() const {
     return hbm_bandwidth_gbps / frequency_ghz;
+}
+
+uint64_t ArchitectureConfig::InputWindowCapacityBytes() const {
+    return input_buffer_bytes / kPingPongRegions;
+}
+
+uint64_t ArchitectureConfig::EdgeShardCapacityBytes() const {
+    return edge_buffer_bytes / kPingPongRegions;
+}
+
+uint64_t ArchitectureConfig::AggregationShardCapacityBytes() const {
+    return aggregation_buffer_bytes /
+        (kPingPongRegions * kAggregationResidencyBanksPerRegion);
+}
+
+uint64_t ArchitectureConfig::UncoordinatedBankInterleave() const {
+    return hbm_banks_per_channel >= static_cast<int>(kUncoordinatedBankInterleave) &&
+            hbm_banks_per_channel % kUncoordinatedBankInterleave == 0
+        ? kUncoordinatedBankInterleave
+        : 1;
 }
 
 AggregationBufferModel::AggregationBufferModel(uint64_t capacity_bytes)
@@ -397,11 +463,15 @@ std::vector<MemoryRequest> MemoryCoordinatorModel::Order(std::vector<MemoryReque
                                                          bool coordinated) {
     for (const auto& request : requests) {
         if (request.batch_id < 0 || request.bytes == 0 ||
-            request.address > std::numeric_limits<uint64_t>::max() - request.bytes) {
+            request.address > std::numeric_limits<uint64_t>::max() - request.bytes ||
+            request.enqueue_cycle < request.producer_ready_cycle) {
             throw std::runtime_error("invalid memory request");
         }
     }
     std::stable_sort(requests.begin(), requests.end(), [coordinated](const auto& lhs, const auto& rhs) {
+        if (lhs.enqueue_cycle != rhs.enqueue_cycle) {
+            return lhs.enqueue_cycle < rhs.enqueue_cycle;
+        }
         if (coordinated) {
             if (lhs.batch_id != rhs.batch_id) {
                 return lhs.batch_id < rhs.batch_id;
@@ -409,8 +479,6 @@ std::vector<MemoryRequest> MemoryCoordinatorModel::Order(std::vector<MemoryReque
             if (lhs.request_class != rhs.request_class) {
                 return static_cast<int>(lhs.request_class) < static_cast<int>(rhs.request_class);
             }
-        } else if (lhs.enqueue_cycle != rhs.enqueue_cycle) {
-            return lhs.enqueue_cycle < rhs.enqueue_cycle;
         }
         return lhs.sequence < rhs.sequence;
     });
@@ -435,6 +503,11 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         bool row_open = false;
     };
 
+    struct BlockTransaction {
+        std::size_t request_index = 0;
+        uint64_t block = 0;
+    };
+
     const auto ordered = Order(requests, coordinated);
     const uint64_t blocks_per_row = architecture.hbm_row_bytes / architecture.block_size;
     const uint64_t bytes_per_channel_cycle =
@@ -445,74 +518,103 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     std::vector<BankState> banks(
         static_cast<std::size_t>(architecture.hbm_channels) *
         architecture.hbm_banks_per_channel);
-
-    for (const auto& request : ordered) {
+    std::vector<BlockTransaction> transactions;
+    std::vector<uint64_t> first_issue(ordered.size(),
+                                      std::numeric_limits<uint64_t>::max());
+    std::vector<uint64_t> completion_cycles(ordered.size(), 0);
+    for (std::size_t request_index = 0; request_index < ordered.size(); ++request_index) {
+        const auto& request = ordered[request_index];
         const uint64_t blocks = CeilDiv(request.bytes, architecture.block_size);
         const uint64_t first_block = request.address / architecture.block_size;
-        uint64_t first_start = std::numeric_limits<uint64_t>::max();
-        uint64_t request_completion = request.enqueue_cycle;
-        uint64_t issue_cursor = request.enqueue_cycle;
-        const auto request_index = static_cast<std::size_t>(request.request_class);
-
         for (uint64_t offset = 0; offset < blocks; ++offset) {
-            const uint64_t block = first_block + offset;
-            std::size_t channel = 0;
-            std::size_t bank = 0;
-            uint64_t row = 0;
-            if (coordinated) {
-                channel = static_cast<std::size_t>(block % architecture.hbm_channels);
-                bank = static_cast<std::size_t>(
-                    (block / architecture.hbm_channels) % architecture.hbm_banks_per_channel);
-                row = block /
-                    (static_cast<uint64_t>(architecture.hbm_channels) *
-                     architecture.hbm_banks_per_channel * blocks_per_row);
-            } else {
-                bank = static_cast<std::size_t>(
-                    (block / blocks_per_row) % architecture.hbm_banks_per_channel);
-                channel = static_cast<std::size_t>(
-                    (block / (blocks_per_row * architecture.hbm_banks_per_channel)) %
-                    architecture.hbm_channels);
-                row = block /
-                    (blocks_per_row * architecture.hbm_banks_per_channel *
-                     architecture.hbm_channels);
-            }
-            auto& bank_state = banks[channel * architecture.hbm_banks_per_channel + bank];
-            const uint64_t start = std::max(
-                {issue_cursor, channel_issue_cycle[channel], bank_state.ready_cycle});
-            first_start = std::min(first_start, start);
-            const bool row_hit = bank_state.row_open && bank_state.open_row == row;
-            const uint64_t access_cycles = row_hit
-                ? architecture.hbm_row_hit_cycles
-                : architecture.hbm_row_miss_cycles;
-            if (row_hit) {
-                ++result.row_buffer_hits;
-            } else {
-                ++result.row_buffer_misses;
-            }
-            const uint64_t completion = start + access_cycles + transfer_cycles;
-            channel_issue_cycle[channel] = start + transfer_cycles;
-            bank_state.ready_cycle = completion;
-            bank_state.open_row = row;
-            bank_state.row_open = true;
-            issue_cursor = start + transfer_cycles;
-            request_completion = std::max(request_completion, completion);
-            ++result.channel_blocks[channel];
-            ++result.bank_blocks[bank];
+            transactions.push_back({request_index, first_block + offset});
         }
+    }
 
+    for (const auto& transaction : transactions) {
+        const auto& request = ordered[transaction.request_index];
+        const uint64_t block = transaction.block;
+        std::size_t channel = 0;
+        std::size_t bank = 0;
+        uint64_t row = 0;
+        if (coordinated) {
+            channel = static_cast<std::size_t>(block % architecture.hbm_channels);
+            bank = static_cast<std::size_t>(
+                (block / architecture.hbm_channels) % architecture.hbm_banks_per_channel);
+            row = block /
+                (static_cast<uint64_t>(architecture.hbm_channels) *
+                 architecture.hbm_banks_per_channel * blocks_per_row);
+        } else {
+            const uint64_t bank_interleave = architecture.UncoordinatedBankInterleave();
+            const uint64_t interleaved_block = block / bank_interleave;
+            channel = static_cast<std::size_t>(
+                (interleaved_block / blocks_per_row) % architecture.hbm_channels);
+            const uint64_t bank_group =
+                (interleaved_block /
+                 (blocks_per_row * architecture.hbm_channels)) %
+                (architecture.hbm_banks_per_channel / bank_interleave);
+            bank = static_cast<std::size_t>(
+                bank_group * bank_interleave + block % bank_interleave);
+            row = interleaved_block /
+                (blocks_per_row * architecture.hbm_channels *
+                 (architecture.hbm_banks_per_channel / bank_interleave));
+        }
+        auto& bank_state = banks[channel * architecture.hbm_banks_per_channel + bank];
+        const uint64_t start = std::max(
+            {request.enqueue_cycle, channel_issue_cycle[channel], bank_state.ready_cycle});
+        first_issue[transaction.request_index] = std::min(
+            first_issue[transaction.request_index], start);
+        const bool row_hit = bank_state.row_open && bank_state.open_row == row;
+        const uint64_t access_cycles = row_hit
+            ? architecture.hbm_row_hit_cycles
+            : architecture.hbm_row_miss_cycles;
+        if (row_hit) {
+            ++result.row_buffer_hits;
+        } else {
+            ++result.row_buffer_misses;
+        }
+        const uint64_t completion = start + access_cycles + transfer_cycles;
+        channel_issue_cycle[channel] = start + transfer_cycles;
+        bank_state.ready_cycle = completion;
+        bank_state.open_row = row;
+        bank_state.row_open = true;
+        completion_cycles[transaction.request_index] = std::max(
+            completion_cycles[transaction.request_index], completion);
+        ++result.channel_blocks[channel];
+        ++result.bank_blocks[bank];
+    }
+
+    for (std::size_t ordered_index = 0; ordered_index < ordered.size(); ++ordered_index) {
+        const auto& request = ordered[ordered_index];
+        const auto class_index = static_cast<std::size_t>(request.request_class);
+        const uint64_t request_completion = completion_cycles[ordered_index];
+        const uint64_t first_start = first_issue[ordered_index];
         const uint64_t wait = first_start - request.enqueue_cycle;
         result.queue_wait_cycles += wait;
         result.blocked_cycles += wait;
-        ++result.request_counts[request_index];
-        result.request_bytes[request_index] += request.bytes;
-        result.request_wait_cycles[request_index] += wait;
-        result.class_completion_cycles[request_index] = std::max(
-            result.class_completion_cycles[request_index], request_completion);
+        ++result.request_counts[class_index];
+        result.request_bytes[class_index] += request.bytes;
+        result.request_wait_cycles[class_index] += wait;
+        result.class_completion_cycles[class_index] = std::max(
+            result.class_completion_cycles[class_index], request_completion);
         auto& batch_completion = result.batch_completion_cycles[request.batch_id];
-        batch_completion[request_index] = std::max(
-            batch_completion[request_index], request_completion);
+        batch_completion[class_index] = std::max(
+            batch_completion[class_index], request_completion);
+        result.request_traces.push_back({
+            request.batch_id,
+            request.request_class,
+            request.bytes,
+            request.address,
+            request.producer_ready_cycle,
+            request.enqueue_cycle,
+            first_start,
+            request_completion,
+            request.sequence,
+        });
         result.cycles = std::max(result.cycles, request_completion);
     }
+    std::stable_sort(result.request_traces.begin(), result.request_traces.end(),
+        [](const auto& lhs, const auto& rhs) { return lhs.sequence < rhs.sequence; });
     return result;
 }
 
@@ -536,10 +638,26 @@ uint64_t ExperimentResult::TotalCycles() const {
     return total;
 }
 
+uint64_t ExperimentResult::TotalAggregationCycles() const {
+    uint64_t total = 0;
+    for (const auto& layer : layers) {
+        total += layer.aggregation_cycles;
+    }
+    return total;
+}
+
 uint64_t ExperimentResult::TotalDramBytes() const {
     uint64_t total = 0;
     for (const auto& layer : layers) {
         total += layer.TotalDramBytes();
+    }
+    return total;
+}
+
+uint64_t ExperimentResult::TotalAggregationDramBytes() const {
+    uint64_t total = 0;
+    for (const auto& layer : layers) {
+        total += layer.edge_dram_bytes + layer.input_dram_bytes;
     }
     return total;
 }
@@ -587,9 +705,13 @@ std::vector<EdgeShard> PaperSimulator::BuildShards(const Graph& graph,
     }
     const uint64_t feature_stride = Align(static_cast<uint64_t>(feature_count) * kDataBytes,
                                           architecture_.block_size);
-    const int interval_capacity = std::max<int>(1, architecture_.input_buffer_bytes / feature_stride);
-    const uint64_t ping_pong_half = architecture_.aggregation_buffer_bytes / 2;
-    const int max_dst_vertices = std::max<int>(1, ping_pong_half / feature_stride);
+    const uint64_t input_partition_bytes = architecture_.InputWindowCapacityBytes();
+    const uint64_t edge_partition_bytes = architecture_.EdgeShardCapacityBytes();
+    const uint64_t aggregation_partition_bytes =
+        architecture_.AggregationShardCapacityBytes();
+    const int interval_capacity = std::max<int>(1, input_partition_bytes / feature_stride);
+    const uint64_t aggregation_capacity = aggregation_partition_bytes;
+    const int max_dst_vertices = std::max<int>(1, aggregation_capacity / feature_stride);
 
     std::vector<EdgeShard> shards;
     int batch_id = 0;
@@ -602,11 +724,11 @@ std::vector<EdgeShard> PaperSimulator::BuildShards(const Graph& graph,
             const uint64_t row_bytes = kIndexBytes +
                 static_cast<uint64_t>(graph.r_adj[dst].size()) * (kIndexBytes + kDataBytes);
             if (chunk_vertices > 0 &&
-                (chunk_bytes + row_bytes > architecture_.edge_buffer_bytes ||
+                (chunk_bytes + row_bytes > edge_partition_bytes ||
                  chunk_vertices >= max_dst_vertices)) {
                 break;
             }
-            if (row_bytes > architecture_.edge_buffer_bytes) {
+            if (row_bytes > edge_partition_bytes) {
                 throw std::runtime_error("single adjacency row exceeds edge buffer");
             }
             chunk_bytes += row_bytes;
@@ -689,7 +811,8 @@ std::vector<EdgeShard> PaperSimulator::BuildShards(const Graph& graph,
             shard.shrunk_interval_end = shard.unique_neighbors.back() + 1;
             shard.edge_bytes = first_shard ? Align(chunk_bytes, architecture_.block_size) : 0;
 
-            shard.input_bytes = shard.unique_neighbors.size() * feature_stride;
+            shard.input_bytes = static_cast<uint64_t>(
+                shard.shrunk_interval_end - shard.interval_start) * feature_stride;
             shards.push_back(std::move(shard));
             position = end;
             first_shard = false;
@@ -737,7 +860,8 @@ CombinationSchedule PaperSimulator::BuildCombinationSchedule(
     schedule.inner_tiles = CeilDiv(inner, architecture.arrays_per_module);
     schedule.column_tiles = CeilDiv(columns, architecture.array_width);
     schedule.active_modules = mode == CombinationMode::INDEPENDENT
-        ? std::min<uint64_t>(architecture.combination_modules, batches)
+        ? std::min<uint64_t>(architecture.combination_modules,
+                             static_cast<uint64_t>(rows))
         : architecture.combination_modules;
     schedule.batch_waves = mode == CombinationMode::INDEPENDENT
         ? CeilDiv(batches, architecture.combination_modules)
@@ -854,6 +978,7 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
         uint64_t shard_count = 0;
         uint64_t edge_count = 0;
         uint64_t aggregation_bytes = 0;
+        uint64_t spill_bytes = 0;
     };
 
     int raw_batch_count = 0;
@@ -880,9 +1005,11 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
         }
         batch.aggregation_bytes =
             static_cast<uint64_t>(batch.dst_end - batch.dst_start) * input_stride;
-        if (batch.aggregation_bytes > architecture_.aggregation_buffer_bytes / 2) {
-            throw std::runtime_error("execution batch exceeds aggregation ping-pong half");
+        const uint64_t batch_capacity = architecture_.AggregationShardCapacityBytes();
+        if (batch.aggregation_bytes > batch_capacity) {
+            throw std::runtime_error("execution batch exceeds aggregation buffer allocation");
         }
+        batch.spill_bytes = Align(batch.aggregation_bytes, batch_capacity);
     }
 
     uint64_t edge_count = 0;
@@ -901,13 +1028,15 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
         metrics.edge_dram_bytes += shard.edge_bytes;
         metrics.input_dram_bytes += shard.input_bytes;
         metrics.requested_input_vertices += flags.sparsity_elimination
-            ? shard.unique_neighbors.size()
+            ? static_cast<uint64_t>(shard.shrunk_interval_end - shard.interval_start)
             : static_cast<uint64_t>(shard.interval_end - shard.interval_start);
-        const uint64_t interval_vertices = shard.interval_end > shard.interval_start
-            ? static_cast<uint64_t>(shard.interval_end - shard.interval_start)
-            : 0;
-        if (interval_vertices > shard.unique_neighbors.size()) {
-            metrics.skipped_input_vertices += interval_vertices - shard.unique_neighbors.size();
+        const uint64_t requested_vertices = flags.sparsity_elimination
+            ? static_cast<uint64_t>(shard.shrunk_interval_end - shard.interval_start)
+            : static_cast<uint64_t>(shard.interval_end - shard.interval_start);
+        const uint64_t interval_vertices = static_cast<uint64_t>(
+            shard.interval_end - shard.interval_start);
+        if (interval_vertices > requested_vertices) {
+            metrics.skipped_input_vertices += interval_vertices - requested_vertices;
         }
     }
 
@@ -929,33 +1058,48 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
     metrics.simd_parallel_vertices = std::max<uint64_t>(
         1, architecture_.num_simd / metrics.simd_cores_per_vertex);
 
-    const uint64_t raw_weight_bytes = static_cast<uint64_t>(shape.input_features) *
-                                      shape.output_features * kDataBytes;
-    const uint64_t aligned_weight_bytes = Align(raw_weight_bytes, architecture_.block_size);
-    metrics.weight_dram_bytes = aligned_weight_bytes;
-    metrics.weight_cascade_bytes = flags.combination == CombinationMode::COOPERATIVE
-        ? aligned_weight_bytes * (architecture_.combination_modules - 1)
-        : 0;
-    metrics.output_dram_bytes = static_cast<uint64_t>(graph.num_vertex) * output_stride;
-    metrics.aggregation_buffer_read_bytes = static_cast<uint64_t>(graph.num_vertex) * input_stride;
-    metrics.aggregation_buffer_write_bytes = metrics.aggregation_buffer_read_bytes;
-    const uint64_t combination_operations = static_cast<uint64_t>(graph.num_vertex) *
-                                            shape.input_features * shape.output_features;
-    metrics.mac_operations += combination_operations;
-    if (flags.pipeline == PipelineMode::SEQUENTIAL) {
-        metrics.intermediate_dram_bytes = 2 * metrics.aggregation_buffer_write_bytes;
+    uint64_t aligned_weight_bytes = 0;
+    uint64_t combination_operations = 0;
+    metrics.aggregation_buffer_write_bytes =
+        static_cast<uint64_t>(graph.num_vertex) * input_stride;
+    if (!flags.aggregation_only) {
+        const uint64_t raw_weight_bytes = static_cast<uint64_t>(shape.input_features) *
+                                          shape.output_features * kDataBytes;
+        aligned_weight_bytes = Align(raw_weight_bytes, architecture_.block_size);
+        metrics.weight_dram_bytes = aligned_weight_bytes;
+        metrics.weight_cascade_bytes = flags.combination == CombinationMode::COOPERATIVE
+            ? aligned_weight_bytes * (architecture_.combination_modules - 1)
+            : 0;
+        metrics.output_dram_bytes = static_cast<uint64_t>(graph.num_vertex) * output_stride;
+        metrics.aggregation_buffer_read_bytes = metrics.aggregation_buffer_write_bytes;
+        combination_operations = static_cast<uint64_t>(graph.num_vertex) *
+                                 shape.input_features * shape.output_features;
+        metrics.mac_operations += combination_operations;
+        if (flags.pipeline == PipelineMode::SEQUENTIAL) {
+            for (const auto& batch : batch_info) {
+                metrics.intermediate_dram_bytes += 2 * batch.spill_bytes;
+            }
+        }
     }
 
     const uint64_t input_region = static_cast<uint64_t>(graph.num_vertex) * input_stride;
-    const uint64_t output_region = static_cast<uint64_t>(graph.num_vertex) * output_stride;
+    const uint64_t output_region = flags.aggregation_only
+        ? 0
+        : static_cast<uint64_t>(graph.num_vertex) * output_stride;
     uint64_t edge_region = 0;
     for (const auto& shard : shards) {
         edge_region += shard.edge_bytes;
     }
+    uint64_t intermediate_region = 0;
+    if (!flags.aggregation_only && flags.pipeline == PipelineMode::SEQUENTIAL) {
+        for (const auto& batch : batch_info) {
+            intermediate_region += batch.spill_bytes;
+        }
+    }
     const auto layout = BuildHbmLayout(
         input_region, output_region, aligned_weight_bytes, edge_region,
-        metrics.intermediate_dram_bytes, architecture_.hbm_capacity_bytes);
-    if (graph.num_vertex > 1) {
+        intermediate_region, architecture_.hbm_capacity_bytes);
+    if (!flags.aggregation_only && graph.num_vertex > 1) {
         const auto first = OutputAddress(layout.output.start, 0, 0,
                                          output_stride, architecture_.block_size);
         const auto second = OutputAddress(layout.output.start, 1, 0,
@@ -972,156 +1116,298 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
         if (shard.edge_bytes > 0) {
             requests.push_back({shard.batch_id, RequestClass::EDGE, shard.edge_bytes,
                                 layout.edge.start + edge_offset,
-                                static_cast<uint64_t>(shard.batch_id),
-                                sequence++});
+                                static_cast<uint64_t>(shard.batch_id), sequence++});
             edge_offset += shard.edge_bytes;
         }
         if (shard.input_bytes > 0) {
-            if (!flags.sparsity_elimination) {
-                requests.push_back({shard.batch_id, RequestClass::INPUT, shard.input_bytes,
-                                    layout.input.start +
-                                        static_cast<uint64_t>(shard.interval_start) * input_stride,
-                                    static_cast<uint64_t>(shard.batch_id), sequence++});
-            } else {
-                std::size_t begin = 0;
-                while (begin < shard.unique_neighbors.size()) {
-                    std::size_t end = begin + 1;
-                    while (end < shard.unique_neighbors.size() &&
-                           shard.unique_neighbors[end] == shard.unique_neighbors[end - 1] + 1) {
-                        ++end;
-                    }
-                    const uint64_t vertices = end - begin;
-                    requests.push_back({
-                        shard.batch_id,
-                        RequestClass::INPUT,
-                        vertices * input_stride,
-                        layout.input.start +
-                            static_cast<uint64_t>(shard.unique_neighbors[begin]) * input_stride,
-                        static_cast<uint64_t>(shard.batch_id),
-                        sequence++,
-                    });
-                    begin = end;
-                }
+            const int window_end = flags.sparsity_elimination
+                ? shard.shrunk_interval_end
+                : shard.interval_end;
+            const uint64_t window_vertices = static_cast<uint64_t>(
+                window_end - shard.interval_start);
+            const uint64_t unique_vertices = shard.unique_neighbors.size();
+            const uint64_t address = layout.input.start +
+                static_cast<uint64_t>(shard.interval_start) * input_stride;
+            requests.push_back({
+                shard.batch_id,
+                RequestClass::INPUT,
+                shard.input_bytes,
+                address,
+                static_cast<uint64_t>(shard.batch_id),
+                sequence++,
+            });
+            metrics.input_window_traces.push_back({
+                shard.batch_id,
+                shard.interval_start,
+                shard.interval_end,
+                shard.interval_start,
+                window_end,
+                address,
+                shard.input_bytes,
+                CeilDiv(shard.input_bytes, architecture_.block_size),
+                unique_vertices,
+                window_vertices > unique_vertices ? window_vertices - unique_vertices : 0,
+            });
+        }
+    }
+    if (!flags.aggregation_only) {
+        requests.push_back({0, RequestClass::WEIGHT, metrics.weight_dram_bytes,
+                            layout.weight.start, 0, sequence++});
+    }
+
+    auto validate_requests = [&]() {
+        for (const auto& request : requests) {
+            if (request.bytes > architecture_.hbm_capacity_bytes ||
+                request.address > architecture_.hbm_capacity_bytes - request.bytes) {
+                throw std::runtime_error("memory request exceeds configured HBM capacity");
+            }
+            if (request.enqueue_cycle < request.producer_ready_cycle) {
+                throw std::runtime_error("memory request enqueued before producer readiness");
             }
         }
-    }
-    requests.push_back({0, RequestClass::WEIGHT, metrics.weight_dram_bytes,
-                        layout.weight.start, 0, sequence++});
-    uint64_t intermediate_offset = 0;
-    const uint64_t intermediate_read_base = metrics.aggregation_buffer_write_bytes;
-    for (int batch = 0; batch < raw_batch_count; ++batch) {
-        const auto& info = batch_info[batch];
-        const uint64_t vertices = info.dst_end - info.dst_start;
-        requests.push_back({batch, RequestClass::OUTPUT, vertices * output_stride,
-                            OutputAddress(layout.output.start, info.dst_start, 0,
-                                          output_stride, architecture_.block_size),
-                            static_cast<uint64_t>(batch), sequence++});
-        if (flags.pipeline == PipelineMode::SEQUENTIAL) {
-            requests.push_back({batch, RequestClass::OUTPUT, info.aggregation_bytes,
-                                layout.intermediate.start + intermediate_offset,
-                                static_cast<uint64_t>(batch), sequence++});
-            requests.push_back({batch, RequestClass::OUTPUT, info.aggregation_bytes,
-                                layout.intermediate.start + intermediate_read_base +
-                                    intermediate_offset,
-                                static_cast<uint64_t>(batch), sequence++});
-            intermediate_offset += info.aggregation_bytes;
+    };
+    auto simulate = [&]() {
+        validate_requests();
+        return MemoryCoordinatorModel::Simulate(
+            requests, architecture_, flags.memory_coordination);
+    };
+    auto trace_completion = [](const MemoryTimingResult& timing, uint64_t request_sequence) {
+        const auto iterator = std::find_if(
+            timing.request_traces.begin(), timing.request_traces.end(),
+            [request_sequence](const auto& trace) {
+                return trace.sequence == request_sequence;
+            });
+        if (iterator == timing.request_traces.end()) {
+            throw std::runtime_error("memory request trace not found");
         }
-    }
+        return iterator->completion_cycle;
+    };
 
-    for (const auto& request : requests) {
-        if (request.bytes > architecture_.hbm_capacity_bytes ||
-            request.address > architecture_.hbm_capacity_bytes - request.bytes) {
-            throw std::runtime_error("memory request exceeds configured HBM capacity");
-        }
-    }
-    const auto memory_timing = MemoryCoordinatorModel::Simulate(
-        requests, architecture_, flags.memory_coordination);
-    metrics.memory_service_cycles = memory_timing.cycles;
-    metrics.queue_wait_cycles = memory_timing.queue_wait_cycles;
-    metrics.hbm_blocked_cycles = memory_timing.blocked_cycles;
-    metrics.row_buffer_hits = memory_timing.row_buffer_hits;
-    metrics.row_buffer_misses = memory_timing.row_buffer_misses;
-    metrics.request_counts = memory_timing.request_counts;
-    metrics.request_bytes = memory_timing.request_bytes;
-    metrics.request_wait_cycles = memory_timing.request_wait_cycles;
-    metrics.channel_blocks = memory_timing.channel_blocks;
-    metrics.bank_blocks = memory_timing.bank_blocks;
-    metrics.aggregation_memory_cycles = std::max(
-        memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::EDGE)],
-        memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::INPUT)]);
-    metrics.combination_weight_load_cycles =
-        memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::WEIGHT)];
-    metrics.combination_output_cycles =
-        memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::OUTPUT)];
-
-    std::vector<std::pair<int, int>> groups;
-    if (flags.pipeline == PipelineMode::SEQUENTIAL) {
-        groups.push_back({0, raw_batch_count});
-    } else if (flags.pipeline == PipelineMode::LATENCY_AWARE) {
-        for (int batch = 0; batch < raw_batch_count; ++batch) {
-            groups.push_back({batch, batch + 1});
-        }
-    } else {
-        int begin = 0;
-        while (begin < raw_batch_count) {
-            int end = begin;
-            uint64_t vertices = 0;
-            uint64_t bytes = 0;
-            while (end < raw_batch_count) {
-                const auto& info = batch_info[end];
-                const uint64_t next_vertices = info.dst_end - info.dst_start;
-                if (end > begin &&
-                    (vertices + next_vertices >
-                         static_cast<uint64_t>(architecture_.energy_batch_vertices) ||
-                     bytes + info.aggregation_bytes > architecture_.aggregation_buffer_bytes)) {
-                    break;
-                }
-                vertices += next_vertices;
-                bytes += info.aggregation_bytes;
-                ++end;
-            }
-            groups.push_back({begin, end});
-            begin = end;
-        }
-    }
-    metrics.batches = groups.size();
-
-    using Release = std::pair<uint64_t, uint64_t>;
-    std::priority_queue<Release, std::vector<Release>, std::greater<Release>> releases;
-    std::vector<uint64_t> module_ready(architecture_.combination_modules, 0);
+    const auto prefetch_timing = simulate();
+    const uint64_t weight_ready = prefetch_timing.class_completion_cycles[
+        static_cast<std::size_t>(RequestClass::WEIGHT)];
+    std::vector<uint64_t> batch_ae_finish(raw_batch_count, 0);
     uint64_t ae_cursor = 0;
-    uint64_t cooperative_ready = 0;
-    uint64_t buffer_used = 0;
-    uint64_t array_capacity_cycles = 0;
-    uint64_t first_ce_start = std::numeric_limits<uint64_t>::max();
-    uint64_t last_ce_finish = 0;
-    uint64_t fifo_release_cycle = 0;
+    for (int batch = 0; batch < raw_batch_count; ++batch) {
+        const auto completion = prefetch_timing.batch_completion_cycles.find(batch);
+        uint64_t memory_ready = 0;
+        if (completion != prefetch_timing.batch_completion_cycles.end()) {
+            memory_ready = std::max(
+                completion->second[static_cast<std::size_t>(RequestClass::EDGE)],
+                completion->second[static_cast<std::size_t>(RequestClass::INPUT)]);
+        }
+        ae_cursor = std::max(ae_cursor, memory_ready) + batch_ae_compute[batch] +
+            batch_info[batch].shard_count * architecture_.edram_latency_cycles;
+        batch_ae_finish[batch] = ae_cursor;
+    }
+    metrics.ae_finish_cycle = ae_cursor;
+    metrics.aggregation_cycles = metrics.ae_finish_cycle;
 
-    auto reclaim_until = [&](uint64_t cycle) {
-        while (!releases.empty() && releases.top().first <= cycle) {
-            if (releases.top().second > buffer_used) {
-                throw std::runtime_error("aggregation buffer release underflow");
+    auto record_memory_timing = [&](const MemoryTimingResult& memory_timing) {
+        metrics.memory_service_cycles = memory_timing.cycles;
+        metrics.queue_wait_cycles = memory_timing.queue_wait_cycles;
+        metrics.hbm_blocked_cycles = memory_timing.blocked_cycles;
+        metrics.row_buffer_hits = memory_timing.row_buffer_hits;
+        metrics.row_buffer_misses = memory_timing.row_buffer_misses;
+        metrics.request_counts = memory_timing.request_counts;
+        metrics.request_bytes = memory_timing.request_bytes;
+        metrics.request_wait_cycles = memory_timing.request_wait_cycles;
+        metrics.channel_blocks = memory_timing.channel_blocks;
+        metrics.bank_blocks = memory_timing.bank_blocks;
+        metrics.aggregation_memory_cycles = std::max(
+            memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::EDGE)],
+            memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::INPUT)]);
+        metrics.combination_weight_load_cycles =
+            memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::WEIGHT)];
+        metrics.combination_output_cycles =
+            memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::OUTPUT)];
+        for (const auto& trace : memory_timing.request_traces) {
+            if (trace.request_class == RequestClass::OUTPUT ||
+                trace.request_class == RequestClass::INTERMEDIATE_WRITE ||
+                trace.request_class == RequestClass::INTERMEDIATE_READ) {
+                if (trace.enqueue_cycle < trace.producer_ready_cycle ||
+                    trace.first_issue_cycle < trace.enqueue_cycle) {
+                    throw std::runtime_error("producer-dependent request violated causality");
+                }
+                metrics.producer_request_traces.push_back(trace);
             }
-            buffer_used -= releases.top().second;
-            releases.pop();
         }
     };
 
-    for (const auto& group : groups) {
-        uint64_t group_bytes = 0;
-        uint64_t group_vertices = 0;
-        uint64_t group_ready = ae_cursor;
-        for (int batch = group.first; batch < group.second; ++batch) {
-            const auto completion = memory_timing.batch_completion_cycles.find(batch);
-            uint64_t memory_ready = 0;
-            if (completion != memory_timing.batch_completion_cycles.end()) {
-                memory_ready = std::max(
-                    completion->second[static_cast<std::size_t>(RequestClass::EDGE)],
-                    completion->second[static_cast<std::size_t>(RequestClass::INPUT)]);
+    if (flags.aggregation_only) {
+        metrics.batches = raw_batch_count;
+        for (const auto& batch : batch_info) {
+            metrics.aggregation_buffer_peak_bytes = std::max(
+                metrics.aggregation_buffer_peak_bytes, batch.aggregation_bytes);
+        }
+        record_memory_timing(prefetch_timing);
+        const uint64_t requested_bytes = std::accumulate(
+            metrics.request_bytes.begin(), metrics.request_bytes.end(), uint64_t{0});
+        if (requested_bytes != metrics.TotalDramBytes() ||
+            metrics.TotalDramBytes() != metrics.edge_dram_bytes + metrics.input_dram_bytes ||
+            metrics.weight_dram_bytes != 0 || metrics.output_dram_bytes != 0 ||
+            metrics.intermediate_dram_bytes != 0 ||
+            !metrics.producer_request_traces.empty()) {
+            throw std::runtime_error("aggregation-only traffic invariant failed");
+        }
+        metrics.channel_imbalance = Imbalance(metrics.channel_blocks);
+        metrics.bank_imbalance = Imbalance(metrics.bank_blocks);
+        metrics.bandwidth_utilization = Clamp(
+            metrics.TotalDramBytes() /
+                (std::max<uint64_t>(1, metrics.memory_service_cycles) *
+                 architecture_.HbmBytesPerCycle()),
+            0.0, 1.0);
+        metrics.cycles = metrics.ae_finish_cycle;
+        return metrics;
+    }
+
+    uint64_t array_capacity_cycles = 0;
+    auto record_schedule = [&](const CombinationSchedule& schedule) {
+        metrics.combination_input_cycles += schedule.input_advance_cycles;
+        metrics.combination_pipeline_fill_cycles += schedule.pipeline_fill_cycles;
+        metrics.combination_compute_cycles += schedule.compute_cycles;
+        metrics.combination_active_modules = std::max(
+            metrics.combination_active_modules, schedule.active_modules);
+        metrics.combination_batch_waves += schedule.batch_waves;
+        metrics.combination_output_columns_per_module = std::max(
+            metrics.combination_output_columns_per_module,
+            schedule.output_columns_per_module);
+        array_capacity_cycles += schedule.compute_cycles * schedule.active_modules *
+            architecture_.arrays_per_module * architecture_.array_width;
+    };
+
+    if (flags.pipeline == PipelineMode::SEQUENTIAL) {
+        metrics.batches = 1;
+        uint64_t intermediate_offset = 0;
+        std::vector<uint64_t> write_sequences;
+        for (int batch = 0; batch < raw_batch_count; ++batch) {
+            const auto& info = batch_info[batch];
+            requests.push_back({
+                batch,
+                RequestClass::INTERMEDIATE_WRITE,
+                info.spill_bytes,
+                layout.intermediate.start + intermediate_offset,
+                batch_ae_finish[batch],
+                sequence,
+                batch_ae_finish[batch],
+            });
+            write_sequences.push_back(sequence++);
+            intermediate_offset += info.spill_bytes;
+            metrics.aggregation_buffer_peak_bytes = std::max(
+                metrics.aggregation_buffer_peak_bytes, info.aggregation_bytes);
+        }
+        const auto write_timing = simulate();
+        uint64_t all_writes_complete = 0;
+        std::vector<uint64_t> write_completions;
+        for (uint64_t write_sequence : write_sequences) {
+            const uint64_t completion = trace_completion(write_timing, write_sequence);
+            write_completions.push_back(completion);
+            all_writes_complete = std::max(all_writes_complete, completion);
+        }
+
+        intermediate_offset = 0;
+        std::vector<uint64_t> read_sequences;
+        for (int batch = 0; batch < raw_batch_count; ++batch) {
+            const auto& info = batch_info[batch];
+            requests.push_back({
+                batch,
+                RequestClass::INTERMEDIATE_READ,
+                info.spill_bytes,
+                layout.intermediate.start + intermediate_offset,
+                all_writes_complete,
+                sequence,
+                write_completions[batch],
+            });
+            read_sequences.push_back(sequence++);
+            intermediate_offset += info.spill_bytes;
+        }
+        const auto read_timing = simulate();
+        uint64_t all_reads_complete = 0;
+        for (uint64_t read_sequence : read_sequences) {
+            all_reads_complete = std::max(
+                all_reads_complete, trace_completion(read_timing, read_sequence));
+        }
+
+        const auto schedule = BuildCombinationSchedule(
+            graph.num_vertex, shape.input_features, shape.output_features,
+            raw_batch_count, architecture_, flags.combination);
+        record_schedule(schedule);
+        metrics.ce_start_cycle = std::max({metrics.ae_finish_cycle,
+                                           all_reads_complete,
+                                           weight_ready});
+        metrics.ce_finish_cycle = metrics.ce_start_cycle + schedule.total_cycles;
+        for (int batch = 0; batch < raw_batch_count; ++batch) {
+            const auto& info = batch_info[batch];
+            const uint64_t vertices = info.dst_end - info.dst_start;
+            requests.push_back({
+                batch,
+                RequestClass::OUTPUT,
+                vertices * output_stride,
+                OutputAddress(layout.output.start, info.dst_start, 0,
+                              output_stride, architecture_.block_size),
+                metrics.ce_finish_cycle,
+                sequence++,
+                metrics.ce_finish_cycle,
+            });
+        }
+    } else {
+        std::vector<std::pair<int, int>> groups;
+        if (flags.pipeline == PipelineMode::LATENCY_AWARE) {
+            for (int batch = 0; batch < raw_batch_count; ++batch) {
+                groups.push_back({batch, batch + 1});
             }
-            uint64_t finish = std::max(ae_cursor, memory_ready) + batch_ae_compute[batch] +
-                batch_info[batch].shard_count * architecture_.edram_latency_cycles;
-            if (flags.pipeline != PipelineMode::SEQUENTIAL) {
+        } else {
+            int begin = 0;
+            while (begin < raw_batch_count) {
+                int end = begin;
+                uint64_t vertices = 0;
+                uint64_t bytes = 0;
+                while (end < raw_batch_count) {
+                    const auto& info = batch_info[end];
+                    const uint64_t next_vertices = info.dst_end - info.dst_start;
+                    if (end > begin &&
+                        (vertices + next_vertices >
+                             static_cast<uint64_t>(architecture_.energy_batch_vertices) ||
+                         bytes + info.aggregation_bytes >
+                             architecture_.aggregation_buffer_bytes)) {
+                        break;
+                    }
+                    vertices += next_vertices;
+                    bytes += info.aggregation_bytes;
+                    ++end;
+                }
+                groups.push_back({begin, end});
+                begin = end;
+            }
+        }
+        metrics.batches = groups.size();
+
+        using Release = std::pair<uint64_t, uint64_t>;
+        std::priority_queue<Release, std::vector<Release>, std::greater<Release>> releases;
+        std::vector<uint64_t> module_ready(architecture_.combination_modules, 0);
+        uint64_t cooperative_ready = 0;
+        uint64_t buffer_used = 0;
+        uint64_t first_ce_start = std::numeric_limits<uint64_t>::max();
+        uint64_t last_ce_finish = 0;
+        uint64_t fifo_release_cycle = 0;
+
+        auto reclaim_until = [&](uint64_t cycle) {
+            while (!releases.empty() && releases.top().first <= cycle) {
+                if (releases.top().second > buffer_used) {
+                    throw std::runtime_error("aggregation buffer release underflow");
+                }
+                buffer_used -= releases.top().second;
+                releases.pop();
+            }
+        };
+
+        uint64_t scheduled_ae_cursor = 0;
+        for (const auto& group : groups) {
+            uint64_t group_bytes = 0;
+            uint64_t group_vertices = 0;
+            uint64_t group_ready = scheduled_ae_cursor;
+            for (int batch = group.first; batch < group.second; ++batch) {
+                uint64_t finish = std::max(scheduled_ae_cursor, batch_ae_finish[batch]);
                 reclaim_until(finish);
                 while (buffer_used + batch_info[batch].aggregation_bytes >
                        architecture_.aggregation_buffer_bytes) {
@@ -1135,83 +1421,71 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
                 buffer_used += batch_info[batch].aggregation_bytes;
                 metrics.aggregation_buffer_peak_bytes = std::max(
                     metrics.aggregation_buffer_peak_bytes, buffer_used);
+                scheduled_ae_cursor = finish;
+                group_ready = finish;
+                group_bytes += batch_info[batch].aggregation_bytes;
+                group_vertices += batch_info[batch].dst_end - batch_info[batch].dst_start;
+            }
+
+            const auto schedule = BuildCombinationSchedule(
+                static_cast<int>(group_vertices), shape.input_features, shape.output_features,
+                static_cast<uint64_t>(group.second - group.first),
+                architecture_, flags.combination);
+            record_schedule(schedule);
+            uint64_t ce_start = 0;
+            if (flags.combination == CombinationMode::COOPERATIVE) {
+                ce_start = std::max({group_ready, cooperative_ready, weight_ready});
             } else {
-                metrics.aggregation_buffer_peak_bytes = std::max(
-                    metrics.aggregation_buffer_peak_bytes,
-                    batch_info[batch].aggregation_bytes);
+                std::vector<std::size_t> module_order(module_ready.size());
+                std::iota(module_order.begin(), module_order.end(), 0);
+                std::stable_sort(module_order.begin(), module_order.end(),
+                    [&](std::size_t lhs, std::size_t rhs) {
+                        return module_ready[lhs] < module_ready[rhs];
+                    });
+                ce_start = std::max(group_ready, weight_ready);
+                for (std::size_t index = 0; index < schedule.active_modules; ++index) {
+                    ce_start = std::max(ce_start, module_ready[module_order[index]]);
+                }
+                const uint64_t finish = ce_start + schedule.total_cycles;
+                for (std::size_t index = 0; index < schedule.active_modules; ++index) {
+                    module_ready[module_order[index]] = finish;
+                }
             }
-            ae_cursor = finish;
-            group_ready = finish;
-            group_bytes += batch_info[batch].aggregation_bytes;
-            group_vertices += batch_info[batch].dst_end - batch_info[batch].dst_start;
-        }
-
-        const auto schedule = BuildCombinationSchedule(
-            static_cast<int>(group_vertices), shape.input_features, shape.output_features,
-            static_cast<uint64_t>(group.second - group.first), architecture_, flags.combination);
-        metrics.combination_input_cycles += schedule.input_advance_cycles;
-        metrics.combination_pipeline_fill_cycles += schedule.pipeline_fill_cycles;
-        metrics.combination_compute_cycles += schedule.compute_cycles;
-        metrics.combination_active_modules = std::max(
-            metrics.combination_active_modules, schedule.active_modules);
-        metrics.combination_batch_waves += schedule.batch_waves;
-        metrics.combination_output_columns_per_module = std::max(
-            metrics.combination_output_columns_per_module,
-            schedule.output_columns_per_module);
-        array_capacity_cycles += schedule.compute_cycles * schedule.active_modules *
-            architecture_.arrays_per_module * architecture_.array_width;
-
-        const uint64_t weight_ready =
-            memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::WEIGHT)];
-        uint64_t ce_start = 0;
-        if (flags.combination == CombinationMode::COOPERATIVE) {
-            ce_start = std::max({group_ready, cooperative_ready, weight_ready});
-        } else {
-            std::vector<std::size_t> module_order(module_ready.size());
-            std::iota(module_order.begin(), module_order.end(), 0);
-            std::stable_sort(module_order.begin(), module_order.end(),
-                [&](std::size_t lhs, std::size_t rhs) {
-                    return module_ready[lhs] < module_ready[rhs];
-                });
-            ce_start = std::max(group_ready, weight_ready);
-            for (std::size_t index = 0; index < schedule.active_modules; ++index) {
-                ce_start = std::max(ce_start, module_ready[module_order[index]]);
+            const uint64_t ce_finish = ce_start + schedule.total_cycles;
+            if (flags.combination == CombinationMode::COOPERATIVE) {
+                cooperative_ready = ce_finish;
             }
-            const uint64_t finish = ce_start + schedule.total_cycles;
-            for (std::size_t index = 0; index < schedule.active_modules; ++index) {
-                module_ready[module_order[index]] = finish;
-            }
-        }
-        if (flags.pipeline == PipelineMode::SEQUENTIAL) {
-            ce_start = std::max(ce_start, metrics.ae_finish_cycle);
-        }
-        const uint64_t ce_finish = ce_start + schedule.total_cycles;
-        if (flags.combination == CombinationMode::COOPERATIVE) {
-            cooperative_ready = ce_finish;
-        }
-        first_ce_start = std::min(first_ce_start, ce_start);
-        last_ce_finish = std::max(last_ce_finish, ce_finish);
-        if (flags.pipeline != PipelineMode::SEQUENTIAL) {
+            first_ce_start = std::min(first_ce_start, ce_start);
+            last_ce_finish = std::max(last_ce_finish, ce_finish);
             fifo_release_cycle = std::max(fifo_release_cycle, ce_finish);
             releases.push({fifo_release_cycle, group_bytes});
-        }
-    }
 
-    metrics.ae_finish_cycle = ae_cursor;
-    if (flags.pipeline == PipelineMode::SEQUENTIAL) {
-        const uint64_t spill_cycles = ServiceCycles(
-            metrics.intermediate_dram_bytes, architecture_.HbmBytesPerCycle(), 1.0);
-        const auto schedule = BuildCombinationSchedule(
-            graph.num_vertex, shape.input_features, shape.output_features,
-            raw_batch_count, architecture_, flags.combination);
-        metrics.ce_start_cycle = metrics.ae_finish_cycle + spill_cycles;
-        metrics.ce_finish_cycle = metrics.ce_start_cycle + schedule.total_cycles;
-        first_ce_start = metrics.ce_start_cycle;
-        last_ce_finish = metrics.ce_finish_cycle;
-    } else {
+            const auto& first_batch = batch_info[group.first];
+            const auto& last_batch = batch_info[group.second - 1];
+            requests.push_back({
+                group.first,
+                RequestClass::OUTPUT,
+                group_vertices * output_stride,
+                OutputAddress(layout.output.start, first_batch.dst_start, 0,
+                              output_stride, architecture_.block_size),
+                ce_finish,
+                sequence++,
+                ce_finish,
+            });
+            if (last_batch.dst_end - first_batch.dst_start !=
+                static_cast<int>(group_vertices)) {
+                throw std::runtime_error("pipeline group output is not contiguous");
+            }
+        }
+        metrics.ae_finish_cycle = std::max(metrics.ae_finish_cycle, scheduled_ae_cursor);
+        metrics.aggregation_cycles = metrics.ae_finish_cycle;
         metrics.ce_start_cycle = first_ce_start;
         metrics.ce_finish_cycle = last_ce_finish;
     }
+
+    const auto memory_timing = simulate();
+    record_memory_timing(memory_timing);
+
     metrics.aggregation_cycles = metrics.ae_finish_cycle;
     metrics.combination_cycles = metrics.ce_finish_cycle - metrics.ce_start_cycle;
     metrics.array_utilization = array_capacity_cycles == 0 ? 0.0 : Clamp(
@@ -1368,11 +1642,14 @@ void WriteExperimentJson(const ExperimentResult& result, const std::string& path
         {"combination", ToString(result.flags.combination)},
         {"sparsity_elimination", result.flags.sparsity_elimination},
         {"memory_coordination", result.flags.memory_coordination},
+        {"aggregation_only", result.flags.aggregation_only},
     };
     output["architecture"] = ArchitectureJson(result.architecture);
     output["summary"] = {
         {"total_cycles", result.TotalCycles()},
+        {"total_aggregation_cycles", result.TotalAggregationCycles()},
         {"total_dram_bytes", result.TotalDramBytes()},
+        {"total_aggregation_dram_bytes", result.TotalAggregationDramBytes()},
         {"total_input_dram_bytes", result.TotalInputDramBytes()},
         {"bandwidth_utilization", result.BandwidthUtilization()},
     };
@@ -1397,7 +1674,7 @@ void WriteExperimentCsv(const ExperimentResult& result, const std::string& path)
     if (!stream) {
         throw std::runtime_error("cannot write CSV result: " + path);
     }
-    stream << "model,dataset,profile,pipeline,combination,sparsity,coordination,layer,"
+    stream << "model,dataset,profile,scope,pipeline,combination,sparsity,coordination,layer,"
               "input_features,output_features,cycles,aggregation_cycles,combination_cycles,"
               "memory_service_cycles,edge_dram_bytes,input_dram_bytes,weight_dram_bytes,"
               "output_dram_bytes,intermediate_dram_bytes,total_dram_bytes,mac_operations,"
@@ -1407,6 +1684,7 @@ void WriteExperimentCsv(const ExperimentResult& result, const std::string& path)
               "aggregation_buffer_peak_bytes,simd_idle_lane_cycles,array_idle_lane_cycles\n";
     for (const auto& layer : result.layers) {
         stream << result.model << ',' << result.dataset << ',' << result.profile << ','
+               << (result.flags.aggregation_only ? "aggregation" : "full") << ','
                << ToString(result.flags.pipeline) << ',' << ToString(result.flags.combination) << ','
                << (result.flags.sparsity_elimination ? "on" : "off") << ','
                << (result.flags.memory_coordination ? "on" : "off") << ','

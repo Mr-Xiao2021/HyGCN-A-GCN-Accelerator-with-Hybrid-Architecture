@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <functional>
 #include <iostream>
+#include <map>
 #include <numeric>
 #include <stdexcept>
 #include <string>
@@ -32,8 +33,16 @@ void ExpectThrows(Function function, const std::string& message) {
     }
 }
 
-uint64_t Sum(const std::array<uint64_t, 4>& values) {
+template <std::size_t Size>
+uint64_t Sum(const std::array<uint64_t, Size>& values) {
     return std::accumulate(values.begin(), values.end(), uint64_t{0});
+}
+
+template <typename Function>
+void RunNamedTest(const std::string& name, Function function) {
+    const int failures_before = failures;
+    function();
+    std::cout << name << '=' << (failures == failures_before ? "PASS" : "FAIL") << '\n';
 }
 
 Graph SmallGraph() {
@@ -64,12 +73,24 @@ void TestConfig() {
     Check(paper.array_width == 128, "paper profile array width is 128");
     Check(paper.aggregation_buffer_bytes == 16ULL * 1024 * 1024,
           "paper profile has 16 MiB aggregation buffer");
+    Check(paper.InputWindowCapacityBytes() == 64ULL * 1024,
+          "paper input ping-pong window exposes 64 KiB per resident window");
+    Check(paper.EdgeShardCapacityBytes() == 1ULL * 1024 * 1024,
+          "paper edge ping-pong region exposes 1 MiB per resident shard");
+    Check(paper.AggregationShardCapacityBytes() == 4ULL * 1024 * 1024,
+          "paper aggregation residency slot exposes 4 MiB per shard");
+    Check(paper.UncoordinatedBankInterleave() == 2,
+          "paper uncoordinated baseline records its two-bank interleave");
     Check(std::abs(paper.HbmBytesPerCycle() - 256.0) < 1e-9,
           "paper profile exposes 256 bytes per cycle HBM bandwidth");
 
     auto invalid = paper;
     invalid.num_simd = 0;
     ExpectThrows([&] { invalid.Validate(); }, "invalid architecture values are rejected");
+    auto odd_banks = paper;
+    odd_banks.hbm_banks_per_channel = 3;
+    Check(odd_banks.UncoordinatedBankInterleave() == 1,
+          "odd bank counts use a complete one-bank baseline mapping");
     ExpectThrows([] { ArchitectureConfig::Load("configs/does-not-exist.ini"); },
                  "missing architecture config is rejected");
 }
@@ -113,20 +134,44 @@ void TestPartitionAndSparsity() {
         adjacency = {0, 2, 4, 6};
     }
     FeatureFlags sparse_flags;
+    sparse_flags.aggregation_only = true;
     FeatureFlags dense_flags;
+    dense_flags.aggregation_only = true;
     dense_flags.sparsity_elimination = false;
     const auto sparse_result = simulator.Run(
         non_contiguous, "gcn", "non-contiguous", 1, sparse_flags, 0);
     const auto dense_result = simulator.Run(
         non_contiguous, "gcn", "non-contiguous", 1, dense_flags, 0);
     const auto input_index = static_cast<std::size_t>(RequestClass::INPUT);
-    Check(sparse_result.layers[0].request_counts[input_index] == 4,
-          "non-contiguous neighbors issue four real address runs");
+    Check(sparse_result.layers[0].request_counts[input_index] == 1,
+          "non-contiguous neighbors issue one continuous shrunk window request");
     Check(dense_result.layers[0].request_counts[input_index] == 1,
           "dense interval baseline issues one contiguous input request");
+    Check(sparse_result.layers[0].input_dram_bytes == 7 * 64,
+          "window shrinking retains holes between first and last referenced vertices");
     Check(sparse_result.layers[0].request_bytes[input_index] ==
               sparse_result.layers[0].input_dram_bytes,
           "sparse input request addresses and traffic use the same byte accounting");
+    Check(sparse_result.layers[0].input_window_traces.size() == 1,
+          "golden sparse graph records one continuous window trace");
+    const auto& window = sparse_result.layers[0].input_window_traces.front();
+    Check(window.window_start == 0 && window.window_end == 7 &&
+              window.interval_start == 0 && window.interval_end == 8,
+          "golden sparse window shrinks {0,2,4,6} to [0,7)");
+    Check(window.address == 0 && window.bytes == 448 && window.transactions == 7,
+          "golden sparse window records address, 448-byte span, and seven transactions");
+    Check(window.unique_vertices == 4 && window.internal_holes == 3,
+          "golden sparse window preserves three internal holes");
+    Check(sparse_result.layers[0].weight_dram_bytes == 0 &&
+              sparse_result.layers[0].output_dram_bytes == 0 &&
+              sparse_result.layers[0].intermediate_dram_bytes == 0 &&
+              sparse_result.layers[0].ce_start_cycle == 0 &&
+              sparse_result.layers[0].ce_finish_cycle == 0,
+          "aggregation-only scope excludes Weight, Output, intermediate traffic, and CE");
+    std::cout << "window_evidence={\"neighbors\":[0,2,4,6],\"window\":[0,7],"
+              << "\"address\":" << window.address << ",\"bytes\":" << window.bytes
+              << ",\"internal_holes\":" << window.internal_holes
+              << ",\"transactions\":" << window.transactions << "}\n";
 }
 
 Graph EdgeBoundaryGraph(int neighbors) {
@@ -145,8 +190,8 @@ Graph EdgeBoundaryGraph(int neighbors) {
 void TestEdgeChunkBoundaries() {
     auto config = ArchitectureConfig::Load("configs/HYGCN_SMOKE.ini");
     config.block_size = 4;
-    config.edge_buffer_bytes = 60;
-    config.aggregation_buffer_bytes = 128;
+    config.edge_buffer_bytes = 120;
+    config.aggregation_buffer_bytes = 256;
     config.Validate();
     PaperSimulator simulator(config);
 
@@ -195,6 +240,8 @@ void TestSystolicModel() {
     auto ideal_schedule_config = ideal;
     const auto independent_schedule = PaperSimulator::BuildCombinationSchedule(
         8, 4, 128, 8, ideal_schedule_config, CombinationMode::INDEPENDENT);
+    const auto one_batch_parallel = PaperSimulator::BuildCombinationSchedule(
+        64, 128, 128, 1, ideal_schedule_config, CombinationMode::INDEPENDENT);
     const auto cooperative_schedule = PaperSimulator::BuildCombinationSchedule(
         8, 4, 128, 8, ideal_schedule_config, CombinationMode::COOPERATIVE);
     Check(independent_schedule.weight_load_bytes == 2048 &&
@@ -207,6 +254,11 @@ void TestSystolicModel() {
     Check(independent_schedule.mac_operations == cooperative_schedule.mac_operations &&
               independent_schedule.total_cycles == cooperative_schedule.total_cycles,
           "ideal hand case preserves work across combination policies");
+    Check(one_batch_parallel.active_modules == 8 && one_batch_parallel.batch_waves == 1,
+          "one legal batch distributes vertex groups across all eight combination modules");
+    std::cout << "combination_parallelism_evidence={\"batches\":1,\"rows\":64,"
+              << "\"active_modules\":" << one_batch_parallel.active_modules
+              << ",\"batch_waves\":" << one_batch_parallel.batch_waves << "}\n";
 }
 
 void TestHbmLayoutAndMapping() {
@@ -254,6 +306,10 @@ void TestCoordinator() {
     ExpectThrows([] {
         MemoryCoordinatorModel::Order({{0, RequestClass::EDGE, 0, 0, 0, 0}}, true);
     }, "zero-byte memory requests are rejected");
+    ExpectThrows([] {
+        MemoryCoordinatorModel::Order(
+            {{0, RequestClass::OUTPUT, 64, 0, 9, 0, 10}}, true);
+    }, "requests cannot enqueue before their producer is ready");
 
     auto config = ArchitectureConfig::Load("configs/HYGCN_SMOKE.ini");
     config.hbm_channels = 1;
@@ -275,6 +331,44 @@ void TestCoordinator() {
           "coordinator ordering reduces row conflicts in the request timing model");
     Check(coordinated_timing.row_buffer_hits > fifo_timing.row_buffer_hits,
           "coordinator timing reports additional row-buffer hits");
+}
+
+void TestFragmentationInvariant() {
+    auto config = ArchitectureConfig::Load("configs/HYGCN_SMOKE.ini");
+    config.block_size = 64;
+    config.hbm_channels = 8;
+    config.hbm_banks_per_channel = 4;
+    config.hbm_row_bytes = 256;
+    config.Validate();
+
+    const std::vector<MemoryRequest> coalesced = {
+        {0, RequestClass::INPUT, 8192, 4096, 7, 0},
+    };
+    std::vector<MemoryRequest> fragmented;
+    for (uint64_t block = 0; block < 128; ++block) {
+        fragmented.push_back({
+            0,
+            RequestClass::INPUT,
+            64,
+            4096 + block * 64,
+            7,
+            block,
+        });
+    }
+    const auto whole = MemoryCoordinatorModel::Simulate(coalesced, config, true);
+    const auto split = MemoryCoordinatorModel::Simulate(fragmented, config, true);
+    Check(whole.cycles == split.cycles,
+          "same block stream completion is invariant to request fragmentation");
+    Check(whole.row_buffer_hits == split.row_buffer_hits &&
+              whole.row_buffer_misses == split.row_buffer_misses,
+          "same block stream preserves row hit and miss counts after fragmentation");
+    Check(whole.channel_blocks == split.channel_blocks &&
+              whole.bank_blocks == split.bank_blocks,
+          "same block stream preserves channel and bank transaction counts");
+    std::cout << "fragmentation_evidence={\"blocks\":128,\"coalesced_cycles\":"
+              << whole.cycles << ",\"fragmented_cycles\":" << split.cycles
+              << ",\"row_hits\":" << whole.row_buffer_hits
+              << ",\"row_misses\":" << whole.row_buffer_misses << "}\n";
 }
 
 void TestAggregationBuffer() {
@@ -496,24 +590,98 @@ void TestPipelineBatching() {
           "sequential pipeline waits for AE completion");
 }
 
+void TestProducerDependencies() {
+    auto config = ArchitectureConfig::Load("configs/HYGCN_SMOKE.ini");
+    config.aggregation_buffer_bytes = 1024;
+    config.Validate();
+    PaperSimulator simulator(config);
+    Graph graph;
+    graph.num_vertex = 40;
+    graph.num_edge = 40;
+    graph.num_class = 2;
+    graph.len_feature = 16;
+    graph.r_adj.resize(graph.num_vertex);
+    for (int vertex = 0; vertex < graph.num_vertex; ++vertex) {
+        graph.r_adj[vertex] = {vertex};
+    }
+
+    FeatureFlags latency;
+    latency.pipeline = PipelineMode::LATENCY_AWARE;
+    const auto pipelined = simulator.Run(graph, "gcn", "producer", 1, latency, 0);
+    uint64_t output_requests = 0;
+    for (const auto& trace : pipelined.layers[0].producer_request_traces) {
+        if (trace.request_class != RequestClass::OUTPUT) {
+            continue;
+        }
+        ++output_requests;
+        Check(trace.producer_ready_cycle == trace.enqueue_cycle,
+              "output enqueues exactly when its CE producer is ready");
+        Check(trace.first_issue_cycle >= trace.enqueue_cycle,
+              "output memory issue does not precede producer readiness");
+    }
+    Check(output_requests == pipelined.layers[0].batches,
+          "each pipelined CE batch emits one producer-dependent output request");
+
+    FeatureFlags sequential;
+    sequential.pipeline = PipelineMode::SEQUENTIAL;
+    const auto spilled = simulator.Run(graph, "gcn", "producer", 1, sequential, 0);
+    std::map<int, MemoryRequestTrace> writes;
+    std::map<int, MemoryRequestTrace> reads;
+    uint64_t latest_read_completion = 0;
+    for (const auto& trace : spilled.layers[0].producer_request_traces) {
+        if (trace.request_class == RequestClass::INTERMEDIATE_WRITE) {
+            writes[trace.batch_id] = trace;
+        } else if (trace.request_class == RequestClass::INTERMEDIATE_READ) {
+            reads[trace.batch_id] = trace;
+            latest_read_completion = std::max(latest_read_completion, trace.completion_cycle);
+        } else if (trace.request_class == RequestClass::OUTPUT) {
+            Check(trace.producer_ready_cycle == spilled.layers[0].ce_finish_cycle &&
+                      trace.enqueue_cycle == trace.producer_ready_cycle,
+                  "sequential output waits for CE completion");
+        }
+    }
+    Check(writes.size() == reads.size() && !writes.empty(),
+          "sequential execution records matched intermediate writes and reads");
+    for (const auto& [batch, write] : writes) {
+        const auto read = reads.find(batch);
+        Check(read != reads.end(), "each intermediate write has a dependent read");
+        if (read == reads.end()) {
+            continue;
+        }
+        Check(read->second.address == write.address && read->second.bytes == write.bytes,
+              "intermediate read accesses the bytes produced by its write");
+        Check(read->second.producer_ready_cycle == write.completion_cycle &&
+                  read->second.enqueue_cycle >= write.completion_cycle,
+              "intermediate read observes write completion RAW dependency");
+    }
+    Check(spilled.layers[0].ce_start_cycle == latest_read_completion,
+          "sequential CE starts at the unified memory timeline read completion");
+    std::cout << "producer_dependency_evidence={\"output_requests\":"
+              << output_requests << ",\"intermediate_pairs\":" << writes.size()
+              << ",\"latest_read_completion\":" << latest_read_completion
+              << ",\"ce_start\":" << spilled.layers[0].ce_start_cycle << "}\n";
+}
+
 }  // namespace
 
 int main() {
     try {
-        TestConfig();
-        TestPartitionAndSparsity();
-        TestEdgeChunkBoundaries();
-        TestOutputAddress();
-        TestSystolicModel();
-        TestHbmLayoutAndMapping();
-        TestCoordinator();
-        TestAggregationBuffer();
-        TestEventAndSpmGuards();
-        TestAggregationOperations();
-        TestSimulationDeterminism();
-        TestPolicyMatrix();
-        TestFeatureDispersionAndAddressBounds();
-        TestPipelineBatching();
+        RunNamedTest("config", TestConfig);
+        RunNamedTest("F01_window_sliding_shrinking", TestPartitionAndSparsity);
+        RunNamedTest("edge_chunk_boundaries", TestEdgeChunkBoundaries);
+        RunNamedTest("output_address", TestOutputAddress);
+        RunNamedTest("systolic_model", TestSystolicModel);
+        RunNamedTest("hbm_layout_mapping", TestHbmLayoutAndMapping);
+        RunNamedTest("coordinator_ordering", TestCoordinator);
+        RunNamedTest("F02_fragmentation_invariance", TestFragmentationInvariant);
+        RunNamedTest("aggregation_buffer", TestAggregationBuffer);
+        RunNamedTest("event_spm_guards", TestEventAndSpmGuards);
+        RunNamedTest("aggregation_operations", TestAggregationOperations);
+        RunNamedTest("simulation_determinism", TestSimulationDeterminism);
+        RunNamedTest("policy_matrix", TestPolicyMatrix);
+        RunNamedTest("feature_dispersion_address_bounds", TestFeatureDispersionAndAddressBounds);
+        RunNamedTest("pipeline_batching", TestPipelineBatching);
+        RunNamedTest("F03_producer_and_RAW_dependencies", TestProducerDependencies);
     } catch (const std::exception& error) {
         std::cerr << "UNCAUGHT: " << error.what() << '\n';
         return 2;

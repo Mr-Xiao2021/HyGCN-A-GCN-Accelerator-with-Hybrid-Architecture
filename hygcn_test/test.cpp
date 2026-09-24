@@ -43,6 +43,7 @@ void PrintUsage(const char* program) {
         << "  --model gcn|gin|gs\n"
         << "  --dataset NAME\n"
         << "  --layer all|0|1\n"
+        << "  --scope full|aggregation\n"
         << "  --graph-dir PATH\n"
         << "  --pipeline sequential|latency-aware|energy-aware\n"
         << "  --combination independent|cooperative\n"
@@ -97,6 +98,15 @@ Options ParseOptions(int argc, char** argv) {
             options.dataset = RequireValue(argc, argv, i);
         } else if (argument == "--layer") {
             options.layer = ParseLayer(RequireValue(argc, argv, i));
+        } else if (argument == "--scope") {
+            const auto scope = RequireValue(argc, argv, i);
+            if (scope == "full") {
+                options.flags.aggregation_only = false;
+            } else if (scope == "aggregation") {
+                options.flags.aggregation_only = true;
+            } else {
+                throw std::runtime_error("invalid scope: expected full or aggregation");
+            }
         } else if (argument == "--graph-dir") {
             options.graph_dir = RequireValue(argc, argv, i);
         } else if (argument == "--pipeline") {
@@ -160,6 +170,9 @@ void ValidateInputs(const Options& options) {
             throw std::runtime_error("missing GraphSAGE sample file: " + sample_path.string());
         }
     }
+    if (options.engine == "legacy" && options.flags.aggregation_only) {
+        throw std::runtime_error("aggregation scope is supported only by the paper engine");
+    }
 }
 
 std::string ResultStem(const Options& options) {
@@ -169,6 +182,7 @@ std::string ResultStem(const Options& options) {
            (options.flags.sparsity_elimination ? "on" : "off") + "_coord-" +
            (options.flags.memory_coordination ? "on" : "off") + "_seed-" +
            std::to_string(options.seed) +
+           (options.flags.aggregation_only ? "_scope-aggregation" : "") +
            (options.layer < 0 ? "" : "_layer-" + std::to_string(options.layer));
 }
 

@@ -65,3 +65,14 @@
 - [x] 8.5 修正 independent 模式权重只从 HBM 装载一次、随后由 Weight Buffer 跨 batch/模块复用
 - [x] 8.6 重建论文指标清单：范围逐数据集检查、正文平均值聚合检查、无可靠值指标降为诊断项
 - [x] 8.7 增加协调器 row-conflict 单测并复跑干净构建、默认 CTest、完整三数据集成对消融和严格 OpenSpec 校验
+
+## 9. Review v2 因果与验收整改
+
+- [x] 9.1 按论文 Algorithm 4 把稀疏输入实现为保留内部空洞的连续窗口，并用 `{0,2,4,6} -> [0,7)` 黄金用例记录地址、跨度、空洞和事务数
+- [x] 9.2 把内存请求展平为统一 block 事务流，并用 coalesced/fragmented 同地址流验证周期、row hit/miss、channel 和 bank 事务完全一致
+- [x] 9.3 为 Output 和 intermediate 请求加入 producer-ready，验证 Output 不早于 CE、intermediate read 与 write 同地址且等待写完成，并删除重复 spill 计时
+- [x] 9.4 增加第一层 AE-only scope，保证 Fig. 15 固定图、层和 AE 工作量，只切换连续窗口稀疏优化
+- [x] 9.5 数字化 Fig. 15/16 逐数据集 SVG 柱值，保存来源 URL、SHA256 和坐标，并按逐柱相对误差执行 ±20% 门禁
+- [x] 9.6 修正 Combination Module 单 batch 顶点组并行度，并验证跨 batch producer/RAW 依赖保持约束
+- [x] 9.7 在 JSON 中记录派生驻留容量、producer 时间线和窗口证据，声明 `parameter_recalibration=false` 且论文配置文件未修改
+- [ ] 9.8 从整改提交执行干净 Release 构建、默认 CTest、legacy 回归、严格 OpenSpec 和强制三数据集 benchmark，保存正式复跑产物并推送远端

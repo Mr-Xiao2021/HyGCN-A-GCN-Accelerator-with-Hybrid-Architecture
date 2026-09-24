@@ -62,11 +62,16 @@ struct ArchitectureConfig {
     static ArchitectureConfig Load(const std::string& path);
     void Validate() const;
     double HbmBytesPerCycle() const;
+    uint64_t InputWindowCapacityBytes() const;
+    uint64_t EdgeShardCapacityBytes() const;
+    uint64_t AggregationShardCapacityBytes() const;
+    uint64_t UncoordinatedBankInterleave() const;
 };
 
 struct FeatureFlags {
     bool sparsity_elimination = true;
     bool memory_coordination = true;
+    bool aggregation_only = false;
     PipelineMode pipeline = PipelineMode::LATENCY_AWARE;
     CombinationMode combination = CombinationMode::INDEPENDENT;
 };
@@ -94,7 +99,11 @@ enum class RequestClass {
     INPUT = 1,
     WEIGHT = 2,
     OUTPUT = 3,
+    INTERMEDIATE_WRITE = 4,
+    INTERMEDIATE_READ = 5,
 };
+
+inline constexpr std::size_t kRequestClassCount = 6;
 
 struct MemoryRequest {
     int batch_id = 0;
@@ -103,6 +112,32 @@ struct MemoryRequest {
     uint64_t address = 0;
     uint64_t enqueue_cycle = 0;
     uint64_t sequence = 0;
+    uint64_t producer_ready_cycle = 0;
+};
+
+struct MemoryRequestTrace {
+    int batch_id = 0;
+    RequestClass request_class = RequestClass::EDGE;
+    uint64_t bytes = 0;
+    uint64_t address = 0;
+    uint64_t producer_ready_cycle = 0;
+    uint64_t enqueue_cycle = 0;
+    uint64_t first_issue_cycle = 0;
+    uint64_t completion_cycle = 0;
+    uint64_t sequence = 0;
+};
+
+struct InputWindowTrace {
+    int batch_id = 0;
+    int interval_start = 0;
+    int interval_end = 0;
+    int window_start = 0;
+    int window_end = 0;
+    uint64_t address = 0;
+    uint64_t bytes = 0;
+    uint64_t transactions = 0;
+    uint64_t unique_vertices = 0;
+    uint64_t internal_holes = 0;
 };
 
 struct AddressDistribution {
@@ -116,11 +151,12 @@ struct MemoryTimingResult {
     uint64_t blocked_cycles = 0;
     uint64_t row_buffer_hits = 0;
     uint64_t row_buffer_misses = 0;
-    std::array<uint64_t, 4> request_counts{};
-    std::array<uint64_t, 4> request_bytes{};
-    std::array<uint64_t, 4> request_wait_cycles{};
-    std::array<uint64_t, 4> class_completion_cycles{};
-    std::map<int, std::array<uint64_t, 4>> batch_completion_cycles;
+    std::array<uint64_t, kRequestClassCount> request_counts{};
+    std::array<uint64_t, kRequestClassCount> request_bytes{};
+    std::array<uint64_t, kRequestClassCount> request_wait_cycles{};
+    std::array<uint64_t, kRequestClassCount> class_completion_cycles{};
+    std::map<int, std::array<uint64_t, kRequestClassCount>> batch_completion_cycles;
+    std::vector<MemoryRequestTrace> request_traces;
     std::vector<uint64_t> channel_blocks;
     std::vector<uint64_t> bank_blocks;
 };
@@ -253,9 +289,11 @@ struct LayerMetrics {
     uint64_t simd_cores_per_vertex = 0;
     uint64_t simd_parallel_vertices = 0;
     uint64_t array_idle_lane_cycles = 0;
-    std::array<uint64_t, 4> request_counts{};
-    std::array<uint64_t, 4> request_bytes{};
-    std::array<uint64_t, 4> request_wait_cycles{};
+    std::array<uint64_t, kRequestClassCount> request_counts{};
+    std::array<uint64_t, kRequestClassCount> request_bytes{};
+    std::array<uint64_t, kRequestClassCount> request_wait_cycles{};
+    std::vector<InputWindowTrace> input_window_traces;
+    std::vector<MemoryRequestTrace> producer_request_traces;
     std::vector<uint64_t> channel_blocks;
     std::vector<uint64_t> bank_blocks;
     double simd_utilization = 0.0;
@@ -281,7 +319,9 @@ struct ExperimentResult {
     std::vector<LayerMetrics> layers;
 
     uint64_t TotalCycles() const;
+    uint64_t TotalAggregationCycles() const;
     uint64_t TotalDramBytes() const;
+    uint64_t TotalAggregationDramBytes() const;
     uint64_t TotalInputDramBytes() const;
     double BandwidthUtilization() const;
 };

@@ -58,12 +58,19 @@ def main():
         manifest = result["manifest"]
         for field in ("git_commit", "binary_digest", "graph_digest", "config_digest", "seed",
                       "pipeline", "combination", "sparsity_elimination",
-                      "memory_coordination"):
+                      "memory_coordination", "aggregation_only"):
             if field not in manifest:
                 raise RuntimeError(f"manifest is missing {field}")
         for layer in result["layers"]:
-            if set(layer["request_stats"]) != {"edge", "input", "weight", "output"}:
+            if set(layer["request_stats"]) != {
+                    "edge", "input", "weight", "output",
+                    "intermediate_write", "intermediate_read"}:
                 raise RuntimeError("structured request statistics are incomplete")
+            for request in layer["producer_dependent_requests"]:
+                if request["enqueue_cycle"] < request["producer_ready_cycle"]:
+                    raise RuntimeError("producer-dependent request enqueued too early")
+                if request["first_issue_cycle"] < request["enqueue_cycle"]:
+                    raise RuntimeError("producer-dependent request issued too early")
     print("paper_output_determinism=PASS")
     return 0
 

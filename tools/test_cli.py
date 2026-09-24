@@ -40,6 +40,8 @@ def main():
                    "invalid layer: expected all, 0, or 1", root)
     expect_failure(common + ["--dataset", "test", "--profile-path", "missing.ini", "--quiet"],
                    "cannot parse architecture config", root)
+    expect_failure(common + ["--dataset", "test", "--scope", "invalid", "--quiet"],
+                   "invalid scope: expected full or aggregation", root)
     print("cli_failure_paths=PASS")
     return 0
 

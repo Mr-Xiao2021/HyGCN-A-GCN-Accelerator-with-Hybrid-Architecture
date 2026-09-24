@@ -9,24 +9,40 @@ from pathlib import Path
 
 VARIANTS = {
     "optimized": {
+        "scope": "full",
+        "layer": "all",
+        "pipeline": "latency-aware",
+        "combination": "independent",
+        "sparsity": "on",
+        "coordination": "on",
+    },
+    "sparsity_optimized": {
+        "scope": "aggregation",
+        "layer": "0",
         "pipeline": "latency-aware",
         "combination": "independent",
         "sparsity": "on",
         "coordination": "on",
     },
     "sparsity_baseline": {
+        "scope": "aggregation",
+        "layer": "0",
         "pipeline": "latency-aware",
         "combination": "independent",
         "sparsity": "off",
         "coordination": "on",
     },
     "pipeline_baseline": {
+        "scope": "full",
+        "layer": "all",
         "pipeline": "sequential",
         "combination": "independent",
         "sparsity": "on",
         "coordination": "on",
     },
     "coordination_baseline": {
+        "scope": "full",
+        "layer": "all",
         "pipeline": "latency-aware",
         "combination": "independent",
         "sparsity": "on",
@@ -35,9 +51,9 @@ VARIANTS = {
 }
 
 PAIR_TARGETS = {
-    "sparsity_baseline": "sparsity",
-    "pipeline_baseline": "pipeline",
-    "coordination_baseline": "coordination",
+    "sparsity_baseline": ("sparsity_optimized", "sparsity"),
+    "pipeline_baseline": ("optimized", "pipeline"),
+    "coordination_baseline": ("optimized", "coordination"),
 }
 
 
@@ -54,10 +70,16 @@ def parse_args():
 
 def result_name(dataset, variant):
     flags = VARIANTS[variant]
-    return (
+    name = (
         f"paper_paper_gcn_{dataset}_{flags['pipeline']}_{flags['combination']}_"
         f"sparse-{flags['sparsity']}_coord-{flags['coordination']}_seed-1.json"
     )
+    stem = name[:-5]
+    if flags["scope"] == "aggregation":
+        stem += "_scope-aggregation"
+    if flags["layer"] != "all":
+        stem += f"_layer-{flags['layer']}"
+    return stem + ".json"
 
 
 def fnv1a_digest(path):
@@ -93,11 +115,12 @@ def cached_result_valid(result, root, binary, dataset, variant, profile_path):
         "graph_digest": expected_graph_digest(root, dataset),
         "config_digest": fnv1a_digest(profile_path),
         "seed": 1,
-        "selected_layer": "all",
+        "selected_layer": flags["layer"],
         "pipeline": flags["pipeline"],
         "combination": flags["combination"],
         "sparsity_elimination": flags["sparsity"] == "on",
         "memory_coordination": flags["coordination"] == "on",
+        "aggregation_only": flags["scope"] == "aggregation",
     }
     return all(manifest.get(key) == value for key, value in expected.items())
 
@@ -121,6 +144,8 @@ def run_variant(root, binary, output_dir, dataset, variant, force, profile_path)
             "--profile", "paper",
             "--model", "gcn",
             "--dataset", dataset,
+            "--scope", flags["scope"],
+            "--layer", flags["layer"],
             "--pipeline", flags["pipeline"],
             "--combination", flags["combination"],
             "--sparsity", flags["sparsity"],
@@ -173,6 +198,35 @@ def validate_pair(optimized, baseline, target, dataset):
         raise ValueError(f"{dataset} {target} ablation changed architecture parameters")
 
 
+def calculate_metrics(optimized, sparse_optimized, sparse_base, pipeline_base, coord_base):
+    return {
+        "sparsity_speedup": ratio(
+            sparse_base["total_aggregation_cycles"],
+            sparse_optimized["total_aggregation_cycles"],
+            "sparsity_speedup"),
+        "sparsity_ae_dram_ratio": ratio(
+            sparse_optimized["total_aggregation_dram_bytes"],
+            sparse_base["total_aggregation_dram_bytes"],
+            "sparsity_ae_dram_ratio"),
+        "sparsity_input_dram_ratio": ratio(
+            sparse_optimized["total_input_dram_bytes"],
+            sparse_base["total_input_dram_bytes"],
+            "sparsity_input_dram_ratio"),
+        "pipeline_speedup": ratio(
+            pipeline_base["total_cycles"], optimized["total_cycles"], "pipeline_speedup"),
+        "pipeline_dram_ratio": ratio(
+            optimized["total_dram_bytes"],
+            pipeline_base["total_dram_bytes"],
+            "pipeline_dram_ratio"),
+        "coordination_speedup": ratio(
+            coord_base["total_cycles"], optimized["total_cycles"], "coordination_speedup"),
+        "coordination_bandwidth_gain": ratio(
+            optimized["bandwidth_utilization"],
+            coord_base["bandwidth_utilization"],
+            "coordination_bandwidth_gain"),
+    }
+
+
 def main():
     args = parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -201,32 +255,15 @@ def main():
             name: run_variant(root, binary, output_dir, dataset, name, args.force, profile_path)
             for name in VARIANTS
         }
-        for baseline, target in PAIR_TARGETS.items():
-            validate_pair(runs["optimized"], runs[baseline], target, dataset)
+        for baseline, (optimized_name, target) in PAIR_TARGETS.items():
+            validate_pair(runs[optimized_name], runs[baseline], target, dataset)
         optimized = runs["optimized"]["summary"]
+        sparse_optimized = runs["sparsity_optimized"]["summary"]
         sparse_base = runs["sparsity_baseline"]["summary"]
         pipeline_base = runs["pipeline_baseline"]["summary"]
         coord_base = runs["coordination_baseline"]["summary"]
-        metrics = {
-            "sparsity_speedup": ratio(
-                sparse_base["total_cycles"], optimized["total_cycles"], "sparsity_speedup"),
-            "sparsity_input_dram_ratio": ratio(
-                optimized["total_input_dram_bytes"],
-                sparse_base["total_input_dram_bytes"],
-                "sparsity_input_dram_ratio"),
-            "pipeline_speedup": ratio(
-                pipeline_base["total_cycles"], optimized["total_cycles"], "pipeline_speedup"),
-            "pipeline_dram_ratio": ratio(
-                optimized["total_dram_bytes"],
-                pipeline_base["total_dram_bytes"],
-                "pipeline_dram_ratio"),
-            "coordination_speedup": ratio(
-                coord_base["total_cycles"], optimized["total_cycles"], "coordination_speedup"),
-            "coordination_bandwidth_gain": ratio(
-                optimized["bandwidth_utilization"],
-                coord_base["bandwidth_utilization"],
-                "coordination_bandwidth_gain"),
-        }
+        metrics = calculate_metrics(
+            optimized, sparse_optimized, sparse_base, pipeline_base, coord_base)
         per_dataset[dataset] = {
             "metrics": metrics,
             "runs": {name: result_name(dataset, name) for name in VARIANTS},
@@ -243,7 +280,10 @@ def main():
         "aggregate": aggregate,
         "per_dataset": per_dataset,
         "scope": {
-            "validated": "relative microarchitectural effects for GCN",
+            "validated": (
+                "Fig. 15 layer-0 AE-only sparsity plus Fig. 16-17 relative "
+                "microarchitectural effects for GCN"
+            ),
             "not_validated": [
                 "absolute CPU speedup",
                 "absolute GPU speedup",
@@ -252,6 +292,7 @@ def main():
             ],
         },
         "cache_validation": "input and configuration digests plus complete run manifest",
+        "parameter_recalibration": False,
     }
     report_path = output_dir / "benchmark_report.json"
     with report_path.open("w", encoding="utf-8") as stream:

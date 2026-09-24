@@ -51,7 +51,9 @@ def main():
     for dataset in reference["datasets"]:
         per_dataset[dataset] = {"metrics": {}}
         for name, definition in reference["metrics"].items():
-            if definition["validation"] == "per_dataset_range":
+            if definition["validation"] == "per_dataset_relative_error":
+                per_dataset[dataset]["metrics"][name] = definition["reference"][dataset]
+            elif definition["validation"] == "per_dataset_range":
                 per_dataset[dataset]["metrics"][name] = (
                     definition["reference_min"] + definition["reference_max"]
                 ) / 2
