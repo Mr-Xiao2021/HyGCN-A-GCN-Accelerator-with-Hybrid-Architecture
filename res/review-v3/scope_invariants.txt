@@ -1,0 +1,7 @@
+scope_and_causality_invariants=PASS
+ae_only_runs=6
+producer_timeline_rows=155
+intermediate_raw_pairs=31
+ae_only_excludes=weight,ce,output,intermediate
+producer_rule=enqueue>=producer_ready;first_issue>=enqueue
+raw_rule=read_address/write_address and read_bytes/write_bytes identical;read_ready=write_completion

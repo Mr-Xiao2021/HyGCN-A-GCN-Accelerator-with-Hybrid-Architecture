@@ -1,0 +1,24 @@
+Internal ctest changing into directory: /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/build-review-v3-release
+Test project /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/build-review-v3-release
+    Start 1: hygcn_unit
+1/9 Test #1: hygcn_unit ........................   Passed    0.01 sec
+    Start 2: hygcn_smoke
+2/9 Test #2: hygcn_smoke .......................   Passed    0.09 sec
+    Start 3: hygcn_missing_dataset
+3/9 Test #3: hygcn_missing_dataset .............   Passed    0.00 sec
+    Start 4: paper_reference_manifest
+4/9 Test #4: paper_reference_manifest ..........   Passed    0.07 sec
+    Start 5: paper_metric_validator_selftest
+5/9 Test #5: paper_metric_validator_selftest ...   Passed    0.37 sec
+    Start 6: paper_benchmark_scope
+6/9 Test #6: paper_benchmark_scope .............   Passed    0.07 sec
+    Start 7: legacy_snapshot_fixture
+7/9 Test #7: legacy_snapshot_fixture ...........   Passed    0.08 sec
+    Start 8: paper_output_determinism
+8/9 Test #8: paper_output_determinism ..........   Passed    0.30 sec
+    Start 9: hygcn_cli_failures
+9/9 Test #9: hygcn_cli_failures ................   Passed    0.08 sec
+
+100% tests passed, 0 tests failed out of 9
+
+Total Test time (real) =   1.07 sec

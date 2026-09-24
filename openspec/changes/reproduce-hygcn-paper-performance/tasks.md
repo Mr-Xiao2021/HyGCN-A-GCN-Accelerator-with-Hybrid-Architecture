@@ -75,4 +75,4 @@
 - [x] 9.5 数字化 Fig. 15/16 逐数据集 SVG 柱值，保存来源 URL、SHA256 和坐标，并按逐柱相对误差执行 ±20% 门禁
 - [x] 9.6 修正 Combination Module 单 batch 顶点组并行度，并验证跨 batch producer/RAW 依赖保持约束
 - [x] 9.7 在 JSON 中记录派生驻留容量、producer 时间线和窗口证据，声明 `parameter_recalibration=false` 且论文配置文件未修改
-- [ ] 9.8 从整改提交执行干净 Release 构建、默认 CTest、legacy 回归、严格 OpenSpec 和强制三数据集 benchmark，保存正式复跑产物并推送远端
+- [x] 9.8 从整改提交执行干净 Release 构建、默认 CTest、legacy 回归、严格 OpenSpec 和强制三数据集 benchmark，保存正式复跑产物并推送远端

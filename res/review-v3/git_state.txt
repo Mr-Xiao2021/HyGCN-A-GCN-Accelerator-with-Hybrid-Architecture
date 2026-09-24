@@ -1,0 +1,7 @@
+44ff038da0fb563e06141b880e135a7a0581cbf3
+## run/npu...origin/run/npu [ahead 1]
+?? build-review-v3-dev/
+?? build-review-v3-release/
+?? tools/__pycache__/
+origin	git@github.com:Mr-Xiao2021/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture.git (fetch)
+origin	git@github.com:Mr-Xiao2021/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture.git (push)
