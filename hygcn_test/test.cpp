@@ -48,7 +48,9 @@ void PrintUsage(const char* program) {
         << "  --pipeline sequential|latency-aware|energy-aware\n"
         << "  --combination independent|cooperative\n"
         << "  --sparsity on|off\n"
-        << "  --coordination on|off\n"
+        << "  --coordination on|off (sets priority and mapping together)\n"
+        << "  --priority fifo|batch-class\n"
+        << "  --mapping row-first|low-bits\n"
         << "  --seed N\n"
         << "  --output-dir PATH\n"
         << "  --quiet\n";
@@ -116,7 +118,19 @@ Options ParseOptions(int argc, char** argv) {
         } else if (argument == "--sparsity") {
             options.flags.sparsity_elimination = ParseToggle(RequireValue(argc, argv, i));
         } else if (argument == "--coordination") {
-            options.flags.memory_coordination = ParseToggle(RequireValue(argc, argv, i));
+            const bool enabled = ParseToggle(RequireValue(argc, argv, i));
+            options.flags.memory_priority = enabled
+                ? MemoryPriorityMode::BATCH_CLASS
+                : MemoryPriorityMode::FIFO;
+            options.flags.address_mapping = enabled
+                ? AddressMappingMode::LOW_BITS
+                : AddressMappingMode::ROW_FIRST;
+        } else if (argument == "--priority") {
+            options.flags.memory_priority = ParseMemoryPriorityMode(
+                RequireValue(argc, argv, i));
+        } else if (argument == "--mapping") {
+            options.flags.address_mapping = ParseAddressMappingMode(
+                RequireValue(argc, argv, i));
         } else if (argument == "--seed") {
             options.seed = std::stoull(RequireValue(argc, argv, i));
         } else if (argument == "--output-dir") {
@@ -179,8 +193,9 @@ std::string ResultStem(const Options& options) {
     return options.engine + "_" + options.profile + "_" + options.model + "_" +
            options.dataset + "_" + ToString(options.flags.pipeline) + "_" +
            ToString(options.flags.combination) + "_sparse-" +
-           (options.flags.sparsity_elimination ? "on" : "off") + "_coord-" +
-           (options.flags.memory_coordination ? "on" : "off") + "_seed-" +
+           (options.flags.sparsity_elimination ? "on" : "off") + "_priority-" +
+           ToString(options.flags.memory_priority) + "_mapping-" +
+           ToString(options.flags.address_mapping) + "_seed-" +
            std::to_string(options.seed) +
            (options.flags.aggregation_only ? "_scope-aggregation" : "") +
            (options.layer < 0 ? "" : "_layer-" + std::to_string(options.layer));

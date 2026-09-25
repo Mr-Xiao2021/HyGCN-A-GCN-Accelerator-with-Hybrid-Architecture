@@ -49,33 +49,36 @@
 
 ### 4. 使用带阶段指针和时间线的有界 Aggregation Buffer
 
-保留环形缓冲思想，将 allocated、ready、consuming、reclaim 四个阶段、字节范围和发生周期显式化。latency-aware 在一个分区 batch ready 后启动 CE；energy-aware 聚合多个分区直到目标顶点数或容量边界；sequential 在 AE producer-ready 后执行一次同地址中间写出和依赖该写完成的一次读回，随后启动 CE。AE 在容量不足时等待最早可回收 batch，CE 完成后才释放对应空间。
+保留环形缓冲思想，将 allocated、ready、consuming、reclaim 四个阶段、字节范围和发生周期显式化。latency-aware 在一个分区 batch ready 后启动 CE；energy-aware 聚合多个分区直到目标顶点数或容量边界；sequential 等待 AE 阶段完成，再按每批真实 producer bytes 的 block 对齐值执行同地址写出和依赖读回，随后启动 CE。AE 在容量不足时等待最早可回收 batch，CE 完成后才释放对应空间。
 
 相比硬编码双半区，这一设计可覆盖论文的 ping-pong 行为，同时兼容不同 batch 大小和后续扩展。
 
 ### 5. Coordinator 使用 batch 仲裁、低位交织映射和请求级 HBM 时序
 
-每个 DRAM 请求携带 batch ID、请求类别、地址、字节数、producer-ready 与入队周期。六类请求为 Edge、Input、Weight、Output、Intermediate Write 和 Intermediate Read。模型先把请求展平为统一 block 事务流，保证同一地址/事务序列的完成时间不依赖上层请求切分。协调模式先选择最早 batch，再按请求类别排序，并用 cache-line 低位交织到 channel/bank；对照模式保留 FIFO、二路 bank 交织与 row-first 映射。请求级模型跟踪每个 channel 的发射周期、每个 bank 的可用周期和 open row，行命中/未命中延迟、队列等待和完成周期进入 AE ready 时间与层总周期。
+每个 DRAM 请求携带 batch ID、请求类别、地址、字节数、producer sequence、producer-ready 与入队周期。Input 由对应 Edge completion 加邻居索引延迟动态释放。模型把请求推进为统一 block 流，保证同一地址/事务序列的完成时间不依赖上层请求切分。priority 与 mapping 独立：batch-class 选择最早 batch、请求类别并在同优先级内延续 open row；FIFO 作为排序基线；low-bits 对应论文 §4.5.2；row-first 保留 review v3 的完整 row 优先对照布局。二路 bank striping 从隐藏常数变为显式配置，其依据是历史基线和 DRAMSim3 HBM 双命令宽度的请求级近似，不声称双命令固定作用于相邻 bank。
 
 该规则对应论文“当前批次低优先级请求先于后续批次高优先级请求”的描述，避免现有全局严格优先级造成跨批次饥饿。
 
 ### 6. 以成对消融验证论文公开范围和平均值
 
-基准工具为每个机制运行优化版与唯一开关关闭版，计算：
+基准工具为每个机制运行优化版与唯一开关关闭版，并将 Fig. 17 分解为 priority-only、mapping-only 和 combined，计算：
 
 - `speedup = baseline_cycles / optimized_cycles`
 - `dram_ratio = optimized_dram_bytes / baseline_dram_bytes`
 - `bandwidth_gain = optimized_bandwidth_util / baseline_bandwidth_util`
 
-参考清单保存 Fig. 15/16 arXiv SVG 的 URL、SHA256、坐标提取方法和逐数据集柱值；Fig. 17 使用论文正文给出的跨数据集平均值。Fig. 15 固定第一层和 AE-only scope，只改变连续窗口稀疏开关；Fig. 16 使用完整层执行；协调器按正文平均 3.70x 加速和 4.00x 带宽提升检查。Input-only 稀疏流量不等同 Fig. 15(b) 的 AE 总流量，仅保留为诊断项。
+`bandwidth_util` 使用至少一个 HBM 请求已经 first-issue 且尚未 completion 的区间并集作为服务窗口；没有在途请求、仅等待 AE/CE producer 的空闲周期仍属于总执行时间，但不计作 HBM 服务窗口。
+
+参考清单保存 Fig. 15/16 arXiv SVG 的 URL、SHA256、坐标提取方法和逐数据集柱值；Fig. 17 使用论文正文给出的跨数据集平均值。版本化 workload manifest 将 Fig. 15-17 固定到 Table 5 的 GCN layer 0（dataset feature width → 128），排除未映射到论文的 `128 → num_class` 分类层。Fig. 15 使用 AE-only scope；Fig. 16 使用完整 layer-0 执行；Fig. 17 combined 按正文平均值验收，priority-only 和 mapping-only 作为因果诊断。
 
 绝对周期仍被记录并用于回归，但没有可靠论文绝对值时不作为论文验收门槛。
 
 ### 7. 区分结构参数与时序参数
 
-结构参数来自论文，不允许基准脚本修改。论文未给出的 HBM row hit/miss 延迟、row 大小、channel/bank 数和最小 energy-aware batch 集中在配置中，具有明确单位并写入运行清单。协调开关不得选择预设效率，流水开关不得选择固定重叠率，sequential 不得使用经验 spill 系数。
+结构参数来自论文，不允许基准脚本修改。论文未给出的 HBM row hit/miss 延迟、row 大小、channel/bank 数、请求释放延迟、ping-pong 区数和图分区调度占用上限集中在配置中，具有明确单位并写入运行清单。物理 16 MiB Aggregation Buffer 与低于单个 8 MiB 半区的 scheduler shard cap 分别记录，后者不得伪装成物理容量。基准报告从版本化 review v3 参数基线自动生成 config/source diff；`parameter_recalibration` 不得硬编码。priority/mapping 不得选择预设效率，流水开关不得选择固定重叠率，sequential 不得使用经验 spill 系数。
 
 禁止在结果生成阶段乘全局“论文修正系数”或按数据集写特例。Cora、Citeseer、PubMed 必须使用同一结构和时序参数执行成对消融。
+如果调度占用上限相对验收基线变化，正式证据必须保留跨三个数据集的邻近值敏感性结果，不能只报告单一通过点。
 
 ### 8. 参数化 CLI 与结构化输出
 

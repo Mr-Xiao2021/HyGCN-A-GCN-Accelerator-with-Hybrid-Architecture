@@ -24,7 +24,8 @@ def run(binary, root, output_dir):
             "--pipeline", "latency-aware",
             "--combination", "independent",
             "--sparsity", "on",
-            "--coordination", "on",
+            "--priority", "batch-class",
+            "--mapping", "low-bits",
             "--seed", "17",
             "--output-dir", str(output_dir),
             "--quiet",
@@ -35,7 +36,10 @@ def run(binary, root, output_dir):
         text=True,
         check=True,
     )
-    stem = "paper_smoke_gcn_test_latency-aware_independent_sparse-on_coord-on_seed-17"
+    stem = (
+        "paper_smoke_gcn_test_latency-aware_independent_sparse-on_"
+        "priority-batch-class_mapping-low-bits_seed-17"
+    )
     return output_dir / f"{stem}.json", output_dir / f"{stem}.csv"
 
 
@@ -58,7 +62,7 @@ def main():
         manifest = result["manifest"]
         for field in ("git_commit", "binary_digest", "graph_digest", "config_digest", "seed",
                       "pipeline", "combination", "sparsity_elimination",
-                      "memory_coordination", "aggregation_only"):
+                      "memory_priority", "address_mapping", "aggregation_only"):
             if field not in manifest:
                 raise RuntimeError(f"manifest is missing {field}")
         for layer in result["layers"]:

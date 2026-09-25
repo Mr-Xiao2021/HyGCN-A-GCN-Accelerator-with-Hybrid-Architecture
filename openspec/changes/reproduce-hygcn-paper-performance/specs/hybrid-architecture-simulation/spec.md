@@ -40,7 +40,7 @@
 - **THEN** 多个模块共享同一批输入并按列拆分输出，权重级联流量与并行完成周期被显式统计
 
 ### Requirement: Interval/Shard 与动态稀疏消除
-系统 SHALL 按 Edge Buffer、Input Buffer 和 Aggregation Buffer 容量生成可审计的 Interval/Shard 划分。动态稀疏消除启用时，系统 MUST 仅请求 shard 中实际引用的唯一源顶点特征；禁用时 MUST 请求完整 interval，从而形成可比较基线。
+系统 SHALL 按 Edge Buffer、Input Buffer 和 Aggregation Buffer 容量生成可审计的 Interval/Shard 划分。物理 Aggregation Buffer、ping-pong 半区和 scheduler shard cap MUST 分别记录，且 shard cap MUST 不超过单个半区。动态稀疏消除启用时，系统 MUST 仅请求 shard 中实际引用的唯一源顶点特征；禁用时 MUST 请求完整 interval，从而形成可比较基线。
 
 #### Scenario: 启用稀疏消除
 - **WHEN** shard 只引用 interval 中部分源顶点
@@ -63,10 +63,10 @@
 
 #### Scenario: Sequential 基线
 - **WHEN** 流水被禁用
-- **THEN** CE 仅在当前聚合阶段全部完成后启动，作为流水加速比的基线
+- **THEN** 中间 Write 在 AE 阶段完成后按真实 producer bytes 的 block 对齐值发射，Read 等待对应 Write 完成，CE 再启动
 
 ### Requirement: Batch-aware 访存协调
-Memory Access Coordinator SHALL 支持 Edge、Input、Weight、Output 四类 HBM 请求及 Aggregation Buffer 请求。对于同一 batch，优先级 MUST 为 Edge、Input、Weight、Output；当前 batch 的低优先级请求 MUST 先于后续 batch 的高优先级请求完成发射。协调模式 MUST 使用 cache-line 低位交织到 channel/bank，并以 row-buffer hit/miss、channel 发射与 bank 可用周期计算完成时间；协调关闭时 MUST 保留 FIFO 与传统 row-first 映射作为对照。系统 SHALL 报告各类队列等待、HBM 阻塞、行命中/未命中、有效带宽和地址映射分布。
+Memory Access Coordinator SHALL 支持 Edge、Input、Weight、Output 四类 HBM 请求及 Aggregation Buffer 请求。Input MUST 等待对应 Edge 完成和邻居索引 ready。priority 与 address mapping MUST 可独立切换；同一 batch 的优先级 MUST 为 Edge、Input、Weight、Output，且同优先级请求 SHOULD 延续已打开 row。低位 mapping MUST 对应论文 §4.5.2；row-first 基线的 bank striping 宽度 MUST 进入配置和报告，并区分历史对照值、DRAMSim3 HBM 双命令宽度近似与真实 bank 配对语义，不得保留源码隐藏常数或宣称双命令固定配对相邻 bank。系统 SHALL 报告请求 producer、入队、发射、完成、重排次数和 channel/bank 分布。
 
 #### Scenario: 同批次优先级
 - **WHEN** 同一 batch 同时存在 Edge、Input、Weight 和 Output 请求
@@ -79,6 +79,10 @@ Memory Access Coordinator SHALL 支持 Edge、Input、Weight、Output 四类 HBM
 #### Scenario: 协调时序进入关键路径
 - **WHEN** 两组请求产生不同的 row-buffer 冲突与 channel/bank 并行度
 - **THEN** 协调开关产生不同的请求完成周期，且该差异反馈到 AE ready、总周期和带宽利用率，而不是来自预设效率常数
+
+#### Scenario: Edge 到 Input 动态依赖
+- **WHEN** 当前 batch 的 Edge 与下一 batch 请求竞争 HBM
+- **THEN** 当前 batch Input 只在 Edge completion 加邻居索引延迟后入队，priority-only 运行产生可审计的 issue/completion 差异
 
 ### Requirement: 地址与流量统计正确性
 所有内存请求 SHALL 使用对应数据对象的实际字节数，顶点输出地址 MUST 按顶点步长与输出分块计算。系统 MUST 检测区域越界、重叠、负事件计数和未完成事务，并在错误时以非零状态终止。

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "baseline_version": "review-v3-9aa127d",
+  "baseline_commit": "9aa127d248849e68160c7aafd70b79cbe468094a",
+  "parameters": {
+    "aggregation_ping_pong_regions": 2,
+    "aggregation_residency_banks_per_region": 2,
+    "aggregation_shard_capacity_bytes": 4194304,
+    "batch_launch_interval_cycles": 1,
+    "benchmark_selected_layer": "all",
+    "edge_input_dependency": "static_enqueue_cycle",
+    "edge_ping_pong_regions": 2,
+    "input_ping_pong_regions": 2,
+    "neighbor_index_ready_cycles": 0,
+    "row_first_bank_interleave": 2,
+    "sequential_spill_alignment": "aggregation_shard_capacity"
+  }
+}

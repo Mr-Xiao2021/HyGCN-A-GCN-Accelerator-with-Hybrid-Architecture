@@ -100,6 +100,38 @@
       "experiment_scope": "full layer DRAM bytes",
       "source": "HyGCN HPCA 2020 Figure 16(b), digitized from the arXiv SVG"
     },
+    "priority_speedup": {
+      "required": false,
+      "validation": "diagnostic_only",
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "experiment_scope": "Fig. 17 priority-only execution cycles with row-first baseline mapping fixed",
+      "source": "Internal causal decomposition of the paper coordinator"
+    },
+    "priority_bandwidth_gain": {
+      "required": false,
+      "validation": "diagnostic_only",
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "experiment_scope": "Fig. 17 priority-only effective HBM bandwidth with row-first baseline mapping fixed",
+      "source": "Internal causal decomposition of the paper coordinator"
+    },
+    "mapping_speedup": {
+      "required": false,
+      "validation": "diagnostic_only",
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "experiment_scope": "Fig. 17 mapping-only execution cycles with FIFO baseline priority fixed",
+      "source": "Internal causal decomposition of the paper coordinator"
+    },
+    "mapping_bandwidth_gain": {
+      "required": false,
+      "validation": "diagnostic_only",
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "experiment_scope": "Fig. 17 mapping-only effective HBM bandwidth with FIFO baseline priority fixed",
+      "source": "Internal causal decomposition of the paper coordinator"
+    },
     "coordination_speedup": {
       "required": true,
       "validation": "aggregate_relative_error",
@@ -115,7 +147,7 @@
       "reference": 4.00,
       "unit": "x",
       "aggregation": "arithmetic_mean_over_datasets",
-      "experiment_scope": "effective HBM bandwidth utilization",
+      "experiment_scope": "effective HBM bandwidth over the union of in-flight request intervals, excluding producer-idle gaps",
       "source": "HyGCN HPCA 2020 Section 5.3 and Figure 17: average 4x bandwidth utilization"
     }
   }

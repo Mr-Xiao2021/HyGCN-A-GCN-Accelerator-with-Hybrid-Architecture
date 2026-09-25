@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -77,20 +78,24 @@ void TestConfig() {
           "paper input ping-pong window exposes 64 KiB per resident window");
     Check(paper.EdgeShardCapacityBytes() == 1ULL * 1024 * 1024,
           "paper edge ping-pong region exposes 1 MiB per resident shard");
-    Check(paper.AggregationShardCapacityBytes() == 4ULL * 1024 * 1024,
-          "paper aggregation residency slot exposes 4 MiB per shard");
-    Check(paper.UncoordinatedBankInterleave() == 2,
-          "paper uncoordinated baseline records its two-bank interleave");
+    Check(paper.AggregationShardCapacityBytes() == 5ULL * 1024 * 1024,
+          "paper graph partition exposes the audited 5 MiB shard cap");
+    Check(paper.input_ping_pong_regions == 2 && paper.edge_ping_pong_regions == 2 &&
+              paper.aggregation_ping_pong_regions == 2,
+          "paper profile audits all ping-pong region counts");
+    Check(paper.aggregation_shard_capacity_bytes == 5ULL * 1024 * 1024 &&
+              paper.row_first_bank_interleave == 2,
+          "paper profile audits aggregation partitioning and row-first bank lanes");
+    Check(paper.batch_launch_interval_cycles == 1 &&
+              paper.neighbor_index_ready_cycles == 2 &&
+              paper.sequential_spill_alignment == "block",
+          "paper profile audits request release and spill behavior");
     Check(std::abs(paper.HbmBytesPerCycle() - 256.0) < 1e-9,
           "paper profile exposes 256 bytes per cycle HBM bandwidth");
 
     auto invalid = paper;
     invalid.num_simd = 0;
     ExpectThrows([&] { invalid.Validate(); }, "invalid architecture values are rejected");
-    auto odd_banks = paper;
-    odd_banks.hbm_banks_per_channel = 3;
-    Check(odd_banks.UncoordinatedBankInterleave() == 1,
-          "odd bank counts use a complete one-bank baseline mapping");
     ExpectThrows([] { ArchitectureConfig::Load("configs/does-not-exist.ini"); },
                  "missing architecture config is rejected");
 }
@@ -192,6 +197,7 @@ void TestEdgeChunkBoundaries() {
     config.block_size = 4;
     config.edge_buffer_bytes = 120;
     config.aggregation_buffer_bytes = 256;
+    config.aggregation_shard_capacity_bytes = 64;
     config.Validate();
     PaperSimulator simulator(config);
 
@@ -283,6 +289,23 @@ void TestHbmLayoutAndMapping() {
           "synthetic address stream maps evenly across two channels");
     Check(distribution.bank_blocks == std::vector<uint64_t>({2, 2}),
           "synthetic address stream maps evenly across two banks");
+
+    auto mapping_config = ArchitectureConfig::Load("configs/HYGCN_SMOKE.ini");
+    const std::vector<MemoryRequest> contiguous = {
+        {0, RequestClass::INPUT, 8192, 0, 0, 0},
+    };
+    const auto low_bits = MemoryCoordinatorModel::Simulate(
+        contiguous, mapping_config, MemoryPriorityMode::FIFO,
+        AddressMappingMode::LOW_BITS);
+    const auto row_first = MemoryCoordinatorModel::Simulate(
+        contiguous, mapping_config, MemoryPriorityMode::FIFO,
+        AddressMappingMode::ROW_FIRST);
+    Check(low_bits.channel_blocks == std::vector<uint64_t>({32, 32, 32, 32}),
+          "paper low-bit mapping stripes a contiguous request across channels");
+    Check(row_first.channel_blocks == std::vector<uint64_t>({32, 32, 32, 32}),
+          "row-first baseline stripes complete rows across channels");
+    Check(row_first.bank_blocks == std::vector<uint64_t>({64, 64, 0, 0}),
+          "versioned row-first baseline exposes its two-lane bank approximation");
 }
 
 void TestCoordinator() {
@@ -292,7 +315,8 @@ void TestCoordinator() {
         {0, RequestClass::INPUT, 64, 0, 0, 1},
         {0, RequestClass::EDGE, 64, 0, 0, 0},
     };
-    const auto ordered = MemoryCoordinatorModel::Order(requests, true);
+    const auto ordered = MemoryCoordinatorModel::Order(
+        requests, MemoryPriorityMode::BATCH_CLASS);
     Check(ordered[0].batch_id == 0 && ordered[0].request_class == RequestClass::EDGE,
           "coordinator prioritizes edge inside the oldest batch");
     Check(ordered[1].batch_id == 0 && ordered[1].request_class == RequestClass::INPUT,
@@ -300,20 +324,24 @@ void TestCoordinator() {
     Check(ordered[2].batch_id == 0 && ordered[2].request_class == RequestClass::OUTPUT,
           "current batch output precedes next batch edge");
 
-    const auto uncoordinated = MemoryCoordinatorModel::Order(requests, false);
+    const auto uncoordinated = MemoryCoordinatorModel::Order(
+        requests, MemoryPriorityMode::FIFO);
     Check(uncoordinated[0].sequence == 0 && uncoordinated[1].sequence == 1,
           "uncoordinated baseline preserves FIFO request order");
     ExpectThrows([] {
-        MemoryCoordinatorModel::Order({{0, RequestClass::EDGE, 0, 0, 0, 0}}, true);
+        MemoryCoordinatorModel::Order(
+            {{0, RequestClass::EDGE, 0, 0, 0, 0}}, MemoryPriorityMode::BATCH_CLASS);
     }, "zero-byte memory requests are rejected");
     ExpectThrows([] {
         MemoryCoordinatorModel::Order(
-            {{0, RequestClass::OUTPUT, 64, 0, 9, 0, 10}}, true);
+            {{0, RequestClass::OUTPUT, 64, 0, 9, 0, 10}},
+            MemoryPriorityMode::BATCH_CLASS);
     }, "requests cannot enqueue before their producer is ready");
 
     auto config = ArchitectureConfig::Load("configs/HYGCN_SMOKE.ini");
     config.hbm_channels = 1;
     config.hbm_banks_per_channel = 1;
+    config.row_first_bank_interleave = 1;
     config.hbm_row_bytes = 256;
     config.block_size = 64;
     config.Validate();
@@ -325,12 +353,56 @@ void TestCoordinator() {
         {1, RequestClass::OUTPUT, 64, 384, 0, 4},
         {0, RequestClass::EDGE, 64, 128, 0, 5},
     };
-    const auto fifo_timing = MemoryCoordinatorModel::Simulate(alternating, config, false);
-    const auto coordinated_timing = MemoryCoordinatorModel::Simulate(alternating, config, true);
+    const auto fifo_timing = MemoryCoordinatorModel::Simulate(
+        alternating, config, MemoryPriorityMode::FIFO, AddressMappingMode::LOW_BITS);
+    const auto coordinated_timing = MemoryCoordinatorModel::Simulate(
+        alternating, config, MemoryPriorityMode::BATCH_CLASS,
+        AddressMappingMode::LOW_BITS);
     Check(coordinated_timing.cycles < fifo_timing.cycles,
           "coordinator ordering reduces row conflicts in the request timing model");
     Check(coordinated_timing.row_buffer_hits > fifo_timing.row_buffer_hits,
           "coordinator timing reports additional row-buffer hits");
+
+    const std::vector<MemoryRequest> dynamic = {
+        {0, RequestClass::EDGE, 128, 0, 0, 0, 0},
+        {1, RequestClass::EDGE, 512, 256, 0, 1, 0},
+        {0, RequestClass::INPUT, 128, 128, 0, 2, 0, 0, 0},
+    };
+    const auto dynamic_fifo = MemoryCoordinatorModel::Simulate(
+        dynamic, config, MemoryPriorityMode::FIFO, AddressMappingMode::LOW_BITS);
+    const auto dynamic_priority = MemoryCoordinatorModel::Simulate(
+        dynamic, config, MemoryPriorityMode::BATCH_CLASS,
+        AddressMappingMode::LOW_BITS);
+    auto trace = [](const MemoryTimingResult& timing, uint64_t sequence) {
+        const auto iterator = std::find_if(
+            timing.request_traces.begin(), timing.request_traces.end(),
+            [sequence](const auto& item) { return item.sequence == sequence; });
+        if (iterator == timing.request_traces.end()) {
+            throw std::runtime_error("dynamic priority trace not found");
+        }
+        return *iterator;
+    };
+    const auto priority_edge0 = trace(dynamic_priority, 0);
+    const auto priority_edge1 = trace(dynamic_priority, 1);
+    const auto priority_input0 = trace(dynamic_priority, 2);
+    const auto fifo_input0 = trace(dynamic_fifo, 2);
+    Check(priority_input0.producer_ready_cycle == priority_edge0.completion_cycle &&
+              priority_input0.enqueue_cycle == priority_input0.producer_ready_cycle,
+          "Input dynamically enqueues after its Edge producer completes");
+    Check(priority_input0.first_issue_cycle < fifo_input0.first_issue_cycle &&
+              priority_input0.completion_cycle < priority_edge1.completion_cycle,
+          "batch priority advances current-batch Input ahead of queued next-batch Edge");
+    Check(dynamic_priority.priority_reorders > 0,
+          "dynamic priority records an observable arbitration reorder");
+    Check(dynamic_priority.active_cycles > 0 &&
+              dynamic_priority.active_cycles <= dynamic_priority.cycles,
+          "HBM active cycles exclude producer-idle gaps from bandwidth utilization");
+    std::cout << "priority_trace_evidence={\"edge0_complete\":"
+              << priority_edge0.completion_cycle << ",\"input0_enqueue\":"
+              << priority_input0.enqueue_cycle << ",\"priority_input_issue\":"
+              << priority_input0.first_issue_cycle << ",\"fifo_input_issue\":"
+              << fifo_input0.first_issue_cycle << ",\"priority_reorders\":"
+              << dynamic_priority.priority_reorders << "}\n";
 }
 
 void TestFragmentationInvariant() {
@@ -355,10 +427,16 @@ void TestFragmentationInvariant() {
             block,
         });
     }
-    const auto whole = MemoryCoordinatorModel::Simulate(coalesced, config, true);
-    const auto split = MemoryCoordinatorModel::Simulate(fragmented, config, true);
+    const auto whole = MemoryCoordinatorModel::Simulate(
+        coalesced, config, MemoryPriorityMode::BATCH_CLASS,
+        AddressMappingMode::LOW_BITS);
+    const auto split = MemoryCoordinatorModel::Simulate(
+        fragmented, config, MemoryPriorityMode::BATCH_CLASS,
+        AddressMappingMode::LOW_BITS);
     Check(whole.cycles == split.cycles,
           "same block stream completion is invariant to request fragmentation");
+    Check(whole.active_cycles == split.active_cycles,
+          "same block stream active service time is invariant to request fragmentation");
     Check(whole.row_buffer_hits == split.row_buffer_hits &&
               whole.row_buffer_misses == split.row_buffer_misses,
           "same block stream preserves row hit and miss counts after fragmentation");
@@ -561,6 +639,7 @@ void TestFeatureDispersionAndAddressBounds() {
 void TestPipelineBatching() {
     auto config = ArchitectureConfig::Load("configs/HYGCN_SMOKE.ini");
     config.aggregation_buffer_bytes = 1024;
+    config.aggregation_shard_capacity_bytes = 512;
     config.Validate();
     PaperSimulator simulator(config);
     Graph graph;
@@ -593,6 +672,7 @@ void TestPipelineBatching() {
 void TestProducerDependencies() {
     auto config = ArchitectureConfig::Load("configs/HYGCN_SMOKE.ini");
     config.aggregation_buffer_bytes = 1024;
+    config.aggregation_shard_capacity_bytes = 512;
     config.Validate();
     PaperSimulator simulator(config);
     Graph graph;
@@ -628,9 +708,14 @@ void TestProducerDependencies() {
     std::map<int, MemoryRequestTrace> writes;
     std::map<int, MemoryRequestTrace> reads;
     uint64_t latest_read_completion = 0;
+    uint64_t written_bytes = 0;
     for (const auto& trace : spilled.layers[0].producer_request_traces) {
         if (trace.request_class == RequestClass::INTERMEDIATE_WRITE) {
             writes[trace.batch_id] = trace;
+            written_bytes += trace.bytes;
+            Check(trace.producer_ready_cycle <= trace.enqueue_cycle &&
+                      trace.enqueue_cycle == spilled.layers[0].ae_finish_cycle,
+                  "sequential intermediate writes wait for the AE phase boundary");
         } else if (trace.request_class == RequestClass::INTERMEDIATE_READ) {
             reads[trace.batch_id] = trace;
             latest_read_completion = std::max(latest_read_completion, trace.completion_cycle);
@@ -656,6 +741,11 @@ void TestProducerDependencies() {
     }
     Check(spilled.layers[0].ce_start_cycle == latest_read_completion,
           "sequential CE starts at the unified memory timeline read completion");
+    const uint64_t expected_producer_bytes =
+        static_cast<uint64_t>(graph.num_vertex) * graph.len_feature * sizeof(float);
+    Check(written_bytes == expected_producer_bytes &&
+              spilled.layers[0].intermediate_dram_bytes == 2 * expected_producer_bytes,
+          "sequential spill reads and writes only block-aligned producer bytes");
     std::cout << "producer_dependency_evidence={\"output_requests\":"
               << output_requests << ",\"intermediate_pairs\":" << writes.size()
               << ",\"latest_read_completion\":" << latest_read_completion

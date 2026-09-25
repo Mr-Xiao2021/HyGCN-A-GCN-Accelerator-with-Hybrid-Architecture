@@ -25,11 +25,12 @@ ctest --test-dir build --output-on-failure
   --model gcn \
   --dataset cora \
   --scope full \
-  --layer all \
+  --layer 0 \
   --pipeline latency-aware \
   --combination independent \
   --sparsity on \
-  --coordination on \
+  --priority batch-class \
+  --mapping low-bits \
   --seed 1 \
   --output-dir res/manual
 ```
@@ -47,9 +48,13 @@ cmake --build build --target paper_benchmark
 ```
 
 `legacy_regression` 复跑 GCN+Cora/Citeseer 并与版本化快照逐项比较。
-`paper_benchmark` 运行 Cora、Citeseer、PubMed 的优化版和三组成对消融。Fig. 15/16
+`paper_benchmark` 运行 Cora、Citeseer、PubMed 的优化版和稀疏、流水、priority-only、
+mapping-only、combined 消融。Fig. 15/16
 使用版本化 SVG 坐标数字化的逐数据集柱值，Fig. 17 使用论文正文平均值，统一执行
 `±20%` 相对误差校验。报告写入 `res/paper/benchmark_report.json` 和
-`res/paper/validation_report.md`，并显式记录是否发生参数重标定。
+`res/paper/validation_report.md`。`configs/paper_workloads.json` 固定 Fig. 15-17 的
+Table 5 layer-0 shape；参数报告根据 `configs/paper_parameter_baseline.json` 自动生成差异，
+不使用硬编码重标定声明。物理 16 MiB Aggregation Buffer 与 5 MiB 图分区调度上限分别记录，
+并在正式证据中保留 4/5/6 MiB 敏感性对照。
 
 实现范围、指标定义和声明边界见 [docs/paper-reproduction.md](docs/paper-reproduction.md)。

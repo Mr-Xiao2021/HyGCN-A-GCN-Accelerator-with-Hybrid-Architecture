@@ -76,3 +76,13 @@
 - [x] 9.6 修正 Combination Module 单 batch 顶点组并行度，并验证跨 batch producer/RAW 依赖保持约束
 - [x] 9.7 在 JSON 中记录派生驻留容量、producer 时间线和窗口证据，声明 `parameter_recalibration=false` 且论文配置文件未修改
 - [x] 9.8 从整改提交执行干净 Release 构建、默认 CTest、legacy 回归、严格 OpenSpec 和强制三数据集 benchmark，保存正式复跑产物并推送远端
+
+## 10. Review v3 工作负载、流量与协调器整改
+
+- [x] 10.1 sequential intermediate 只按真实 producer bytes 的 block 对齐值读写，并验证严格 AE→Write→Read→CE 阶段
+- [x] 10.2 将 priority 和 address mapping 拆成独立开关，把原隐藏 interleave 改为有 DRAMSim3 HBM dual-command 依据的显式配置，并保存 row-first/low-bits 实现依据
+- [x] 10.3 建立 Edge completion 与 neighbor-index ready 到 Input enqueue 的动态依赖，覆盖跨 batch priority 冲突
+- [x] 10.4 新增 Table 5 layer-0 workload manifest，确保 Fig. 15-17 不包含隐式 `128→num_class` 分类层
+- [x] 10.5 生成 priority-only、mapping-only、combined 分解消融，并保存请求 timeline 与 channel/bank 分布
+- [x] 10.6 将行为参数纳入配置和自动 baseline diff，禁止硬编码 `parameter_recalibration`
+- [ ] 10.7 保持 F-01 至 F-04、CTest、legacy 与现有因果回归通过，并完成三数据集强制 benchmark

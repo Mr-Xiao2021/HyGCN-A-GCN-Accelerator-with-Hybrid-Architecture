@@ -28,6 +28,16 @@ enum class AggregationOp {
     MAX,
 };
 
+enum class MemoryPriorityMode {
+    FIFO,
+    BATCH_CLASS,
+};
+
+enum class AddressMappingMode {
+    ROW_FIRST,
+    LOW_BITS,
+};
+
 struct ArchitectureConfig {
     std::string profile;
     double frequency_ghz = 0.0;
@@ -58,6 +68,14 @@ struct ArchitectureConfig {
     double independent_array_efficiency = 0.0;
     double cooperative_array_efficiency = 0.0;
     int energy_batch_vertices = 0;
+    int input_ping_pong_regions = 0;
+    int edge_ping_pong_regions = 0;
+    int aggregation_ping_pong_regions = 0;
+    uint64_t aggregation_shard_capacity_bytes = 0;
+    int batch_launch_interval_cycles = 0;
+    int neighbor_index_ready_cycles = 0;
+    int row_first_bank_interleave = 0;
+    std::string sequential_spill_alignment;
 
     static ArchitectureConfig Load(const std::string& path);
     void Validate() const;
@@ -65,15 +83,15 @@ struct ArchitectureConfig {
     uint64_t InputWindowCapacityBytes() const;
     uint64_t EdgeShardCapacityBytes() const;
     uint64_t AggregationShardCapacityBytes() const;
-    uint64_t UncoordinatedBankInterleave() const;
 };
 
 struct FeatureFlags {
     bool sparsity_elimination = true;
-    bool memory_coordination = true;
     bool aggregation_only = false;
     PipelineMode pipeline = PipelineMode::LATENCY_AWARE;
     CombinationMode combination = CombinationMode::INDEPENDENT;
+    MemoryPriorityMode memory_priority = MemoryPriorityMode::BATCH_CLASS;
+    AddressMappingMode address_mapping = AddressMappingMode::LOW_BITS;
 };
 
 struct LayerShape {
@@ -113,6 +131,8 @@ struct MemoryRequest {
     uint64_t enqueue_cycle = 0;
     uint64_t sequence = 0;
     uint64_t producer_ready_cycle = 0;
+    std::optional<uint64_t> producer_sequence;
+    uint64_t producer_delay_cycles = 0;
 };
 
 struct MemoryRequestTrace {
@@ -125,6 +145,7 @@ struct MemoryRequestTrace {
     uint64_t first_issue_cycle = 0;
     uint64_t completion_cycle = 0;
     uint64_t sequence = 0;
+    std::optional<uint64_t> producer_sequence;
 };
 
 struct InputWindowTrace {
@@ -147,10 +168,12 @@ struct AddressDistribution {
 
 struct MemoryTimingResult {
     uint64_t cycles = 0;
+    uint64_t active_cycles = 0;
     uint64_t queue_wait_cycles = 0;
     uint64_t blocked_cycles = 0;
     uint64_t row_buffer_hits = 0;
     uint64_t row_buffer_misses = 0;
+    uint64_t priority_reorders = 0;
     std::array<uint64_t, kRequestClassCount> request_counts{};
     std::array<uint64_t, kRequestClassCount> request_bytes{};
     std::array<uint64_t, kRequestClassCount> request_wait_cycles{};
@@ -235,10 +258,11 @@ private:
 class MemoryCoordinatorModel {
 public:
     static std::vector<MemoryRequest> Order(std::vector<MemoryRequest> requests,
-                                            bool coordinated);
+                                            MemoryPriorityMode priority);
     static MemoryTimingResult Simulate(const std::vector<MemoryRequest>& requests,
                                        const ArchitectureConfig& architecture,
-                                       bool coordinated);
+                                       MemoryPriorityMode priority,
+                                       AddressMappingMode mapping);
 };
 
 struct LayerMetrics {
@@ -261,10 +285,12 @@ struct LayerMetrics {
     uint64_t combination_output_columns_per_module = 0;
     uint64_t weight_cascade_bytes = 0;
     uint64_t memory_service_cycles = 0;
+    uint64_t memory_active_cycles = 0;
     uint64_t queue_wait_cycles = 0;
     uint64_t hbm_blocked_cycles = 0;
     uint64_t row_buffer_hits = 0;
     uint64_t row_buffer_misses = 0;
+    uint64_t priority_reorders = 0;
     uint64_t ae_finish_cycle = 0;
     uint64_t ce_start_cycle = 0;
     uint64_t ce_finish_cycle = 0;
@@ -293,6 +319,7 @@ struct LayerMetrics {
     std::array<uint64_t, kRequestClassCount> request_bytes{};
     std::array<uint64_t, kRequestClassCount> request_wait_cycles{};
     std::vector<InputWindowTrace> input_window_traces;
+    std::vector<MemoryRequestTrace> memory_request_traces;
     std::vector<MemoryRequestTrace> producer_request_traces;
     std::vector<uint64_t> channel_blocks;
     std::vector<uint64_t> bank_blocks;
@@ -388,8 +415,12 @@ private:
 std::string ToString(PipelineMode mode);
 std::string ToString(CombinationMode mode);
 std::string ToString(AggregationOp operation);
+std::string ToString(MemoryPriorityMode mode);
+std::string ToString(AddressMappingMode mode);
 PipelineMode ParsePipelineMode(const std::string& value);
 CombinationMode ParseCombinationMode(const std::string& value);
+MemoryPriorityMode ParseMemoryPriorityMode(const std::string& value);
+AddressMappingMode ParseAddressMappingMode(const std::string& value);
 bool ParseToggle(const std::string& value);
 
 std::string DigestFile(const std::string& path);

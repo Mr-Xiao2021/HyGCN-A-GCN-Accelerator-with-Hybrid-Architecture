@@ -43,7 +43,7 @@
 - **THEN** 整体验收失败，并列出超限指标及其差值
 
 ### Requirement: 受支持论文基准矩阵
-论文性能验收 SHALL 至少覆盖仓库现有且与论文重合的 Cora、Citeseer、PubMed 数据集上的 GCN 两层运行。GraphSAGE 和 GIN MAY 作为扩展报告，但在采样语义与 MLP 语义通过专项测试前不得计入强制 ±20% 验收。
+论文性能验收 SHALL 至少覆盖仓库现有且与论文重合的 Cora、Citeseer、PubMed 数据集，并通过版本化 workload manifest 将 Fig. 15-17 绑定到 Table 5 的 GCN layer 0（dataset feature width → 128）。未映射到论文的 `128 → num_class` 分类层 MUST NOT 隐式进入强制验收。GraphSAGE 和 GIN MAY 作为扩展报告，但不得计入强制 ±20% 验收。
 
 #### Scenario: 核心矩阵完整
 - **WHEN** 执行论文验收套件
@@ -59,6 +59,25 @@
 #### Scenario: 流水消融
 - **WHEN** 计算引擎流水加速与 DRAM 比率
 - **THEN** sequential 与目标流水策略使用相同架构参数、输入和组合策略
+
+#### Scenario: 协调器分解消融
+- **WHEN** 验收 Fig. 17
+- **THEN** 报告 priority-only、mapping-only 和 combined 三组结果，分别保持非目标机制不变，并保存 priority 请求 timeline 与 mapping channel/bank 分布
+
+#### Scenario: 带宽与总执行时间解耦
+- **WHEN** 请求时间线包含等待 AE/CE producer 且没有 HBM 请求在途的空闲区间
+- **THEN** 总执行周期保留该区间，带宽利用率只使用 in-flight request 区间并集，并在结果中同时记录 wall-clock memory cycles 和 active memory cycles
+
+### Requirement: 参数差异可审计
+系统 SHALL 从版本化参数基线和当前有效配置自动计算参数差异。`parameter_recalibration` MUST 由差异结果生成，不得写死；报告 MUST 包含 workload/config/source 行为参数的 baseline、current 和来源。
+
+#### Scenario: 行为参数发生变化
+- **WHEN** ping-pong 派生容量、spill alignment、依赖延迟、工作负载层或映射常数变化
+- **THEN** benchmark 报告列出逐项差异并自动标记发生参数变化
+
+#### Scenario: 图分区占用上限重标定
+- **WHEN** scheduler shard cap 相对上一验收基线变化
+- **THEN** 报告将其与物理 Aggregation Buffer 容量分开记录，并保存同一配置族在三个数据集上的邻近值敏感性结果
 
 ### Requirement: 因果与请求切分不变量
 同一有序 block 流的内存完成时间、row hit/miss 和 channel/bank 事务计数 MUST 不受上层请求切分影响。Output 请求 MUST 在对应 CE producer-ready 后入队；Intermediate Read MUST 访问对应 Write 的同一地址和字节范围，并等待该 Write 完成。已经进入请求级时间线的 intermediate 流量 MUST NOT 再以解析延迟重复计时。

@@ -12,6 +12,10 @@ REQUIRED_METRICS = {
     "sparsity_input_dram_ratio",
     "pipeline_speedup",
     "pipeline_dram_ratio",
+    "priority_speedup",
+    "priority_bandwidth_gain",
+    "mapping_speedup",
+    "mapping_bandwidth_gain",
     "coordination_speedup",
     "coordination_bandwidth_gain",
 }
