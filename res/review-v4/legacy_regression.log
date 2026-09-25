@@ -1,0 +1,9 @@
+Consolidate compiler generated dependencies of target dramsim3
+[ 46%] Built target dramsim3
+Consolidate compiler generated dependencies of target HyGCN
+[ 92%] Built target HyGCN
+Consolidate compiler generated dependencies of target hygcntest
+[100%] Built target hygcntest
+legacy_snapshot=cora:PASS
+legacy_snapshot=citeseer:PASS
+[100%] Built target legacy_regression

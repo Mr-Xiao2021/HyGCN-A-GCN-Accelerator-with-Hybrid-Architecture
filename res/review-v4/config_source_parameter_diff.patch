@@ -1,0 +1,1196 @@
+diff --git a/configs/HYGCN_PAPER.ini b/configs/HYGCN_PAPER.ini
+index daf94a5..546ddf2 100644
+--- a/configs/HYGCN_PAPER.ini
++++ b/configs/HYGCN_PAPER.ini
+@@ -31,3 +31,11 @@ simd_efficiency = 0.78
+ independent_array_efficiency = 0.72
+ cooperative_array_efficiency = 0.82
+ energy_batch_vertices = 256
++input_ping_pong_regions = 2
++edge_ping_pong_regions = 2
++aggregation_ping_pong_regions = 2
++aggregation_shard_capacity_bytes = 5242880
++batch_launch_interval_cycles = 1
++neighbor_index_ready_cycles = 2
++row_first_bank_interleave = 2
++sequential_spill_alignment = block
+diff --git a/configs/paper_parameter_baseline.json b/configs/paper_parameter_baseline.json
+new file mode 100644
+index 0000000..0d9872f
+--- /dev/null
++++ b/configs/paper_parameter_baseline.json
+@@ -0,0 +1,18 @@
++{
++  "schema_version": 1,
++  "baseline_version": "review-v3-9aa127d",
++  "baseline_commit": "9aa127d248849e68160c7aafd70b79cbe468094a",
++  "parameters": {
++    "aggregation_ping_pong_regions": 2,
++    "aggregation_residency_banks_per_region": 2,
++    "aggregation_shard_capacity_bytes": 4194304,
++    "batch_launch_interval_cycles": 1,
++    "benchmark_selected_layer": "all",
++    "edge_input_dependency": "static_enqueue_cycle",
++    "edge_ping_pong_regions": 2,
++    "input_ping_pong_regions": 2,
++    "neighbor_index_ready_cycles": 0,
++    "row_first_bank_interleave": 2,
++    "sequential_spill_alignment": "aggregation_shard_capacity"
++  }
++}
+diff --git a/configs/paper_workloads.json b/configs/paper_workloads.json
+new file mode 100644
+index 0000000..f48894f
+--- /dev/null
++++ b/configs/paper_workloads.json
+@@ -0,0 +1,53 @@
++{
++  "schema_version": 1,
++  "workload_version": "hygcn-hpca2020-table5-gcn-v1",
++  "paper_source": "HyGCN HPCA 2020 Table 5 and Section 5.3",
++  "figures": {
++    "figure_15": {
++      "model": "gcn",
++      "selected_layer": "0",
++      "scope": "aggregation",
++      "input_features": "dataset_metadata.feature",
++      "output_features": 128,
++      "aggregation": "per_dataset"
++    },
++    "figure_16": {
++      "model": "gcn",
++      "selected_layer": "0",
++      "scope": "full",
++      "input_features": "dataset_metadata.feature",
++      "output_features": 128,
++      "aggregation": "per_dataset"
++    },
++    "figure_17": {
++      "model": "gcn",
++      "selected_layer": "0",
++      "scope": "full",
++      "input_features": "dataset_metadata.feature",
++      "output_features": 128,
++      "aggregation": "arithmetic_mean_over_datasets"
++    }
++  },
++  "graph_partition": {
++    "aggregation_shard_capacity_bytes": 5242880,
++    "aggregation_ping_pong_half_capacity_bytes": 8388608,
++    "policy": "fixed dataset-independent scheduler occupancy cap below one physical ping-pong half",
++    "source": "HyGCN Section 4.3.2 requires the destination interval and its aggregation results to fit the on-chip Aggregation Buffer; the paper does not publish the simulator's interval occupancy, so this request-level model reports the fixed scheduler cap separately from the 16 MiB physical capacity",
++    "calibration_disclosure": "changed from the review-v3 implicit 4 MiB value and covered by 4/5/6 MiB sensitivity evidence"
++  },
++  "memory_ablation": {
++    "priority_baseline": "fifo",
++    "priority_optimized": "batch-class",
++    "mapping_baseline": "row-first",
++    "mapping_optimized": "low-bits",
++    "row_first_bank_interleave": 2,
++    "row_first_source": "The review-v3 baseline used kUncoordinatedBankInterleave=2. This version preserves that baseline value for comparability but moves it into configuration and reports it explicitly. DRAMSim3 enables a second HBM command per cycle when read/write classes differ; the two-bank striping is only a request-level width approximation, not a claim that DRAMSim3 pairs adjacent banks.",
++    "row_first_layout_basis": "configs/HBM1_4Gb_x128.ini uses address_mapping=rorabgbachco; the request-level row-first baseline preserves full-row locality before distributing rows across channels and reports the collapsed mapping formula in source and tests",
++    "low_bits_source": "HyGCN HPCA 2020 Section 4.5.2: channel and bank identifiers use lower address bits"
++  },
++  "scope_limits": [
++    "GCN only",
++    "Cora, Citeseer, and PubMed only",
++    "request-level model rather than Ramulator or RTL cycle accuracy"
++  ]
++}
+diff --git a/hygcn/paper_sim.cpp b/hygcn/paper_sim.cpp
+index 885e5e4..46f71f6 100644
+--- a/hygcn/paper_sim.cpp
++++ b/hygcn/paper_sim.cpp
+@@ -26,9 +26,6 @@ using json = nlohmann::json;
+ constexpr uint64_t kGiB = 1024ULL * 1024ULL * 1024ULL;
+ constexpr int kDataBytes = 4;
+ constexpr int kIndexBytes = 4;
+-constexpr uint64_t kPingPongRegions = 2;
+-constexpr uint64_t kAggregationResidencyBanksPerRegion = 2;
+-constexpr uint64_t kUncoordinatedBankInterleave = 2;
+ 
+ uint64_t CeilDiv(uint64_t value, uint64_t divisor) {
+     if (divisor == 0) {
+@@ -106,6 +103,9 @@ json ArchitectureJson(const ArchitectureConfig& architecture) {
+         {"weight_buffer_bytes", architecture.weight_buffer_bytes},
+         {"output_buffer_bytes", architecture.output_buffer_bytes},
+         {"aggregation_buffer_bytes", architecture.aggregation_buffer_bytes},
++        {"input_ping_pong_regions", architecture.input_ping_pong_regions},
++        {"edge_ping_pong_regions", architecture.edge_ping_pong_regions},
++        {"aggregation_ping_pong_regions", architecture.aggregation_ping_pong_regions},
+         {"input_window_capacity_bytes", architecture.InputWindowCapacityBytes()},
+         {"edge_shard_capacity_bytes", architecture.EdgeShardCapacityBytes()},
+         {"aggregation_shard_capacity_bytes", architecture.AggregationShardCapacityBytes()},
+@@ -116,13 +116,16 @@ json ArchitectureJson(const ArchitectureConfig& architecture) {
+         {"hbm_row_bytes", architecture.hbm_row_bytes},
+         {"hbm_row_hit_cycles", architecture.hbm_row_hit_cycles},
+         {"hbm_row_miss_cycles", architecture.hbm_row_miss_cycles},
+-        {"uncoordinated_bank_interleave", architecture.UncoordinatedBankInterleave()},
+         {"edram_latency_cycles", architecture.edram_latency_cycles},
+         {"edram_transactions_per_cycle", architecture.edram_transactions_per_cycle},
+         {"simd_efficiency", architecture.simd_efficiency},
+         {"independent_array_efficiency", architecture.independent_array_efficiency},
+         {"cooperative_array_efficiency", architecture.cooperative_array_efficiency},
+         {"energy_batch_vertices", architecture.energy_batch_vertices},
++        {"batch_launch_interval_cycles", architecture.batch_launch_interval_cycles},
++        {"neighbor_index_ready_cycles", architecture.neighbor_index_ready_cycles},
++        {"row_first_bank_interleave", architecture.row_first_bank_interleave},
++        {"sequential_spill_alignment", architecture.sequential_spill_alignment},
+     };
+ }
+ 
+@@ -148,6 +151,24 @@ json LayerJson(const LayerMetrics& layer) {
+             {"enqueue_cycle", trace.enqueue_cycle},
+             {"first_issue_cycle", trace.first_issue_cycle},
+             {"completion_cycle", trace.completion_cycle},
++            {"producer_sequence", trace.producer_sequence.has_value()
++                ? json(*trace.producer_sequence) : json(nullptr)},
++        });
++    }
++    json memory_requests = json::array();
++    for (const auto& trace : layer.memory_request_traces) {
++        memory_requests.push_back({
++            {"sequence", trace.sequence},
++            {"batch_id", trace.batch_id},
++            {"request_class", RequestClassName(trace.request_class)},
++            {"address", trace.address},
++            {"bytes", trace.bytes},
++            {"producer_ready_cycle", trace.producer_ready_cycle},
++            {"enqueue_cycle", trace.enqueue_cycle},
++            {"first_issue_cycle", trace.first_issue_cycle},
++            {"completion_cycle", trace.completion_cycle},
++            {"producer_sequence", trace.producer_sequence.has_value()
++                ? json(*trace.producer_sequence) : json(nullptr)},
+         });
+     }
+     json input_windows = json::array();
+@@ -186,10 +207,12 @@ json LayerJson(const LayerMetrics& layer) {
+          layer.combination_output_columns_per_module},
+         {"weight_cascade_bytes", layer.weight_cascade_bytes},
+         {"memory_service_cycles", layer.memory_service_cycles},
++        {"memory_active_cycles", layer.memory_active_cycles},
+         {"queue_wait_cycles", layer.queue_wait_cycles},
+         {"hbm_blocked_cycles", layer.hbm_blocked_cycles},
+         {"row_buffer_hits", layer.row_buffer_hits},
+         {"row_buffer_misses", layer.row_buffer_misses},
++        {"priority_reorders", layer.priority_reorders},
+         {"ae_finish_cycle", layer.ae_finish_cycle},
+         {"ce_start_cycle", layer.ce_start_cycle},
+         {"ce_finish_cycle", layer.ce_finish_cycle},
+@@ -217,6 +240,7 @@ json LayerJson(const LayerMetrics& layer) {
+         {"array_idle_lane_cycles", layer.array_idle_lane_cycles},
+         {"request_stats", request_stats},
+         {"input_window_requests", input_windows},
++        {"memory_requests", memory_requests},
+         {"producer_dependent_requests", producer_requests},
+         {"channel_blocks", layer.channel_blocks},
+         {"bank_blocks", layer.bank_blocks},
+@@ -270,6 +294,22 @@ ArchitectureConfig ArchitectureConfig::Load(const std::string& path) {
+     config.independent_array_efficiency = reader.GetReal("model", "independent_array_efficiency", -1.0);
+     config.cooperative_array_efficiency = reader.GetReal("model", "cooperative_array_efficiency", -1.0);
+     config.energy_batch_vertices = reader.GetInteger("model", "energy_batch_vertices", -1);
++    config.input_ping_pong_regions = reader.GetInteger(
++        "model", "input_ping_pong_regions", -1);
++    config.edge_ping_pong_regions = reader.GetInteger(
++        "model", "edge_ping_pong_regions", -1);
++    config.aggregation_ping_pong_regions = reader.GetInteger(
++        "model", "aggregation_ping_pong_regions", -1);
++    config.aggregation_shard_capacity_bytes = reader.GetInteger(
++        "model", "aggregation_shard_capacity_bytes", -1);
++    config.batch_launch_interval_cycles = reader.GetInteger(
++        "model", "batch_launch_interval_cycles", -1);
++    config.neighbor_index_ready_cycles = reader.GetInteger(
++        "model", "neighbor_index_ready_cycles", -1);
++    config.row_first_bank_interleave = reader.GetInteger(
++        "model", "row_first_bank_interleave", -1);
++    config.sequential_spill_alignment = reader.Get(
++        "model", "sequential_spill_alignment", "");
+     config.Validate();
+     return config;
+ }
+@@ -293,15 +333,24 @@ void ArchitectureConfig::Validate() const {
+     require_positive(weight_buffer_bytes > 0, "weight_buffer_bytes");
+     require_positive(output_buffer_bytes > 0, "output_buffer_bytes");
+     require_positive(aggregation_buffer_bytes > 0, "aggregation_buffer_bytes");
+-    require_positive(input_buffer_bytes % kPingPongRegions == 0,
++    require_positive(input_ping_pong_regions > 0, "input_ping_pong_regions");
++    require_positive(edge_ping_pong_regions > 0, "edge_ping_pong_regions");
++    require_positive(aggregation_ping_pong_regions > 0,
++                     "aggregation_ping_pong_regions");
++    require_positive(aggregation_shard_capacity_bytes > 0,
++                     "aggregation_shard_capacity_bytes");
++    require_positive(input_buffer_bytes % input_ping_pong_regions == 0,
+                      "input_buffer_bytes ping-pong alignment");
+-    require_positive(edge_buffer_bytes % kPingPongRegions == 0,
++    require_positive(edge_buffer_bytes % edge_ping_pong_regions == 0,
+                      "edge_buffer_bytes ping-pong alignment");
+     require_positive(
+-        aggregation_buffer_bytes %
+-                (kPingPongRegions * kAggregationResidencyBanksPerRegion) ==
+-            0,
+-        "aggregation_buffer_bytes residency alignment");
++        aggregation_buffer_bytes % aggregation_ping_pong_regions == 0,
++        "aggregation_buffer_bytes ping-pong alignment");
++    require_positive(
++        aggregation_shard_capacity_bytes <=
++            aggregation_buffer_bytes /
++                static_cast<uint64_t>(aggregation_ping_pong_regions),
++        "aggregation_shard_capacity_bytes ping-pong bound");
+     require_positive(hbm_capacity_bytes > 0, "hbm_capacity_bytes");
+     require_positive(hbm_bandwidth_gbps > 0.0, "hbm_bandwidth_gbps");
+     require_positive(hbm_channels > 0, "hbm_channels");
+@@ -320,6 +369,16 @@ void ArchitectureConfig::Validate() const {
+     require_positive(cooperative_array_efficiency > 0.0 && cooperative_array_efficiency <= 1.0,
+                      "cooperative_array_efficiency");
+     require_positive(energy_batch_vertices > 0, "energy_batch_vertices");
++    require_positive(batch_launch_interval_cycles >= 0,
++                     "batch_launch_interval_cycles");
++    require_positive(neighbor_index_ready_cycles >= 0,
++                     "neighbor_index_ready_cycles");
++    require_positive(row_first_bank_interleave > 0 &&
++                         row_first_bank_interleave <= hbm_banks_per_channel &&
++                         hbm_banks_per_channel % row_first_bank_interleave == 0,
++                     "row_first_bank_interleave");
++    require_positive(sequential_spill_alignment == "block",
++                     "sequential_spill_alignment");
+     require_positive(InputWindowCapacityBytes() >= static_cast<uint64_t>(block_size),
+                      "input_window_capacity_bytes");
+     require_positive(EdgeShardCapacityBytes() >= static_cast<uint64_t>(block_size),
+@@ -333,23 +392,15 @@ double ArchitectureConfig::HbmBytesPerCycle() const {
+ }
+ 
+ uint64_t ArchitectureConfig::InputWindowCapacityBytes() const {
+-    return input_buffer_bytes / kPingPongRegions;
++    return input_buffer_bytes / input_ping_pong_regions;
+ }
+ 
+ uint64_t ArchitectureConfig::EdgeShardCapacityBytes() const {
+-    return edge_buffer_bytes / kPingPongRegions;
++    return edge_buffer_bytes / edge_ping_pong_regions;
+ }
+ 
+ uint64_t ArchitectureConfig::AggregationShardCapacityBytes() const {
+-    return aggregation_buffer_bytes /
+-        (kPingPongRegions * kAggregationResidencyBanksPerRegion);
+-}
+-
+-uint64_t ArchitectureConfig::UncoordinatedBankInterleave() const {
+-    return hbm_banks_per_channel >= static_cast<int>(kUncoordinatedBankInterleave) &&
+-            hbm_banks_per_channel % kUncoordinatedBankInterleave == 0
+-        ? kUncoordinatedBankInterleave
+-        : 1;
++    return aggregation_shard_capacity_bytes;
+ }
+ 
+ AggregationBufferModel::AggregationBufferModel(uint64_t capacity_bytes)
+@@ -460,19 +511,20 @@ const std::deque<BufferSegment>& AggregationBufferModel::Segments() const {
+ }
+ 
+ std::vector<MemoryRequest> MemoryCoordinatorModel::Order(std::vector<MemoryRequest> requests,
+-                                                         bool coordinated) {
++                                                         MemoryPriorityMode priority) {
+     for (const auto& request : requests) {
+         if (request.batch_id < 0 || request.bytes == 0 ||
+             request.address > std::numeric_limits<uint64_t>::max() - request.bytes ||
+-            request.enqueue_cycle < request.producer_ready_cycle) {
++            (!request.producer_sequence.has_value() &&
++             request.enqueue_cycle < request.producer_ready_cycle)) {
+             throw std::runtime_error("invalid memory request");
+         }
+     }
+-    std::stable_sort(requests.begin(), requests.end(), [coordinated](const auto& lhs, const auto& rhs) {
++    std::stable_sort(requests.begin(), requests.end(), [priority](const auto& lhs, const auto& rhs) {
+         if (lhs.enqueue_cycle != rhs.enqueue_cycle) {
+             return lhs.enqueue_cycle < rhs.enqueue_cycle;
+         }
+-        if (coordinated) {
++        if (priority == MemoryPriorityMode::BATCH_CLASS) {
+             if (lhs.batch_id != rhs.batch_id) {
+                 return lhs.batch_id < rhs.batch_id;
+             }
+@@ -488,7 +540,8 @@ std::vector<MemoryRequest> MemoryCoordinatorModel::Order(std::vector<MemoryReque
+ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         const std::vector<MemoryRequest>& requests,
+         const ArchitectureConfig& architecture,
+-        bool coordinated) {
++        MemoryPriorityMode priority,
++        AddressMappingMode mapping) {
+     architecture.Validate();
+     MemoryTimingResult result;
+     result.channel_blocks.assign(architecture.hbm_channels, 0);
+@@ -503,12 +556,28 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         bool row_open = false;
+     };
+ 
+-    struct BlockTransaction {
++    struct RequestState {
++        MemoryRequest request;
++        uint64_t first_block = 0;
++        uint64_t block_count = 0;
++        uint64_t next_block = 0;
++        uint64_t first_issue = std::numeric_limits<uint64_t>::max();
++        uint64_t completion = 0;
++        uint64_t effective_producer_ready = 0;
++        uint64_t effective_enqueue = 0;
++    };
++
++    struct Candidate {
+         std::size_t request_index = 0;
++        uint64_t start_cycle = 0;
++        uint64_t producer_ready_cycle = 0;
++        uint64_t enqueue_cycle = 0;
+         uint64_t block = 0;
++        std::size_t channel = 0;
++        std::size_t bank = 0;
++        uint64_t row = 0;
+     };
+ 
+-    const auto ordered = Order(requests, coordinated);
+     const uint64_t blocks_per_row = architecture.hbm_row_bytes / architecture.block_size;
+     const uint64_t bytes_per_channel_cycle =
+         std::max<double>(1.0, architecture.HbmBytesPerCycle() / architecture.hbm_channels);
+@@ -518,53 +587,329 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+     std::vector<BankState> banks(
+         static_cast<std::size_t>(architecture.hbm_channels) *
+         architecture.hbm_banks_per_channel);
+-    std::vector<BlockTransaction> transactions;
+-    std::vector<uint64_t> first_issue(ordered.size(),
+-                                      std::numeric_limits<uint64_t>::max());
+-    std::vector<uint64_t> completion_cycles(ordered.size(), 0);
+-    for (std::size_t request_index = 0; request_index < ordered.size(); ++request_index) {
+-        const auto& request = ordered[request_index];
+-        const uint64_t blocks = CeilDiv(request.bytes, architecture.block_size);
+-        const uint64_t first_block = request.address / architecture.block_size;
+-        for (uint64_t offset = 0; offset < blocks; ++offset) {
+-            transactions.push_back({request_index, first_block + offset});
+-        }
+-    }
+-
+-    for (const auto& transaction : transactions) {
+-        const auto& request = ordered[transaction.request_index];
+-        const uint64_t block = transaction.block;
+-        std::size_t channel = 0;
+-        std::size_t bank = 0;
+-        uint64_t row = 0;
+-        if (coordinated) {
+-            channel = static_cast<std::size_t>(block % architecture.hbm_channels);
+-            bank = static_cast<std::size_t>(
++    std::vector<RequestState> states;
++    states.reserve(requests.size());
++    std::map<uint64_t, std::size_t> sequence_to_index;
++    uint64_t remaining_blocks = 0;
++    for (const auto& request : requests) {
++        if (request.batch_id < 0 || request.bytes == 0 ||
++            request.address > std::numeric_limits<uint64_t>::max() - request.bytes ||
++            (!request.producer_sequence.has_value() &&
++             request.enqueue_cycle < request.producer_ready_cycle) ||
++            !sequence_to_index.emplace(request.sequence, states.size()).second) {
++            throw std::runtime_error("invalid memory request");
++        }
++        const uint64_t block_count = CeilDiv(request.bytes, architecture.block_size);
++        states.push_back({request, request.address / architecture.block_size, block_count});
++        remaining_blocks += block_count;
++    }
++    for (const auto& state : states) {
++        if (!state.request.producer_sequence.has_value()) {
++            continue;
++        }
++        const auto producer = sequence_to_index.find(*state.request.producer_sequence);
++        if (producer == sequence_to_index.end() ||
++            *state.request.producer_sequence == state.request.sequence) {
++            throw std::runtime_error("invalid memory request dependency");
++        }
++    }
++
++    auto map_block = [&](uint64_t block) {
++        Candidate candidate;
++        candidate.block = block;
++        if (mapping == AddressMappingMode::LOW_BITS) {
++            candidate.channel = static_cast<std::size_t>(block % architecture.hbm_channels);
++            candidate.bank = static_cast<std::size_t>(
+                 (block / architecture.hbm_channels) % architecture.hbm_banks_per_channel);
+-            row = block /
++            candidate.row = block /
+                 (static_cast<uint64_t>(architecture.hbm_channels) *
+                  architecture.hbm_banks_per_channel * blocks_per_row);
+         } else {
+-            const uint64_t bank_interleave = architecture.UncoordinatedBankInterleave();
++            const uint64_t bank_interleave =
++                static_cast<uint64_t>(architecture.row_first_bank_interleave);
+             const uint64_t interleaved_block = block / bank_interleave;
+-            channel = static_cast<std::size_t>(
++            candidate.channel = static_cast<std::size_t>(
+                 (interleaved_block / blocks_per_row) % architecture.hbm_channels);
+             const uint64_t bank_group =
+                 (interleaved_block /
+                  (blocks_per_row * architecture.hbm_channels)) %
+                 (architecture.hbm_banks_per_channel / bank_interleave);
+-            bank = static_cast<std::size_t>(
++            candidate.bank = static_cast<std::size_t>(
+                 bank_group * bank_interleave + block % bank_interleave);
+-            row = interleaved_block /
++            candidate.row = interleaved_block /
+                 (blocks_per_row * architecture.hbm_channels *
+                  (architecture.hbm_banks_per_channel / bank_interleave));
+         }
+-        auto& bank_state = banks[channel * architecture.hbm_banks_per_channel + bank];
+-        const uint64_t start = std::max(
+-            {request.enqueue_cycle, channel_issue_cycle[channel], bank_state.ready_cycle});
+-        first_issue[transaction.request_index] = std::min(
+-            first_issue[transaction.request_index], start);
+-        const bool row_hit = bank_state.row_open && bank_state.open_row == row;
++        return candidate;
++    };
++
++    auto fifo_less = [&](const Candidate& lhs, const Candidate& rhs) {
++        const auto& lhs_request = states[lhs.request_index].request;
++        const auto& rhs_request = states[rhs.request_index].request;
++        if (lhs.enqueue_cycle != rhs.enqueue_cycle) {
++            return lhs.enqueue_cycle < rhs.enqueue_cycle;
++        }
++        return lhs_request.sequence < rhs_request.sequence;
++    };
++    auto priority_less = [&](const Candidate& lhs, const Candidate& rhs) {
++        const auto& lhs_request = states[lhs.request_index].request;
++        const auto& rhs_request = states[rhs.request_index].request;
++        if (priority == MemoryPriorityMode::FIFO) {
++            return fifo_less(lhs, rhs);
++        }
++        if (lhs_request.batch_id != rhs_request.batch_id) {
++            return lhs_request.batch_id < rhs_request.batch_id;
++        }
++        if (lhs_request.request_class != rhs_request.request_class) {
++            return static_cast<int>(lhs_request.request_class) <
++                   static_cast<int>(rhs_request.request_class);
++        }
++        return lhs_request.sequence < rhs_request.sequence;
++    };
++
++    std::vector<std::vector<std::size_t>> dependents(states.size());
++    for (std::size_t index = 0; index < states.size(); ++index) {
++        const auto& producer_sequence = states[index].request.producer_sequence;
++        if (producer_sequence.has_value()) {
++            dependents[sequence_to_index.at(*producer_sequence)].push_back(index);
++        }
++    }
++
++    auto make_candidate = [&](std::size_t index) {
++        const auto& state = states[index];
++        if (state.next_block >= state.block_count) {
++            throw std::runtime_error("completed request cannot be scheduled");
++        }
++        uint64_t producer_ready = state.request.producer_ready_cycle;
++        if (state.request.producer_sequence.has_value()) {
++            const auto& producer = states[sequence_to_index.at(
++                *state.request.producer_sequence)];
++            if (producer.next_block < producer.block_count) {
++                throw std::runtime_error("dependent request released before producer completion");
++            }
++            producer_ready = std::max(
++                producer_ready,
++                producer.completion + state.request.producer_delay_cycles);
++        }
++        const uint64_t enqueue = std::max(state.request.enqueue_cycle, producer_ready);
++        auto candidate = map_block(state.first_block + state.next_block);
++        candidate.request_index = index;
++        candidate.producer_ready_cycle = producer_ready;
++        candidate.enqueue_cycle = enqueue;
++        const auto& bank_state = banks[
++            candidate.channel * architecture.hbm_banks_per_channel + candidate.bank];
++        candidate.start_cycle = std::max(
++            {enqueue, channel_issue_cycle[candidate.channel], bank_state.ready_cycle});
++        return candidate;
++    };
++    struct BankQueue {
++        using Comparator = std::function<bool(const Candidate&, const Candidate&)>;
++        using Queue = std::priority_queue<Candidate, std::vector<Candidate>, Comparator>;
++        using Set = std::set<Candidate, Comparator>;
++
++        BankQueue(const Comparator& future_after, const Comparator& available_less)
++            : future(future_after), available(available_less),
++              available_less(available_less) {}
++
++        Queue future;
++        Set available;
++        std::map<uint64_t, Set> available_rows;
++        Comparator available_less;
++    };
++    struct BankChoice {
++        Candidate candidate;
++        std::size_t flat_bank = 0;
++        int source = 0;
++        bool valid = false;
++    };
++
++    auto future_after = [&](const Candidate& lhs, const Candidate& rhs) {
++        if (lhs.enqueue_cycle != rhs.enqueue_cycle) {
++            return lhs.enqueue_cycle > rhs.enqueue_cycle;
++        }
++        return priority_less(rhs, lhs);
++    };
++    auto available_less = [&](const Candidate& lhs, const Candidate& rhs) {
++        return priority_less(lhs, rhs);
++    };
++    auto fifo_after = [&](const Candidate& lhs, const Candidate& rhs) {
++        return fifo_less(rhs, lhs);
++    };
++    const std::size_t total_banks =
++        static_cast<std::size_t>(architecture.hbm_channels) *
++        architecture.hbm_banks_per_channel;
++    std::vector<BankQueue> bank_queues;
++    bank_queues.reserve(total_banks);
++    for (std::size_t bank = 0; bank < total_banks; ++bank) {
++        bank_queues.emplace_back(future_after, available_less);
++    }
++    std::priority_queue<Candidate, std::vector<Candidate>, decltype(fifo_after)> active_fifo(
++        fifo_after);
++
++    auto resource_ready = [&](std::size_t flat_bank) {
++        const std::size_t channel =
++            flat_bank / architecture.hbm_banks_per_channel;
++        return std::max(channel_issue_cycle[channel], banks[flat_bank].ready_cycle);
++    };
++    auto push_available = [&](BankQueue& queue, const Candidate& candidate) {
++        queue.available.insert(candidate);
++        auto row = queue.available_rows.find(candidate.row);
++        if (row == queue.available_rows.end()) {
++            row = queue.available_rows.emplace(
++                std::piecewise_construct,
++                std::forward_as_tuple(candidate.row),
++                std::forward_as_tuple(queue.available_less)).first;
++        }
++        row->second.insert(candidate);
++    };
++    auto enqueue_candidate = [&](const Candidate& candidate, bool activate_request) {
++        const std::size_t flat_bank =
++            candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
++        if (candidate.enqueue_cycle <= resource_ready(flat_bank)) {
++            push_available(bank_queues[flat_bank], candidate);
++        } else {
++            bank_queues[flat_bank].future.push(candidate);
++        }
++        if (activate_request) {
++            active_fifo.push(candidate);
++        }
++    };
++    auto peek_bank = [&](std::size_t flat_bank) {
++        auto& queue = bank_queues[flat_bank];
++        const uint64_t ready_cycle = resource_ready(flat_bank);
++        while (!queue.future.empty() &&
++               queue.future.top().enqueue_cycle <= ready_cycle) {
++            push_available(queue, queue.future.top());
++            queue.future.pop();
++        }
++        BankChoice choice;
++        choice.flat_bank = flat_bank;
++        if (!queue.available.empty()) {
++            choice.candidate = *queue.available.begin();
++            choice.candidate.start_cycle = ready_cycle;
++            choice.source = 1;
++            choice.valid = true;
++            if (priority == MemoryPriorityMode::BATCH_CLASS &&
++                banks[flat_bank].row_open) {
++                const auto row = queue.available_rows.find(banks[flat_bank].open_row);
++                if (row != queue.available_rows.end()) {
++                    auto& row_queue = row->second;
++                    if (!row_queue.empty()) {
++                        const auto& primary_request =
++                            states[choice.candidate.request_index].request;
++                        const auto& row_request =
++                            states[row_queue.begin()->request_index].request;
++                        if (primary_request.batch_id == row_request.batch_id &&
++                            primary_request.request_class == row_request.request_class) {
++                            choice.candidate = *row_queue.begin();
++                            choice.candidate.start_cycle = ready_cycle;
++                            choice.source = 2;
++                        }
++                    }
++                }
++            }
++        } else if (!queue.future.empty()) {
++            choice.candidate = queue.future.top();
++            choice.candidate.start_cycle = queue.future.top().enqueue_cycle;
++            choice.valid = true;
++        }
++        return choice;
++    };
++    auto choice_less = [&](const BankChoice& lhs, const BankChoice& rhs) {
++        if (!lhs.valid) {
++            return false;
++        }
++        if (!rhs.valid) {
++            return true;
++        }
++        if (priority == MemoryPriorityMode::FIFO) {
++            if (fifo_less(lhs.candidate, rhs.candidate)) {
++                return true;
++            }
++            if (fifo_less(rhs.candidate, lhs.candidate)) {
++                return false;
++            }
++        }
++        if (lhs.candidate.start_cycle != rhs.candidate.start_cycle) {
++            return lhs.candidate.start_cycle < rhs.candidate.start_cycle;
++        }
++        return priority_less(lhs.candidate, rhs.candidate);
++    };
++
++    std::vector<BankChoice> channel_choices(architecture.hbm_channels);
++    auto recompute_channel = [&](std::size_t channel) {
++        BankChoice best;
++        const std::size_t first_bank =
++            channel * architecture.hbm_banks_per_channel;
++        for (std::size_t bank = 0;
++             bank < static_cast<std::size_t>(architecture.hbm_banks_per_channel);
++             ++bank) {
++            const BankChoice candidate = peek_bank(first_bank + bank);
++            if (choice_less(candidate, best)) {
++                best = candidate;
++            }
++        }
++        channel_choices[channel] = best;
++    };
++
++    for (std::size_t index = 0; index < states.size(); ++index) {
++        if (!states[index].request.producer_sequence.has_value()) {
++            enqueue_candidate(make_candidate(index), true);
++        }
++    }
++    for (std::size_t channel = 0; channel < channel_choices.size(); ++channel) {
++        recompute_channel(channel);
++    }
++
++    while (remaining_blocks > 0) {
++        BankChoice selected_choice;
++        for (const auto& channel_choice : channel_choices) {
++            if (choice_less(channel_choice, selected_choice)) {
++                selected_choice = channel_choice;
++            }
++        }
++        if (!selected_choice.valid) {
++            throw std::runtime_error("memory request dependency cycle");
++        }
++        const Candidate selected = selected_choice.candidate;
++        auto& selected_queue = bank_queues[selected_choice.flat_bank];
++        if (selected_choice.source == 1 || selected_choice.source == 2) {
++            selected_queue.available.erase(selected);
++            auto row = selected_queue.available_rows.find(selected.row);
++            if (row == selected_queue.available_rows.end() ||
++                row->second.erase(selected) != 1) {
++                throw std::runtime_error("available row index is inconsistent");
++            }
++            if (row->second.empty()) {
++                selected_queue.available_rows.erase(row);
++            }
++        } else {
++            selected_queue.future.pop();
++        }
++
++        auto& state = states[selected.request_index];
++        while (!active_fifo.empty() &&
++               states[active_fifo.top().request_index].next_block >=
++                   states[active_fifo.top().request_index].block_count) {
++            active_fifo.pop();
++        }
++        if (priority == MemoryPriorityMode::BATCH_CLASS &&
++            state.first_issue == std::numeric_limits<uint64_t>::max() &&
++            !active_fifo.empty() &&
++            active_fifo.top().request_index != selected.request_index) {
++            const Candidate fifo_candidate = make_candidate(
++                active_fifo.top().request_index);
++            if (fifo_candidate.start_cycle <= selected.start_cycle) {
++                ++result.priority_reorders;
++            }
++        }
++        auto& bank_state = banks[selected_choice.flat_bank];
++        state.effective_producer_ready = std::max(
++            state.effective_producer_ready, selected.producer_ready_cycle);
++        state.effective_enqueue = std::max(
++            state.effective_enqueue, selected.enqueue_cycle);
++        state.first_issue = std::min(state.first_issue, selected.start_cycle);
++        const bool row_hit = bank_state.row_open && bank_state.open_row == selected.row;
+         const uint64_t access_cycles = row_hit
+             ? architecture.hbm_row_hit_cycles
+             : architecture.hbm_row_miss_cycles;
+@@ -573,48 +918,86 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         } else {
+             ++result.row_buffer_misses;
+         }
+-        const uint64_t completion = start + access_cycles + transfer_cycles;
+-        channel_issue_cycle[channel] = start + transfer_cycles;
++        const uint64_t completion = selected.start_cycle + access_cycles + transfer_cycles;
++        channel_issue_cycle[selected.channel] = selected.start_cycle + transfer_cycles;
+         bank_state.ready_cycle = completion;
+-        bank_state.open_row = row;
++        bank_state.open_row = selected.row;
+         bank_state.row_open = true;
+-        completion_cycles[transaction.request_index] = std::max(
+-            completion_cycles[transaction.request_index], completion);
+-        ++result.channel_blocks[channel];
+-        ++result.bank_blocks[bank];
++        state.completion = std::max(state.completion, completion);
++        ++state.next_block;
++        --remaining_blocks;
++        ++result.channel_blocks[selected.channel];
++        ++result.bank_blocks[selected.bank];
++
++        std::vector<bool> affected_channels(architecture.hbm_channels, false);
++        affected_channels[selected.channel] = true;
++        if (state.next_block < state.block_count) {
++            const Candidate next = make_candidate(selected.request_index);
++            enqueue_candidate(next, false);
++            affected_channels[next.channel] = true;
++        } else {
++            for (std::size_t dependent : dependents[selected.request_index]) {
++                const Candidate released = make_candidate(dependent);
++                enqueue_candidate(released, true);
++                affected_channels[released.channel] = true;
++            }
++        }
++        for (std::size_t channel = 0; channel < affected_channels.size(); ++channel) {
++            if (affected_channels[channel]) {
++                recompute_channel(channel);
++            }
++        }
+     }
+ 
+-    for (std::size_t ordered_index = 0; ordered_index < ordered.size(); ++ordered_index) {
+-        const auto& request = ordered[ordered_index];
++    for (const auto& state : states) {
++        const auto& request = state.request;
+         const auto class_index = static_cast<std::size_t>(request.request_class);
+-        const uint64_t request_completion = completion_cycles[ordered_index];
+-        const uint64_t first_start = first_issue[ordered_index];
+-        const uint64_t wait = first_start - request.enqueue_cycle;
++        const uint64_t wait = state.first_issue - state.effective_enqueue;
+         result.queue_wait_cycles += wait;
+         result.blocked_cycles += wait;
+         ++result.request_counts[class_index];
+         result.request_bytes[class_index] += request.bytes;
+         result.request_wait_cycles[class_index] += wait;
+         result.class_completion_cycles[class_index] = std::max(
+-            result.class_completion_cycles[class_index], request_completion);
++            result.class_completion_cycles[class_index], state.completion);
+         auto& batch_completion = result.batch_completion_cycles[request.batch_id];
+         batch_completion[class_index] = std::max(
+-            batch_completion[class_index], request_completion);
++            batch_completion[class_index], state.completion);
+         result.request_traces.push_back({
+             request.batch_id,
+             request.request_class,
+             request.bytes,
+             request.address,
+-            request.producer_ready_cycle,
+-            request.enqueue_cycle,
+-            first_start,
+-            request_completion,
++            state.effective_producer_ready,
++            state.effective_enqueue,
++            state.first_issue,
++            state.completion,
+             request.sequence,
++            request.producer_sequence,
+         });
+-        result.cycles = std::max(result.cycles, request_completion);
++        result.cycles = std::max(result.cycles, state.completion);
+     }
+     std::stable_sort(result.request_traces.begin(), result.request_traces.end(),
+         [](const auto& lhs, const auto& rhs) { return lhs.sequence < rhs.sequence; });
++    std::vector<std::pair<uint64_t, uint64_t>> active_intervals;
++    active_intervals.reserve(result.request_traces.size());
++    for (const auto& trace : result.request_traces) {
++        active_intervals.push_back({trace.first_issue_cycle, trace.completion_cycle});
++    }
++    std::sort(active_intervals.begin(), active_intervals.end());
++    uint64_t active_start = active_intervals.front().first;
++    uint64_t active_end = active_intervals.front().second;
++    for (std::size_t index = 1; index < active_intervals.size(); ++index) {
++        const auto& interval = active_intervals[index];
++        if (interval.first <= active_end) {
++            active_end = std::max(active_end, interval.second);
++            continue;
++        }
++        result.active_cycles += active_end - active_start;
++        active_start = interval.first;
++        active_end = interval.second;
++    }
++    result.active_cycles += active_end - active_start;
+     return result;
+ }
+ 
+@@ -673,7 +1056,7 @@ uint64_t ExperimentResult::TotalInputDramBytes() const {
+ double ExperimentResult::BandwidthUtilization() const {
+     uint64_t memory_cycles = 0;
+     for (const auto& layer : layers) {
+-        memory_cycles += layer.memory_service_cycles;
++        memory_cycles += layer.memory_active_cycles;
+     }
+     if (memory_cycles == 0) {
+         return 0.0;
+@@ -1009,7 +1392,7 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+         if (batch.aggregation_bytes > batch_capacity) {
+             throw std::runtime_error("execution batch exceeds aggregation buffer allocation");
+         }
+-        batch.spill_bytes = Align(batch.aggregation_bytes, batch_capacity);
++        batch.spill_bytes = Align(batch.aggregation_bytes, architecture_.block_size);
+     }
+ 
+     uint64_t edge_count = 0;
+@@ -1112,14 +1495,24 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+     std::vector<MemoryRequest> requests;
+     uint64_t sequence = 0;
+     uint64_t edge_offset = 0;
++    std::vector<std::optional<uint64_t>> edge_sequences(raw_batch_count);
+     for (const auto& shard : shards) {
+         if (shard.edge_bytes > 0) {
++            const uint64_t edge_sequence = sequence++;
++            edge_sequences[shard.batch_id] = edge_sequence;
+             requests.push_back({shard.batch_id, RequestClass::EDGE, shard.edge_bytes,
+                                 layout.edge.start + edge_offset,
+-                                static_cast<uint64_t>(shard.batch_id), sequence++});
++                                static_cast<uint64_t>(shard.batch_id) *
++                                    architecture_.batch_launch_interval_cycles,
++                                edge_sequence});
+             edge_offset += shard.edge_bytes;
+         }
++    }
++    for (const auto& shard : shards) {
+         if (shard.input_bytes > 0) {
++            if (!edge_sequences[shard.batch_id].has_value()) {
++                throw std::runtime_error("input window is missing its edge producer");
++            }
+             const int window_end = flags.sparsity_elimination
+                 ? shard.shrunk_interval_end
+                 : shard.interval_end;
+@@ -1133,8 +1526,12 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+                 RequestClass::INPUT,
+                 shard.input_bytes,
+                 address,
+-                static_cast<uint64_t>(shard.batch_id),
++                static_cast<uint64_t>(shard.batch_id) *
++                    architecture_.batch_launch_interval_cycles,
+                 sequence++,
++                0,
++                edge_sequences[shard.batch_id],
++                static_cast<uint64_t>(architecture_.neighbor_index_ready_cycles),
+             });
+             metrics.input_window_traces.push_back({
+                 shard.batch_id,
+@@ -1161,7 +1558,8 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+                 request.address > architecture_.hbm_capacity_bytes - request.bytes) {
+                 throw std::runtime_error("memory request exceeds configured HBM capacity");
+             }
+-            if (request.enqueue_cycle < request.producer_ready_cycle) {
++            if (!request.producer_sequence.has_value() &&
++                request.enqueue_cycle < request.producer_ready_cycle) {
+                 throw std::runtime_error("memory request enqueued before producer readiness");
+             }
+         }
+@@ -1169,7 +1567,7 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+     auto simulate = [&]() {
+         validate_requests();
+         return MemoryCoordinatorModel::Simulate(
+-            requests, architecture_, flags.memory_coordination);
++            requests, architecture_, flags.memory_priority, flags.address_mapping);
+     };
+     auto trace_completion = [](const MemoryTimingResult& timing, uint64_t request_sequence) {
+         const auto iterator = std::find_if(
+@@ -1205,15 +1603,18 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+ 
+     auto record_memory_timing = [&](const MemoryTimingResult& memory_timing) {
+         metrics.memory_service_cycles = memory_timing.cycles;
++        metrics.memory_active_cycles = memory_timing.active_cycles;
+         metrics.queue_wait_cycles = memory_timing.queue_wait_cycles;
+         metrics.hbm_blocked_cycles = memory_timing.blocked_cycles;
+         metrics.row_buffer_hits = memory_timing.row_buffer_hits;
+         metrics.row_buffer_misses = memory_timing.row_buffer_misses;
++        metrics.priority_reorders = memory_timing.priority_reorders;
+         metrics.request_counts = memory_timing.request_counts;
+         metrics.request_bytes = memory_timing.request_bytes;
+         metrics.request_wait_cycles = memory_timing.request_wait_cycles;
+         metrics.channel_blocks = memory_timing.channel_blocks;
+         metrics.bank_blocks = memory_timing.bank_blocks;
++        metrics.memory_request_traces = memory_timing.request_traces;
+         metrics.aggregation_memory_cycles = std::max(
+             memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::EDGE)],
+             memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::INPUT)]);
+@@ -1222,7 +1623,8 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+         metrics.combination_output_cycles =
+             memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::OUTPUT)];
+         for (const auto& trace : memory_timing.request_traces) {
+-            if (trace.request_class == RequestClass::OUTPUT ||
++            if (trace.producer_sequence.has_value() ||
++                trace.request_class == RequestClass::OUTPUT ||
+                 trace.request_class == RequestClass::INTERMEDIATE_WRITE ||
+                 trace.request_class == RequestClass::INTERMEDIATE_READ) {
+                 if (trace.enqueue_cycle < trace.producer_ready_cycle ||
+@@ -1246,15 +1648,14 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+         if (requested_bytes != metrics.TotalDramBytes() ||
+             metrics.TotalDramBytes() != metrics.edge_dram_bytes + metrics.input_dram_bytes ||
+             metrics.weight_dram_bytes != 0 || metrics.output_dram_bytes != 0 ||
+-            metrics.intermediate_dram_bytes != 0 ||
+-            !metrics.producer_request_traces.empty()) {
++            metrics.intermediate_dram_bytes != 0) {
+             throw std::runtime_error("aggregation-only traffic invariant failed");
+         }
+         metrics.channel_imbalance = Imbalance(metrics.channel_blocks);
+         metrics.bank_imbalance = Imbalance(metrics.bank_blocks);
+         metrics.bandwidth_utilization = Clamp(
+             metrics.TotalDramBytes() /
+-                (std::max<uint64_t>(1, metrics.memory_service_cycles) *
++                (std::max<uint64_t>(1, metrics.memory_active_cycles) *
+                  architecture_.HbmBytesPerCycle()),
+             0.0, 1.0);
+         metrics.cycles = metrics.ae_finish_cycle;
+@@ -1287,7 +1688,7 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+                 RequestClass::INTERMEDIATE_WRITE,
+                 info.spill_bytes,
+                 layout.intermediate.start + intermediate_offset,
+-                batch_ae_finish[batch],
++                metrics.ae_finish_cycle,
+                 sequence,
+                 batch_ae_finish[batch],
+             });
+@@ -1317,6 +1718,8 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+                 all_writes_complete,
+                 sequence,
+                 write_completions[batch],
++                write_sequences[batch],
++                0,
+             });
+             read_sequences.push_back(sequence++);
+             intermediate_offset += info.spill_bytes;
+@@ -1505,7 +1908,7 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+     metrics.bank_imbalance = Imbalance(metrics.bank_blocks);
+     metrics.bandwidth_utilization = Clamp(
+         metrics.TotalDramBytes() /
+-            (std::max<uint64_t>(1, metrics.memory_service_cycles) *
++            (std::max<uint64_t>(1, metrics.memory_active_cycles) *
+              architecture_.HbmBytesPerCycle()),
+         0.0, 1.0);
+     metrics.cycles = std::max(metrics.ce_finish_cycle, metrics.memory_service_cycles);
+@@ -1574,6 +1977,26 @@ std::string ToString(AggregationOp operation) {
+     throw std::runtime_error("unknown aggregation operation");
+ }
+ 
++std::string ToString(MemoryPriorityMode mode) {
++    switch (mode) {
++        case MemoryPriorityMode::FIFO:
++            return "fifo";
++        case MemoryPriorityMode::BATCH_CLASS:
++            return "batch-class";
++    }
++    throw std::runtime_error("unknown memory priority mode");
++}
++
++std::string ToString(AddressMappingMode mode) {
++    switch (mode) {
++        case AddressMappingMode::ROW_FIRST:
++            return "row-first";
++        case AddressMappingMode::LOW_BITS:
++            return "low-bits";
++    }
++    throw std::runtime_error("unknown address mapping mode");
++}
++
+ PipelineMode ParsePipelineMode(const std::string& value) {
+     if (value == "sequential") {
+         return PipelineMode::SEQUENTIAL;
+@@ -1597,6 +2020,26 @@ CombinationMode ParseCombinationMode(const std::string& value) {
+     throw std::runtime_error("invalid combination mode: " + value);
+ }
+ 
++MemoryPriorityMode ParseMemoryPriorityMode(const std::string& value) {
++    if (value == "fifo") {
++        return MemoryPriorityMode::FIFO;
++    }
++    if (value == "batch-class" || value == "batch") {
++        return MemoryPriorityMode::BATCH_CLASS;
++    }
++    throw std::runtime_error("invalid memory priority mode: " + value);
++}
++
++AddressMappingMode ParseAddressMappingMode(const std::string& value) {
++    if (value == "row-first" || value == "row") {
++        return AddressMappingMode::ROW_FIRST;
++    }
++    if (value == "low-bits" || value == "low") {
++        return AddressMappingMode::LOW_BITS;
++    }
++    throw std::runtime_error("invalid address mapping mode: " + value);
++}
++
+ bool ParseToggle(const std::string& value) {
+     if (value == "on" || value == "true" || value == "1") {
+         return true;
+@@ -1641,7 +2084,11 @@ void WriteExperimentJson(const ExperimentResult& result, const std::string& path
+         {"pipeline", ToString(result.flags.pipeline)},
+         {"combination", ToString(result.flags.combination)},
+         {"sparsity_elimination", result.flags.sparsity_elimination},
+-        {"memory_coordination", result.flags.memory_coordination},
++        {"memory_priority", ToString(result.flags.memory_priority)},
++        {"address_mapping", ToString(result.flags.address_mapping)},
++        {"memory_coordination",
++         result.flags.memory_priority == MemoryPriorityMode::BATCH_CLASS &&
++             result.flags.address_mapping == AddressMappingMode::LOW_BITS},
+         {"aggregation_only", result.flags.aggregation_only},
+     };
+     output["architecture"] = ArchitectureJson(result.architecture);
+@@ -1674,9 +2121,9 @@ void WriteExperimentCsv(const ExperimentResult& result, const std::string& path)
+     if (!stream) {
+         throw std::runtime_error("cannot write CSV result: " + path);
+     }
+-    stream << "model,dataset,profile,scope,pipeline,combination,sparsity,coordination,layer,"
++    stream << "model,dataset,profile,scope,pipeline,combination,sparsity,priority,mapping,layer,"
+               "input_features,output_features,cycles,aggregation_cycles,combination_cycles,"
+-              "memory_service_cycles,edge_dram_bytes,input_dram_bytes,weight_dram_bytes,"
++              "memory_service_cycles,memory_active_cycles,edge_dram_bytes,input_dram_bytes,weight_dram_bytes,"
+               "output_dram_bytes,intermediate_dram_bytes,total_dram_bytes,mac_operations,"
+               "add_operations,compare_operations,simd_utilization,array_utilization,"
+               "bandwidth_utilization,queue_wait_cycles,hbm_blocked_cycles,channel_imbalance,"
+@@ -1687,10 +2134,12 @@ void WriteExperimentCsv(const ExperimentResult& result, const std::string& path)
+                << (result.flags.aggregation_only ? "aggregation" : "full") << ','
+                << ToString(result.flags.pipeline) << ',' << ToString(result.flags.combination) << ','
+                << (result.flags.sparsity_elimination ? "on" : "off") << ','
+-               << (result.flags.memory_coordination ? "on" : "off") << ','
++               << ToString(result.flags.memory_priority) << ','
++               << ToString(result.flags.address_mapping) << ','
+                << layer.layer << ',' << layer.input_features << ',' << layer.output_features << ','
+                << layer.cycles << ',' << layer.aggregation_cycles << ','
+                << layer.combination_cycles << ',' << layer.memory_service_cycles << ','
++               << layer.memory_active_cycles << ','
+                << layer.edge_dram_bytes << ',' << layer.input_dram_bytes << ','
+                << layer.weight_dram_bytes << ',' << layer.output_dram_bytes << ','
+                << layer.intermediate_dram_bytes << ',' << layer.TotalDramBytes() << ','
+diff --git a/hygcn/paper_sim.h b/hygcn/paper_sim.h
+index ed1dfec..e981315 100644
+--- a/hygcn/paper_sim.h
++++ b/hygcn/paper_sim.h
+@@ -28,6 +28,16 @@ enum class AggregationOp {
+     MAX,
+ };
+ 
++enum class MemoryPriorityMode {
++    FIFO,
++    BATCH_CLASS,
++};
++
++enum class AddressMappingMode {
++    ROW_FIRST,
++    LOW_BITS,
++};
++
+ struct ArchitectureConfig {
+     std::string profile;
+     double frequency_ghz = 0.0;
+@@ -58,6 +68,14 @@ struct ArchitectureConfig {
+     double independent_array_efficiency = 0.0;
+     double cooperative_array_efficiency = 0.0;
+     int energy_batch_vertices = 0;
++    int input_ping_pong_regions = 0;
++    int edge_ping_pong_regions = 0;
++    int aggregation_ping_pong_regions = 0;
++    uint64_t aggregation_shard_capacity_bytes = 0;
++    int batch_launch_interval_cycles = 0;
++    int neighbor_index_ready_cycles = 0;
++    int row_first_bank_interleave = 0;
++    std::string sequential_spill_alignment;
+ 
+     static ArchitectureConfig Load(const std::string& path);
+     void Validate() const;
+@@ -65,15 +83,15 @@ struct ArchitectureConfig {
+     uint64_t InputWindowCapacityBytes() const;
+     uint64_t EdgeShardCapacityBytes() const;
+     uint64_t AggregationShardCapacityBytes() const;
+-    uint64_t UncoordinatedBankInterleave() const;
+ };
+ 
+ struct FeatureFlags {
+     bool sparsity_elimination = true;
+-    bool memory_coordination = true;
+     bool aggregation_only = false;
+     PipelineMode pipeline = PipelineMode::LATENCY_AWARE;
+     CombinationMode combination = CombinationMode::INDEPENDENT;
++    MemoryPriorityMode memory_priority = MemoryPriorityMode::BATCH_CLASS;
++    AddressMappingMode address_mapping = AddressMappingMode::LOW_BITS;
+ };
+ 
+ struct LayerShape {
+@@ -113,6 +131,8 @@ struct MemoryRequest {
+     uint64_t enqueue_cycle = 0;
+     uint64_t sequence = 0;
+     uint64_t producer_ready_cycle = 0;
++    std::optional<uint64_t> producer_sequence;
++    uint64_t producer_delay_cycles = 0;
+ };
+ 
+ struct MemoryRequestTrace {
+@@ -125,6 +145,7 @@ struct MemoryRequestTrace {
+     uint64_t first_issue_cycle = 0;
+     uint64_t completion_cycle = 0;
+     uint64_t sequence = 0;
++    std::optional<uint64_t> producer_sequence;
+ };
+ 
+ struct InputWindowTrace {
+@@ -147,10 +168,12 @@ struct AddressDistribution {
+ 
+ struct MemoryTimingResult {
+     uint64_t cycles = 0;
++    uint64_t active_cycles = 0;
+     uint64_t queue_wait_cycles = 0;
+     uint64_t blocked_cycles = 0;
+     uint64_t row_buffer_hits = 0;
+     uint64_t row_buffer_misses = 0;
++    uint64_t priority_reorders = 0;
+     std::array<uint64_t, kRequestClassCount> request_counts{};
+     std::array<uint64_t, kRequestClassCount> request_bytes{};
+     std::array<uint64_t, kRequestClassCount> request_wait_cycles{};
+@@ -235,10 +258,11 @@ private:
+ class MemoryCoordinatorModel {
+ public:
+     static std::vector<MemoryRequest> Order(std::vector<MemoryRequest> requests,
+-                                            bool coordinated);
++                                            MemoryPriorityMode priority);
+     static MemoryTimingResult Simulate(const std::vector<MemoryRequest>& requests,
+                                        const ArchitectureConfig& architecture,
+-                                       bool coordinated);
++                                       MemoryPriorityMode priority,
++                                       AddressMappingMode mapping);
+ };
+ 
+ struct LayerMetrics {
+@@ -261,10 +285,12 @@ struct LayerMetrics {
+     uint64_t combination_output_columns_per_module = 0;
+     uint64_t weight_cascade_bytes = 0;
+     uint64_t memory_service_cycles = 0;
++    uint64_t memory_active_cycles = 0;
+     uint64_t queue_wait_cycles = 0;
+     uint64_t hbm_blocked_cycles = 0;
+     uint64_t row_buffer_hits = 0;
+     uint64_t row_buffer_misses = 0;
++    uint64_t priority_reorders = 0;
+     uint64_t ae_finish_cycle = 0;
+     uint64_t ce_start_cycle = 0;
+     uint64_t ce_finish_cycle = 0;
+@@ -293,6 +319,7 @@ struct LayerMetrics {
+     std::array<uint64_t, kRequestClassCount> request_bytes{};
+     std::array<uint64_t, kRequestClassCount> request_wait_cycles{};
+     std::vector<InputWindowTrace> input_window_traces;
++    std::vector<MemoryRequestTrace> memory_request_traces;
+     std::vector<MemoryRequestTrace> producer_request_traces;
+     std::vector<uint64_t> channel_blocks;
+     std::vector<uint64_t> bank_blocks;
+@@ -388,8 +415,12 @@ private:
+ std::string ToString(PipelineMode mode);
+ std::string ToString(CombinationMode mode);
+ std::string ToString(AggregationOp operation);
++std::string ToString(MemoryPriorityMode mode);
++std::string ToString(AddressMappingMode mode);
+ PipelineMode ParsePipelineMode(const std::string& value);
+ CombinationMode ParseCombinationMode(const std::string& value);
++MemoryPriorityMode ParseMemoryPriorityMode(const std::string& value);
++AddressMappingMode ParseAddressMappingMode(const std::string& value);
+ bool ParseToggle(const std::string& value);
+ 
+ std::string DigestFile(const std::string& path);

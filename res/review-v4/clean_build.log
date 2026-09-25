@@ -1,0 +1,314 @@
+[ 13%] Building CXX object dramsim3/CMakeFiles/dramsim3.dir/src/channel_state.cc.o
+[ 13%] Building CXX object dramsim3/CMakeFiles/dramsim3.dir/src/command_queue.cc.o
+[ 13%] Building CXX object dramsim3/CMakeFiles/dramsim3.dir/src/bankstate.cc.o
+[ 13%] Building CXX object dramsim3/CMakeFiles/dramsim3.dir/src/common.cc.o
+[ 20%] Building CXX object dramsim3/CMakeFiles/dramsim3.dir/src/configuration.cc.o
+[ 20%] Building CXX object dramsim3/CMakeFiles/dramsim3.dir/src/controller.cc.o
+[ 26%] Building CXX object dramsim3/CMakeFiles/dramsim3.dir/src/hmc.cc.o
+[ 26%] Building CXX object dramsim3/CMakeFiles/dramsim3.dir/src/dram_system.cc.o
+[ 33%] Building CXX object dramsim3/CMakeFiles/dramsim3.dir/src/refresh.cc.o
+[ 33%] Building CXX object dramsim3/CMakeFiles/dramsim3.dir/src/simple_stats.cc.o
+[ 36%] Building CXX object dramsim3/CMakeFiles/dramsim3.dir/src/timing.cc.o
+[ 40%] Building CXX object dramsim3/CMakeFiles/dramsim3.dir/src/memory_system.cc.o
+In file included from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/bankstate.h:5,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/bankstate.cc:1:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In constructor ‘dramsim3::Address::Address(int, int, int, int, int, int, uint64_t)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:22:5: warning:   when initialized here [-Wreorder]
+   22 |     Address(int channel, int rank, int bankgroup, int bank, int row, int column, uint64_t hex_addr)
+      |     ^~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In copy constructor ‘dramsim3::Address::Address(const dramsim3::Address&)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:30:5: warning:   when initialized here [-Wreorder]
+   30 |     Address(const Address& addr)
+      |     ^~~~~~~
+In file included from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/bankstate.h:5,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/channel_state.h:5,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/channel_state.cc:1:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In constructor ‘dramsim3::Address::Address(int, int, int, int, int, int, uint64_t)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:22:5: warning:   when initialized here [-Wreorder]
+   22 |     Address(int channel, int rank, int bankgroup, int bank, int row, int column, uint64_t hex_addr)
+      |     ^~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In copy constructor ‘dramsim3::Address::Address(const dramsim3::Address&)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:30:5: warning:   when initialized here [-Wreorder]
+   30 |     Address(const Address& addr)
+      |     ^~~~~~~
+In file included from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/timing.h:5,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/timing.cc:1:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In constructor ‘dramsim3::Address::Address(int, int, int, int, int, int, uint64_t)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:22:5: warning:   when initialized here [-Wreorder]
+   22 |     Address(int channel, int rank, int bankgroup, int bank, int row, int column, uint64_t hex_addr)
+      |     ^~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In copy constructor ‘dramsim3::Address::Address(const dramsim3::Address&)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:30:5: warning:   when initialized here [-Wreorder]
+   30 |     Address(const Address& addr)
+      |     ^~~~~~~
+In file included from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/bankstate.h:5,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/channel_state.h:5,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/refresh.h:5,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/refresh.cc:1:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In constructor ‘dramsim3::Address::Address(int, int, int, int, int, int, uint64_t)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:22:5: warning:   when initialized here [-Wreorder]
+   22 |     Address(int channel, int rank, int bankgroup, int bank, int row, int column, uint64_t hex_addr)
+      |     ^~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In copy constructor ‘dramsim3::Address::Address(const dramsim3::Address&)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:30:5: warning:   when initialized here [-Wreorder]
+   30 |     Address(const Address& addr)
+      |     ^~~~~~~
+In file included from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.cc:1:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In constructor ‘dramsim3::Address::Address(int, int, int, int, int, int, uint64_t)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:22:5: warning:   when initialized here [-Wreorder]
+   22 |     Address(int channel, int rank, int bankgroup, int bank, int row, int column, uint64_t hex_addr)
+      |     ^~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In copy constructor ‘dramsim3::Address::Address(const dramsim3::Address&)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:30:5: warning:   when initialized here [-Wreorder]
+   30 |     Address(const Address& addr)
+      |     ^~~~~~~
+In file included from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/configuration.h:6,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/configuration.cc:1:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In constructor ‘dramsim3::Address::Address(int, int, int, int, int, int, uint64_t)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:22:5: warning:   when initialized here [-Wreorder]
+   22 |     Address(int channel, int rank, int bankgroup, int bank, int row, int column, uint64_t hex_addr)
+      |     ^~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In copy constructor ‘dramsim3::Address::Address(const dramsim3::Address&)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:30:5: warning:   when initialized here [-Wreorder]
+   30 |     Address(const Address& addr)
+      |     ^~~~~~~
+In file included from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/dram_system.h:7,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/dram_system.cc:1:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In constructor ‘dramsim3::Address::Address(int, int, int, int, int, int, uint64_t)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:22:5: warning:   when initialized here [-Wreorder]
+   22 |     Address(int channel, int rank, int bankgroup, int bank, int row, int column, uint64_t hex_addr)
+      |     ^~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In copy constructor ‘dramsim3::Address::Address(const dramsim3::Address&)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:30:5: warning:   when initialized here [-Wreorder]
+   30 |     Address(const Address& addr)
+      |     ^~~~~~~
+In file included from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/bankstate.h:5,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/channel_state.h:5,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/command_queue.h:6,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/command_queue.cc:1:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In constructor ‘dramsim3::Address::Address(int, int, int, int, int, int, uint64_t)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:22:5: warning:   when initialized here [-Wreorder]
+   22 |     Address(int channel, int rank, int bankgroup, int bank, int row, int column, uint64_t hex_addr)
+      |     ^~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In copy constructor ‘dramsim3::Address::Address(const dramsim3::Address&)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:30:5: warning:   when initialized here [-Wreorder]
+   30 |     Address(const Address& addr)
+      |     ^~~~~~~
+In file included from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/bankstate.h:5,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/channel_state.h:5,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/controller.h:8,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/controller.cc:1:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In constructor ‘dramsim3::Address::Address(int, int, int, int, int, int, uint64_t)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:22:5: warning:   when initialized here [-Wreorder]
+   22 |     Address(int channel, int rank, int bankgroup, int bank, int row, int column, uint64_t hex_addr)
+      |     ^~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In copy constructor ‘dramsim3::Address::Address(const dramsim3::Address&)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:30:5: warning:   when initialized here [-Wreorder]
+   30 |     Address(const Address& addr)
+      |     ^~~~~~~
+In file included from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/configuration.h:6,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/memory_system.h:7,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/memory_system.cc:1:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In constructor ‘dramsim3::Address::Address(int, int, int, int, int, int, uint64_t)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:22:5: warning:   when initialized here [-Wreorder]
+   22 |     Address(int channel, int rank, int bankgroup, int bank, int row, int column, uint64_t hex_addr)
+      |     ^~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In copy constructor ‘dramsim3::Address::Address(const dramsim3::Address&)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:30:5: warning:   when initialized here [-Wreorder]
+   30 |     Address(const Address& addr)
+      |     ^~~~~~~
+In file included from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/dram_system.h:7,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/hmc.h:8,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/hmc.cc:1:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In constructor ‘dramsim3::Address::Address(int, int, int, int, int, int, uint64_t)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:22:5: warning:   when initialized here [-Wreorder]
+   22 |     Address(int channel, int rank, int bankgroup, int bank, int row, int column, uint64_t hex_addr)
+      |     ^~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In copy constructor ‘dramsim3::Address::Address(const dramsim3::Address&)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:30:5: warning:   when initialized here [-Wreorder]
+   30 |     Address(const Address& addr)
+      |     ^~~~~~~
+In file included from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/configuration.h:6,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/simple_stats.h:9,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/simple_stats.cc:4:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In constructor ‘dramsim3::Address::Address(int, int, int, int, int, int, uint64_t)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:22:5: warning:   when initialized here [-Wreorder]
+   22 |     Address(int channel, int rank, int bankgroup, int bank, int row, int column, uint64_t hex_addr)
+      |     ^~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h: In copy constructor ‘dramsim3::Address::Address(const dramsim3::Address&)’:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:47:9: warning: ‘dramsim3::Address::column’ will be initialized after [-Wreorder]
+   47 |     int column;
+      |         ^~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:40:14: warning:   ‘uint64_t dramsim3::Address::hex_addr’ [-Wreorder]
+   40 |     uint64_t hex_addr = -1;
+      |              ^~~~~~~~
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/common.h:30:5: warning:   when initialized here [-Wreorder]
+   30 |     Address(const Address& addr)
+      |     ^~~~~~~
+In file included from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/configuration.h:8,
+                 from /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/src/configuration.cc:1:
+In function ‘char* strncpy0(char*, const char*, size_t)’,
+    inlined from ‘int ini_parse_stream(ini_reader, void*, ini_handler, void*)’ at /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/ext/headers/INIReader.h:257:25:
+/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/dramsim3/ext/headers/INIReader.h:163:12: warning: ‘char* strncpy(char*, const char*, size_t)’ output may be truncated copying 49 bytes from a string of length 199 [-Wstringop-truncation]
+  163 |     strncpy(dest, src, size);
+      |     ~~~~~~~^~~~~~~~~~~~~~~~~
+[ 43%] Linking CXX static library libdramsim3.a
+[ 43%] Built target dramsim3
+[ 53%] Building CXX object CMakeFiles/HyGCN.dir/hygcn/dataflow/aggr.cpp.o
+[ 53%] Building CXX object CMakeFiles/HyGCN.dir/hygcn/dataflow/comb.cpp.o
+[ 53%] Building CXX object CMakeFiles/HyGCN.dir/hygcn/config.cpp.o
+[ 63%] Building CXX object CMakeFiles/HyGCN.dir/hygcn/dataflow/event.cpp.o
+[ 63%] Building CXX object CMakeFiles/HyGCN.dir/hygcn/graph.cpp.o
+[ 63%] Building CXX object CMakeFiles/HyGCN.dir/hygcn/hardware/coordinator.cpp.o
+[ 66%] Building CXX object CMakeFiles/HyGCN.dir/hygcn/hardware/simd.cpp.o
+[ 76%] Building CXX object CMakeFiles/HyGCN.dir/hygcn/hardware/spm.cpp.o
+[ 76%] Building CXX object CMakeFiles/HyGCN.dir/hygcn/hygcn.cpp.o
+[ 76%] Building CXX object CMakeFiles/HyGCN.dir/hygcn/hardware/systolic_arr.cpp.o
+[ 80%] Building CXX object CMakeFiles/HyGCN.dir/hygcn/paper_sim.cpp.o
+[ 83%] Building CXX object CMakeFiles/HyGCN.dir/hygcn/tool.cpp.o
+[ 86%] Linking CXX static library libHyGCN.a
+[ 86%] Built target HyGCN
+[ 93%] Building CXX object CMakeFiles/hygcn_unit_tests.dir/hygcn_test/unit.cpp.o
+[ 93%] Building CXX object CMakeFiles/hygcntest.dir/hygcn_test/test.cpp.o
+[ 96%] Linking CXX executable hygcn_unit_tests
+[ 96%] Built target hygcn_unit_tests
+[100%] Linking CXX executable hygcntest
+[100%] Built target hygcntest

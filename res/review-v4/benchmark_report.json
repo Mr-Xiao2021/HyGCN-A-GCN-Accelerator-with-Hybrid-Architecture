@@ -1,0 +1,828 @@
+{
+  "aggregate": {
+    "coordination_bandwidth_gain": 3.556359622266342,
+    "coordination_speedup": 3.1499233829178555,
+    "mapping_bandwidth_gain": 3.5354971505469983,
+    "mapping_speedup": 3.165105326915521,
+    "pipeline_dram_ratio": 0.6712370660995312,
+    "pipeline_speedup": 1.8984719300561628,
+    "priority_bandwidth_gain": 3.3907232009941866,
+    "priority_speedup": 2.8160112735708025,
+    "sparsity_ae_dram_ratio": 0.717850907227855,
+    "sparsity_input_dram_ratio": 0.7176311957169967,
+    "sparsity_speedup": 1.7178620728132303
+  },
+  "cache_validation": "input and configuration digests plus complete run manifest",
+  "datasets": [
+    "cora",
+    "citeseer",
+    "pubmed"
+  ],
+  "memory_ablation": {
+    "low_bits_source": "HyGCN HPCA 2020 Section 4.5.2: channel and bank identifiers use lower address bits",
+    "mapping_baseline": "row-first",
+    "mapping_optimized": "low-bits",
+    "priority_baseline": "fifo",
+    "priority_optimized": "batch-class",
+    "row_first_bank_interleave": 2,
+    "row_first_layout_basis": "configs/HBM1_4Gb_x128.ini uses address_mapping=rorabgbachco; the request-level row-first baseline preserves full-row locality before distributing rows across channels and reports the collapsed mapping formula in source and tests",
+    "row_first_source": "The review-v3 baseline used kUncoordinatedBankInterleave=2. This version preserves that baseline value for comparability but moves it into configuration and reports it explicitly. DRAMSim3 enables a second HBM command per cycle when read/write classes differ; the two-bank striping is only a request-level width approximation, not a claim that DRAMSim3 pairs adjacent banks."
+  },
+  "parameter_audit": {
+    "baseline_commit": "9aa127d248849e68160c7aafd70b79cbe468094a",
+    "baseline_version": "review-v3-9aa127d",
+    "current": {
+      "aggregation_ping_pong_regions": 2,
+      "aggregation_shard_capacity_bytes": 5242880,
+      "batch_launch_interval_cycles": 1,
+      "benchmark_selected_layer": "0",
+      "edge_input_dependency": "edge_completion_plus_neighbor_index_ready",
+      "edge_ping_pong_regions": 2,
+      "input_ping_pong_regions": 2,
+      "neighbor_index_ready_cycles": 2,
+      "row_first_bank_interleave": 2,
+      "sequential_spill_alignment": "block"
+    },
+    "differences": [
+      {
+        "baseline": 2,
+        "current": null,
+        "parameter": "aggregation_residency_banks_per_region"
+      },
+      {
+        "baseline": 4194304,
+        "current": 5242880,
+        "parameter": "aggregation_shard_capacity_bytes"
+      },
+      {
+        "baseline": "all",
+        "current": "0",
+        "parameter": "benchmark_selected_layer"
+      },
+      {
+        "baseline": "static_enqueue_cycle",
+        "current": "edge_completion_plus_neighbor_index_ready",
+        "parameter": "edge_input_dependency"
+      },
+      {
+        "baseline": 0,
+        "current": 2,
+        "parameter": "neighbor_index_ready_cycles"
+      },
+      {
+        "baseline": "aggregation_shard_capacity",
+        "current": "block",
+        "parameter": "sequential_spill_alignment"
+      }
+    ],
+    "parameter_recalibration": true
+  },
+  "parameter_baseline_file": "configs/paper_parameter_baseline.json",
+  "parameter_recalibration": true,
+  "per_dataset": {
+    "citeseer": {
+      "mapping_evidence": {
+        "baseline_bank_blocks": [
+          168996,
+          168996,
+          168952,
+          168952,
+          160732,
+          160732,
+          167724,
+          167724,
+          170540,
+          170539,
+          165488,
+          165488,
+          166700,
+          166700,
+          159652,
+          159652
+        ],
+        "baseline_channel_blocks": [
+          332432,
+          333544,
+          334440,
+          331952,
+          330056,
+          331600,
+          331119,
+          332424
+        ],
+        "optimized_bank_blocks": [
+          165880,
+          166040,
+          166040,
+          166176,
+          165760,
+          165823,
+          165976,
+          166352,
+          166280,
+          166096,
+          166320,
+          166144,
+          166288,
+          166144,
+          166064,
+          166184
+        ],
+        "optimized_channel_blocks": [
+          332196,
+          332196,
+          332196,
+          332196,
+          332196,
+          332196,
+          332196,
+          332195
+        ]
+      },
+      "metrics": {
+        "coordination_bandwidth_gain": 3.569707478618352,
+        "coordination_speedup": 3.183364634788161,
+        "mapping_bandwidth_gain": 3.519302102344102,
+        "mapping_speedup": 3.22336858535213,
+        "pipeline_dram_ratio": 0.6325590085913986,
+        "pipeline_speedup": 2.1310546942831876,
+        "priority_bandwidth_gain": 3.4982572958709612,
+        "priority_speedup": 2.823583424661592,
+        "sparsity_ae_dram_ratio": 0.3369416923226975,
+        "sparsity_input_dram_ratio": 0.3367899008115419,
+        "sparsity_speedup": 2.952884882508232
+      },
+      "priority_trace_evidence": {
+        "changed_requests": [
+          {
+            "batch_id": 0,
+            "fifo_completion": 466,
+            "fifo_issue": 0,
+            "optimized_completion": 1359,
+            "optimized_issue": 0,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 0
+          },
+          {
+            "batch_id": 1,
+            "fifo_completion": 26804,
+            "fifo_issue": 26332,
+            "optimized_completion": 75512,
+            "optimized_issue": 1,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 1
+          },
+          {
+            "batch_id": 2,
+            "fifo_completion": 26804,
+            "fifo_issue": 26332,
+            "optimized_completion": 1361,
+            "optimized_issue": 2,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 2
+          },
+          {
+            "batch_id": 3,
+            "fifo_completion": 27252,
+            "fifo_issue": 26720,
+            "optimized_completion": 1293,
+            "optimized_issue": 4,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 3
+          },
+          {
+            "batch_id": 4,
+            "fifo_completion": 27258,
+            "fifo_issue": 26786,
+            "optimized_completion": 296028,
+            "optimized_issue": 5,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 4
+          },
+          {
+            "batch_id": 5,
+            "fifo_completion": 27468,
+            "fifo_issue": 26786,
+            "optimized_completion": 1237,
+            "optimized_issue": 5,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 5
+          },
+          {
+            "batch_id": 6,
+            "fifo_completion": 27712,
+            "fifo_issue": 27240,
+            "optimized_completion": 436509,
+            "optimized_issue": 8,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 6
+          },
+          {
+            "batch_id": 7,
+            "fifo_completion": 27706,
+            "fifo_issue": 27240,
+            "optimized_completion": 510203,
+            "optimized_issue": 7,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 7
+          }
+        ],
+        "priority_reorders": 314
+      },
+      "raw": {
+        "coordination_baseline": {
+          "bandwidth_utilization": 0.2796584075773048,
+          "total_aggregation_cycles": 2356591,
+          "total_aggregation_dram_bytes": 166484928,
+          "total_cycles": 2383175,
+          "total_dram_bytes": 170084288,
+          "total_input_dram_bytes": 166371840
+        },
+        "mapping_only": {
+          "bandwidth_utilization": 0.9842024217250125,
+          "total_aggregation_cycles": 672863,
+          "total_aggregation_dram_bytes": 166484928,
+          "total_cycles": 739343,
+          "total_dram_bytes": 170084288,
+          "total_input_dram_bytes": 166371840
+        },
+        "optimized": {
+          "bandwidth_utilization": 0.9982987089872041,
+          "total_aggregation_cycles": 663273,
+          "total_aggregation_dram_bytes": 166484928,
+          "total_cycles": 748634,
+          "total_dram_bytes": 170084288,
+          "total_input_dram_bytes": 166371840
+        },
+        "pipeline_baseline": {
+          "bandwidth_utilization": 0.9989668635451442,
+          "total_aggregation_cycles": 663273,
+          "total_aggregation_dram_bytes": 166484928,
+          "total_cycles": 1595380,
+          "total_dram_bytes": 268882880,
+          "total_input_dram_bytes": 166371840
+        },
+        "priority_only": {
+          "bandwidth_utilization": 0.9783170646589615,
+          "total_aggregation_cycles": 701297,
+          "total_aggregation_dram_bytes": 166484928,
+          "total_cycles": 844025,
+          "total_dram_bytes": 170084288,
+          "total_input_dram_bytes": 166371840
+        },
+        "sparsity_baseline": {
+          "bandwidth_utilization": 0.9951861054594165,
+          "total_aggregation_cycles": 1945145,
+          "total_aggregation_dram_bytes": 494106048,
+          "total_cycles": 1945145,
+          "total_dram_bytes": 494106048,
+          "total_input_dram_bytes": 493992960
+        },
+        "sparsity_optimized": {
+          "bandwidth_utilization": 0.9940232360502689,
+          "total_aggregation_cycles": 658727,
+          "total_aggregation_dram_bytes": 166484928,
+          "total_cycles": 658727,
+          "total_dram_bytes": 166484928,
+          "total_input_dram_bytes": 166371840
+        }
+      },
+      "runs": {
+        "coordination_baseline": "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-fifo_mapping-row-first_seed-1_layer-0.json",
+        "mapping_only": "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-fifo_mapping-low-bits_seed-1_layer-0.json",
+        "optimized": "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json",
+        "pipeline_baseline": "paper_paper_gcn_citeseer_sequential_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json",
+        "priority_only": "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-batch-class_mapping-row-first_seed-1_layer-0.json",
+        "sparsity_baseline": "paper_paper_gcn_citeseer_latency-aware_independent_sparse-off_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json",
+        "sparsity_optimized": "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json"
+      },
+      "sequential_traffic_oracle": {
+        "alignment": "block",
+        "intermediate_read_bytes": 49399296,
+        "intermediate_write_bytes": 49399296,
+        "producer_bytes": 49399296
+      }
+    },
+    "cora": {
+      "mapping_evidence": {
+        "baseline_bank_blocks": [
+          44670,
+          44670,
+          44967,
+          44967,
+          44785,
+          44785,
+          45795,
+          45795,
+          44221,
+          44221,
+          44695,
+          44695,
+          43817,
+          43817,
+          44683,
+          44683
+        ],
+        "baseline_channel_blocks": [
+          89334,
+          89876,
+          89592,
+          89776,
+          89840,
+          89028,
+          88864,
+          88956
+        ],
+        "optimized_bank_blocks": [
+          44790,
+          44796,
+          44758,
+          44696,
+          44624,
+          44626,
+          44668,
+          44672,
+          44688,
+          44640,
+          44660,
+          44700,
+          44684,
+          44736,
+          44744,
+          44784
+        ],
+        "optimized_channel_blocks": [
+          89401,
+          89401,
+          89409,
+          89409,
+          89417,
+          89417,
+          89406,
+          89406
+        ]
+      },
+      "metrics": {
+        "coordination_bandwidth_gain": 3.5410540576555767,
+        "coordination_speedup": 2.760170567235224,
+        "mapping_bandwidth_gain": 3.5463705417218097,
+        "mapping_speedup": 2.782120738392154,
+        "pipeline_dram_ratio": 0.5947139201101516,
+        "pipeline_speedup": 1.9311662038873463,
+        "priority_bandwidth_gain": 3.204717445705154,
+        "priority_speedup": 2.1887235782586814,
+        "sparsity_ae_dram_ratio": 0.9306264222606646,
+        "sparsity_input_dram_ratio": 0.9304529788281635,
+        "sparsity_speedup": 1.0669873393285179
+      },
+      "priority_trace_evidence": {
+        "changed_requests": [
+          {
+            "batch_id": 0,
+            "fifo_completion": 920,
+            "fifo_issue": 0,
+            "optimized_completion": 2494,
+            "optimized_issue": 0,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 0
+          },
+          {
+            "batch_id": 1,
+            "fifo_completion": 11378,
+            "fifo_issue": 10442,
+            "optimized_completion": 41042,
+            "optimized_issue": 1,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 1
+          },
+          {
+            "batch_id": 2,
+            "fifo_completion": 11832,
+            "fifo_issue": 11070,
+            "optimized_completion": 2148,
+            "optimized_issue": 2,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 2
+          },
+          {
+            "batch_id": 0,
+            "fifo_completion": 12734,
+            "fifo_issue": 11680,
+            "optimized_completion": 12722,
+            "optimized_issue": 2502,
+            "producer_sequence": 0,
+            "request_class": "input",
+            "sequence": 3
+          },
+          {
+            "batch_id": 0,
+            "fifo_completion": 13642,
+            "fifo_issue": 12500,
+            "optimized_completion": 13704,
+            "optimized_issue": 2504,
+            "producer_sequence": 0,
+            "request_class": "input",
+            "sequence": 4
+          },
+          {
+            "batch_id": 0,
+            "fifo_completion": 14550,
+            "fifo_issue": 13182,
+            "optimized_completion": 14594,
+            "optimized_issue": 2496,
+            "producer_sequence": 0,
+            "request_class": "input",
+            "sequence": 5
+          },
+          {
+            "batch_id": 0,
+            "fifo_completion": 15458,
+            "fifo_issue": 14090,
+            "optimized_completion": 21674,
+            "optimized_issue": 2506,
+            "producer_sequence": 0,
+            "request_class": "input",
+            "sequence": 6
+          },
+          {
+            "batch_id": 0,
+            "fifo_completion": 16366,
+            "fifo_issue": 14982,
+            "optimized_completion": 12742,
+            "optimized_issue": 2496,
+            "producer_sequence": 0,
+            "request_class": "input",
+            "sequence": 7
+          }
+        ],
+        "priority_reorders": 40
+      },
+      "raw": {
+        "coordination_baseline": {
+          "bandwidth_utilization": 0.2803829979396574,
+          "total_aggregation_cycles": 633347,
+          "total_aggregation_dram_bytes": 43656832,
+          "total_cycles": 695839,
+          "total_dram_bytes": 45777024,
+          "total_input_dram_bytes": 43539840
+        },
+        "mapping_only": {
+          "bandwidth_utilization": 0.9943420042928478,
+          "total_aggregation_cycles": 189353,
+          "total_aggregation_dram_bytes": 43656832,
+          "total_cycles": 250111,
+          "total_dram_bytes": 45777024,
+          "total_input_dram_bytes": 43539840
+        },
+        "optimized": {
+          "bandwidth_utilization": 0.992851352551859,
+          "total_aggregation_cycles": 189121,
+          "total_aggregation_dram_bytes": 43656832,
+          "total_cycles": 252100,
+          "total_dram_bytes": 45777024,
+          "total_input_dram_bytes": 43539840
+        },
+        "pipeline_baseline": {
+          "bandwidth_utilization": 0.9973546640838016,
+          "total_aggregation_cycles": 189121,
+          "total_aggregation_dram_bytes": 43656832,
+          "total_cycles": 486847,
+          "total_dram_bytes": 76973184,
+          "total_input_dram_bytes": 43539840
+        },
+        "priority_only": {
+          "bandwidth_utilization": 0.8985482849763323,
+          "total_aggregation_cycles": 194009,
+          "total_aggregation_dram_bytes": 43656832,
+          "total_cycles": 317920,
+          "total_dram_bytes": 45777024,
+          "total_input_dram_bytes": 43539840
+        },
+        "sparsity_baseline": {
+          "bandwidth_utilization": 0.9959184338960206,
+          "total_aggregation_cycles": 198975,
+          "total_aggregation_dram_bytes": 46911232,
+          "total_cycles": 198975,
+          "total_dram_bytes": 46911232,
+          "total_input_dram_bytes": 46794240
+        },
+        "sparsity_optimized": {
+          "bandwidth_utilization": 0.9942311280054104,
+          "total_aggregation_cycles": 186483,
+          "total_aggregation_dram_bytes": 43656832,
+          "total_cycles": 186483,
+          "total_dram_bytes": 43656832,
+          "total_input_dram_bytes": 43539840
+        }
+      },
+      "runs": {
+        "coordination_baseline": "paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-fifo_mapping-row-first_seed-1_layer-0.json",
+        "mapping_only": "paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-fifo_mapping-low-bits_seed-1_layer-0.json",
+        "optimized": "paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json",
+        "pipeline_baseline": "paper_paper_gcn_cora_sequential_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json",
+        "priority_only": "paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-batch-class_mapping-row-first_seed-1_layer-0.json",
+        "sparsity_baseline": "paper_paper_gcn_cora_latency-aware_independent_sparse-off_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json",
+        "sparsity_optimized": "paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json"
+      },
+      "sequential_traffic_oracle": {
+        "alignment": "block",
+        "intermediate_read_bytes": 15598080,
+        "intermediate_write_bytes": 15598080,
+        "producer_bytes": 15598080
+      }
+    },
+    "pubmed": {
+      "mapping_evidence": {
+        "baseline_bank_blocks": [
+          290432,
+          290432,
+          290323,
+          290323,
+          289344,
+          289344,
+          292640,
+          292640,
+          290672,
+          290672,
+          289984,
+          289984,
+          290432,
+          290432,
+          289616,
+          289616
+        ],
+        "baseline_channel_blocks": [
+          579174,
+          580032,
+          580640,
+          580896,
+          582848,
+          582336,
+          582208,
+          578752
+        ],
+        "optimized_bank_blocks": [
+          290656,
+          290656,
+          290656,
+          290656,
+          290566,
+          290560,
+          290560,
+          290560,
+          290240,
+          290240,
+          290240,
+          290240,
+          290264,
+          290264,
+          290264,
+          290264
+        ],
+        "optimized_channel_blocks": [
+          580861,
+          580861,
+          580861,
+          580861,
+          580861,
+          580861,
+          580860,
+          580860
+        ]
+      },
+      "metrics": {
+        "coordination_bandwidth_gain": 3.5583173305250986,
+        "coordination_speedup": 3.506234946730182,
+        "mapping_bandwidth_gain": 3.5408188075750835,
+        "mapping_speedup": 3.489826657002279,
+        "pipeline_dram_ratio": 0.7864382695970433,
+        "pipeline_speedup": 1.633194891997955,
+        "priority_bandwidth_gain": 3.4691948614064447,
+        "priority_speedup": 3.4357268177921325,
+        "sparsity_ae_dram_ratio": 0.8859846071002032,
+        "sparsity_input_dram_ratio": 0.8856507075112847,
+        "sparsity_speedup": 1.1337139966029417
+      },
+      "priority_trace_evidence": {
+        "changed_requests": [
+          {
+            "batch_id": 0,
+            "fifo_completion": 1828,
+            "fifo_issue": 0,
+            "optimized_completion": 14773,
+            "optimized_issue": 0,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 0
+          },
+          {
+            "batch_id": 1,
+            "fifo_completion": 7276,
+            "fifo_issue": 4984,
+            "optimized_completion": 13650,
+            "optimized_issue": 1,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 1
+          },
+          {
+            "batch_id": 2,
+            "fifo_completion": 9036,
+            "fifo_issue": 6800,
+            "optimized_completion": 13067,
+            "optimized_issue": 2,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 2
+          },
+          {
+            "batch_id": 3,
+            "fifo_completion": 10470,
+            "fifo_issue": 8616,
+            "optimized_completion": 12853,
+            "optimized_issue": 3,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 3
+          },
+          {
+            "batch_id": 4,
+            "fifo_completion": 12286,
+            "fifo_issue": 10062,
+            "optimized_completion": 579505,
+            "optimized_issue": 4,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 4
+          },
+          {
+            "batch_id": 5,
+            "fifo_completion": 14086,
+            "fifo_issue": 11804,
+            "optimized_completion": 736076,
+            "optimized_issue": 5,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 5
+          },
+          {
+            "batch_id": 6,
+            "fifo_completion": 15846,
+            "fifo_issue": 13610,
+            "optimized_completion": 732341,
+            "optimized_issue": 6,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 6
+          },
+          {
+            "batch_id": 7,
+            "fifo_completion": 16810,
+            "fifo_issue": 15426,
+            "optimized_completion": 8963,
+            "optimized_issue": 7,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 7
+          }
+        ],
+        "priority_reorders": 312
+      },
+      "raw": {
+        "coordination_baseline": {
+          "bandwidth_utilization": 0.2808928004085286,
+          "total_aggregation_cycles": 4009099,
+          "total_aggregation_dram_bytes": 287049600,
+          "total_cycles": 4135818,
+          "total_dram_bytes": 297400704,
+          "total_input_dram_bytes": 286103552
+        },
+        "mapping_only": {
+          "bandwidth_utilization": 0.9945905105989521,
+          "total_aggregation_cycles": 1141707,
+          "total_aggregation_dram_bytes": 287049600,
+          "total_cycles": 1185107,
+          "total_dram_bytes": 297400704,
+          "total_input_dram_bytes": 286103552
+        },
+        "optimized": {
+          "bandwidth_utilization": 0.9995057197133949,
+          "total_aggregation_cycles": 1136161,
+          "total_aggregation_dram_bytes": 287049600,
+          "total_cycles": 1179561,
+          "total_dram_bytes": 297400704,
+          "total_input_dram_bytes": 286103552
+        },
+        "pipeline_baseline": {
+          "bandwidth_utilization": 0.9994624448912982,
+          "total_aggregation_cycles": 1136161,
+          "total_aggregation_dram_bytes": 287049600,
+          "total_cycles": 1926453,
+          "total_dram_bytes": 378161536,
+          "total_input_dram_bytes": 286103552
+        },
+        "priority_only": {
+          "bandwidth_utilization": 0.9744718597833335,
+          "total_aggregation_cycles": 1151036,
+          "total_aggregation_dram_bytes": 287049600,
+          "total_cycles": 1203768,
+          "total_dram_bytes": 297400704,
+          "total_input_dram_bytes": 286103552
+        },
+        "sparsity_baseline": {
+          "bandwidth_utilization": 0.994175560370087,
+          "total_aggregation_cycles": 1286211,
+          "total_aggregation_dram_bytes": 323989376,
+          "total_cycles": 1286211,
+          "total_dram_bytes": 323989376,
+          "total_input_dram_bytes": 323043328
+        },
+        "sparsity_optimized": {
+          "bandwidth_utilization": 0.9999032455974517,
+          "total_aggregation_cycles": 1134511,
+          "total_aggregation_dram_bytes": 287049600,
+          "total_cycles": 1134511,
+          "total_dram_bytes": 287049600,
+          "total_input_dram_bytes": 286103552
+        }
+      },
+      "runs": {
+        "coordination_baseline": "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-fifo_mapping-row-first_seed-1_layer-0.json",
+        "mapping_only": "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-fifo_mapping-low-bits_seed-1_layer-0.json",
+        "optimized": "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json",
+        "pipeline_baseline": "paper_paper_gcn_pubmed_sequential_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json",
+        "priority_only": "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-batch-class_mapping-row-first_seed-1_layer-0.json",
+        "sparsity_baseline": "paper_paper_gcn_pubmed_latency-aware_independent_sparse-off_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json",
+        "sparsity_optimized": "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json"
+      },
+      "sequential_traffic_oracle": {
+        "alignment": "block",
+        "intermediate_read_bytes": 40380416,
+        "intermediate_write_bytes": 40380416,
+        "producer_bytes": 40380416
+      }
+    }
+  },
+  "reference_file": "configs/paper_metrics.json",
+  "schema_version": 2,
+  "scope": {
+    "not_validated": [
+      "absolute CPU speedup",
+      "absolute GPU speedup",
+      "DiffPool",
+      "complete chip energy and area",
+      "exact ping-pong half ownership",
+      "automatic SVG redownload and redigitization"
+    ],
+    "validated": "Fig. 15 layer-0 AE-only sparsity and Fig. 16-17 layer-0 request-level microarchitectural effects for GCN"
+  },
+  "workload_manifest": {
+    "figures": {
+      "figure_15": {
+        "aggregation": "per_dataset",
+        "input_features": "dataset_metadata.feature",
+        "model": "gcn",
+        "output_features": 128,
+        "scope": "aggregation",
+        "selected_layer": "0"
+      },
+      "figure_16": {
+        "aggregation": "per_dataset",
+        "input_features": "dataset_metadata.feature",
+        "model": "gcn",
+        "output_features": 128,
+        "scope": "full",
+        "selected_layer": "0"
+      },
+      "figure_17": {
+        "aggregation": "arithmetic_mean_over_datasets",
+        "input_features": "dataset_metadata.feature",
+        "model": "gcn",
+        "output_features": 128,
+        "scope": "full",
+        "selected_layer": "0"
+      }
+    },
+    "graph_partition": {
+      "aggregation_ping_pong_half_capacity_bytes": 8388608,
+      "aggregation_shard_capacity_bytes": 5242880,
+      "calibration_disclosure": "changed from the review-v3 implicit 4 MiB value and covered by 4/5/6 MiB sensitivity evidence",
+      "policy": "fixed dataset-independent scheduler occupancy cap below one physical ping-pong half",
+      "source": "HyGCN Section 4.3.2 requires the destination interval and its aggregation results to fit the on-chip Aggregation Buffer; the paper does not publish the simulator's interval occupancy, so this request-level model reports the fixed scheduler cap separately from the 16 MiB physical capacity"
+    },
+    "path": "configs/paper_workloads.json",
+    "sha256": "a3b1f00078ccd97f866196c85eade35c9dfed2a2a7e52685abe2522486102c7b",
+    "version": "hygcn-hpca2020-table5-gcn-v1"
+  }
+}

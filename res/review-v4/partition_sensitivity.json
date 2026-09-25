@@ -1,0 +1,280 @@
+{
+  "base_profile": "configs/HYGCN_PAPER.ini",
+  "base_profile_sha256": "6f6687b91fbb3735d417408c9394d3181061f9df451b2bae98c6091335976030",
+  "binary": "build-review-v4-release-7380832/hygcntest",
+  "binary_sha256": "5938a8d0673f4bbc6cc643913f633fad6e47132f769bda1a4eec717f484039a0",
+  "capacities": {
+    "4": {
+      "all_required_pass": false,
+      "binary_digest": "48b2ce370cac9dc7",
+      "capacity_bytes": 4194304,
+      "per_dataset": {
+        "citeseer": {
+          "pipeline_dram_ratio": {
+            "measured": 0.6421625350482888,
+            "pass": true,
+            "reference": 0.535832,
+            "relative_error": 0.19844006152728622
+          },
+          "pipeline_speedup": {
+            "measured": 2.1652032927244846,
+            "pass": true,
+            "reference": 1.842621,
+            "relative_error": 0.17506708798200202
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.29296633814529494,
+            "pass": true,
+            "reference": 0.339962,
+            "relative_error": 0.13823798499451426
+          },
+          "sparsity_speedup": {
+            "measured": 3.3891673156282067,
+            "pass": true,
+            "reference": 2.883223,
+            "relative_error": 0.1754787318317753
+          }
+        },
+        "cora": {
+          "pipeline_dram_ratio": {
+            "measured": 0.6440685020631964,
+            "pass": false,
+            "reference": 0.501466,
+            "relative_error": 0.2843712276868152
+          },
+          "pipeline_speedup": {
+            "measured": 1.8900992574714892,
+            "pass": true,
+            "reference": 2.125024,
+            "relative_error": 0.11055157143096295
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.8691524292291768,
+            "pass": true,
+            "reference": 0.879502,
+            "relative_error": 0.011767535231100343
+          },
+          "sparsity_speedup": {
+            "measured": 1.1451346196536087,
+            "pass": true,
+            "reference": 1.082102,
+            "relative_error": 0.0582501646366136
+          }
+        },
+        "pubmed": {
+          "pipeline_dram_ratio": {
+            "measured": 0.8159656259780428,
+            "pass": true,
+            "reference": 0.731763,
+            "relative_error": 0.1150681654825985
+          },
+          "pipeline_speedup": {
+            "measured": 1.5404848586671298,
+            "pass": true,
+            "reference": 1.366562,
+            "relative_error": 0.1272703753412796
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.8591067802490172,
+            "pass": true,
+            "reference": 0.896637,
+            "relative_error": 0.041856648511028216
+          },
+          "sparsity_speedup": {
+            "measured": 1.1884310537176523,
+            "pass": true,
+            "reference": 1.115278,
+            "relative_error": 0.06559176610464149
+          }
+        }
+      },
+      "profile_sha256": "cfef25bbd7af71f56fe8e23f26b74ddc7069df5acbcfff397682b18e4aa59222",
+      "source_git_commit": "738083279143"
+    },
+    "5": {
+      "all_required_pass": true,
+      "binary_digest": "48b2ce370cac9dc7",
+      "capacity_bytes": 5242880,
+      "per_dataset": {
+        "citeseer": {
+          "pipeline_dram_ratio": {
+            "measured": 0.6325590085913986,
+            "pass": true,
+            "reference": 0.535832,
+            "relative_error": 0.1805174170101797
+          },
+          "pipeline_speedup": {
+            "measured": 2.1310546942831876,
+            "pass": true,
+            "reference": 1.842621,
+            "relative_error": 0.15653446600423393
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.3369416923226975,
+            "pass": true,
+            "reference": 0.339962,
+            "relative_error": 0.008884250820098987
+          },
+          "sparsity_speedup": {
+            "measured": 2.952884882508232,
+            "pass": true,
+            "reference": 2.883223,
+            "relative_error": 0.02416111501199588
+          }
+        },
+        "cora": {
+          "pipeline_dram_ratio": {
+            "measured": 0.5947139201101516,
+            "pass": true,
+            "reference": 0.501466,
+            "relative_error": 0.18595063296445144
+          },
+          "pipeline_speedup": {
+            "measured": 1.9311662038873463,
+            "pass": true,
+            "reference": 2.125024,
+            "relative_error": 0.09122616785158828
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.9306264222606646,
+            "pass": true,
+            "reference": 0.879502,
+            "relative_error": 0.05812883002047136
+          },
+          "sparsity_speedup": {
+            "measured": 1.0669873393285179,
+            "pass": true,
+            "reference": 1.082102,
+            "relative_error": 0.013967870562555138
+          }
+        },
+        "pubmed": {
+          "pipeline_dram_ratio": {
+            "measured": 0.7864382695970433,
+            "pass": true,
+            "reference": 0.731763,
+            "relative_error": 0.07471718247170638
+          },
+          "pipeline_speedup": {
+            "measured": 1.633194891997955,
+            "pass": true,
+            "reference": 1.366562,
+            "relative_error": 0.1951121807850321
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.8859846071002032,
+            "pass": true,
+            "reference": 0.896637,
+            "relative_error": 0.011880385150062739
+          },
+          "sparsity_speedup": {
+            "measured": 1.1337139966029417,
+            "pass": true,
+            "reference": 1.115278,
+            "relative_error": 0.016530404619244446
+          }
+        }
+      },
+      "profile_sha256": "185494cc47f4a191b936b5e69e1b3c090fcace3d3ca24fa7b4fb7cc11763ea43",
+      "source_git_commit": "738083279143"
+    },
+    "6": {
+      "all_required_pass": false,
+      "binary_digest": "48b2ce370cac9dc7",
+      "capacity_bytes": 6291456,
+      "per_dataset": {
+        "citeseer": {
+          "pipeline_dram_ratio": {
+            "measured": 0.625970280234934,
+            "pass": true,
+            "reference": 0.535832,
+            "relative_error": 0.1682211593091379
+          },
+          "pipeline_speedup": {
+            "measured": 2.16627478931472,
+            "pass": true,
+            "reference": 1.842621,
+            "relative_error": 0.17564859475427652
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.40917117434789796,
+            "pass": false,
+            "reference": 0.339962,
+            "relative_error": 0.20357914810448807
+          },
+          "sparsity_speedup": {
+            "measured": 2.4372308608729103,
+            "pass": true,
+            "reference": 2.883223,
+            "relative_error": 0.15468527378114347
+          }
+        },
+        "cora": {
+          "pipeline_dram_ratio": {
+            "measured": 0.5867986474149061,
+            "pass": true,
+            "reference": 0.501466,
+            "relative_error": 0.1701663670416461
+          },
+          "pipeline_speedup": {
+            "measured": 1.6715204936095196,
+            "pass": false,
+            "reference": 2.125024,
+            "relative_error": 0.2134110044829989
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.8991935758926806,
+            "pass": true,
+            "reference": 0.879502,
+            "relative_error": 0.022389461186763143
+          },
+          "sparsity_speedup": {
+            "measured": 1.109033386639571,
+            "pass": true,
+            "reference": 1.082102,
+            "relative_error": 0.02488802963082137
+          }
+        },
+        "pubmed": {
+          "pipeline_dram_ratio": {
+            "measured": 0.7656102651755283,
+            "pass": true,
+            "reference": 0.731763,
+            "relative_error": 0.046254409112688494
+          },
+          "pipeline_speedup": {
+            "measured": 1.7347749756597042,
+            "pass": false,
+            "reference": 1.366562,
+            "relative_error": 0.2694447640573235
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.8936459877478596,
+            "pass": true,
+            "reference": 0.896637,
+            "relative_error": 0.0033358117634453843
+          },
+          "sparsity_speedup": {
+            "measured": 1.123263660138548,
+            "pass": true,
+            "reference": 1.115278,
+            "relative_error": 0.0071602417859475
+          }
+        }
+      },
+      "profile_sha256": "3f63c82cacc1365cb38193220b8526ddf770fc67953cd9f7d6885aa32a41d155",
+      "source_git_commit": "738083279143"
+    }
+  },
+  "datasets": [
+    "cora",
+    "citeseer",
+    "pubmed"
+  ],
+  "fixed_parameters": {
+    "aggregation_ping_pong_regions": 2,
+    "changed_parameter": "aggregation_shard_capacity_bytes",
+    "physical_aggregation_buffer_bytes": 16777216
+  },
+  "schema_version": 1
+}

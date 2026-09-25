@@ -1,0 +1,15 @@
+metric,scope,paper_target,simulated,relative_error,status
+sparsity_speedup,cora,1.082102000,1.066987339,0.013967871,PASS
+sparsity_speedup,citeseer,2.883223000,2.952884883,0.024161115,PASS
+sparsity_speedup,pubmed,1.115278000,1.133713997,0.016530405,PASS
+sparsity_ae_dram_ratio,cora,0.879502000,0.930626422,0.058128830,PASS
+sparsity_ae_dram_ratio,citeseer,0.339962000,0.336941692,0.008884251,PASS
+sparsity_ae_dram_ratio,pubmed,0.896637000,0.885984607,0.011880385,PASS
+pipeline_speedup,cora,2.125024000,1.931166204,0.091226168,PASS
+pipeline_speedup,citeseer,1.842621000,2.131054694,0.156534466,PASS
+pipeline_speedup,pubmed,1.366562000,1.633194892,0.195112181,PASS
+pipeline_dram_ratio,cora,0.501466000,0.594713920,0.185950633,PASS
+pipeline_dram_ratio,citeseer,0.535832000,0.632559009,0.180517417,PASS
+pipeline_dram_ratio,pubmed,0.731763000,0.786438270,0.074717182,PASS
+coordination_speedup,aggregate,3.700000000,3.149923383,0.148669356,PASS
+coordination_bandwidth_gain,aggregate,4.000000000,3.556359622,0.110910094,PASS

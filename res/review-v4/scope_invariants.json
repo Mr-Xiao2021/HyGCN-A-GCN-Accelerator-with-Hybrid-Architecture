@@ -1,0 +1,21 @@
+{
+  "all_output_features_128": true,
+  "all_selected_layer_0": true,
+  "binary_digests": [
+    "48b2ce370cac9dc7"
+  ],
+  "causality_violation_count": 0,
+  "parameter_recalibration": true,
+  "producer_dependent_request_count": 73640,
+  "raw_json_count": 21,
+  "required_metric_passes": 14,
+  "required_metric_rows": 14,
+  "sensitivity_all_pass": {
+    "4": false,
+    "5": true,
+    "6": false
+  },
+  "source_git_commits": [
+    "738083279143"
+  ]
+}

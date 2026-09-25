@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "workload_version": "hygcn-hpca2020-table5-gcn-v1",
+  "paper_source": "HyGCN HPCA 2020 Table 5 and Section 5.3",
+  "figures": {
+    "figure_15": {
+      "model": "gcn",
+      "selected_layer": "0",
+      "scope": "aggregation",
+      "input_features": "dataset_metadata.feature",
+      "output_features": 128,
+      "aggregation": "per_dataset"
+    },
+    "figure_16": {
+      "model": "gcn",
+      "selected_layer": "0",
+      "scope": "full",
+      "input_features": "dataset_metadata.feature",
+      "output_features": 128,
+      "aggregation": "per_dataset"
+    },
+    "figure_17": {
+      "model": "gcn",
+      "selected_layer": "0",
+      "scope": "full",
+      "input_features": "dataset_metadata.feature",
+      "output_features": 128,
+      "aggregation": "arithmetic_mean_over_datasets"
+    }
+  },
+  "graph_partition": {
+    "aggregation_shard_capacity_bytes": 5242880,
+    "aggregation_ping_pong_half_capacity_bytes": 8388608,
+    "policy": "fixed dataset-independent scheduler occupancy cap below one physical ping-pong half",
+    "source": "HyGCN Section 4.3.2 requires the destination interval and its aggregation results to fit the on-chip Aggregation Buffer; the paper does not publish the simulator's interval occupancy, so this request-level model reports the fixed scheduler cap separately from the 16 MiB physical capacity",
+    "calibration_disclosure": "changed from the review-v3 implicit 4 MiB value and covered by 4/5/6 MiB sensitivity evidence"
+  },
+  "memory_ablation": {
+    "priority_baseline": "fifo",
+    "priority_optimized": "batch-class",
+    "mapping_baseline": "row-first",
+    "mapping_optimized": "low-bits",
+    "row_first_bank_interleave": 2,
+    "row_first_source": "The review-v3 baseline used kUncoordinatedBankInterleave=2. This version preserves that baseline value for comparability but moves it into configuration and reports it explicitly. DRAMSim3 enables a second HBM command per cycle when read/write classes differ; the two-bank striping is only a request-level width approximation, not a claim that DRAMSim3 pairs adjacent banks.",
+    "row_first_layout_basis": "configs/HBM1_4Gb_x128.ini uses address_mapping=rorabgbachco; the request-level row-first baseline preserves full-row locality before distributing rows across channels and reports the collapsed mapping formula in source and tests",
+    "low_bits_source": "HyGCN HPCA 2020 Section 4.5.2: channel and bank identifiers use lower address bits"
+  },
+  "scope_limits": [
+    "GCN only",
+    "Cora, Citeseer, and PubMed only",
+    "request-level model rather than Ramulator or RTL cycle accuracy"
+  ]
+}

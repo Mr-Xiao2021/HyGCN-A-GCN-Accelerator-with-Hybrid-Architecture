@@ -1,0 +1,31 @@
+commit 738083279143c7b9fa80724e086e2faab30a2232
+Author:     Mr-Xiao2021 <349602396@qq.com>
+AuthorDate: Fri Sep 25 13:31:56 2026 +0800
+Commit:     Mr-Xiao2021 <349602396@qq.com>
+CommitDate: Fri Sep 25 13:31:56 2026 +0800
+
+    close review v3 findings
+
+ .gitignore                                         |   2 +
+ README.md                                          |  13 +-
+ configs/HYGCN_LEGACY.ini                           |   8 +
+ configs/HYGCN_PAPER.ini                            |   8 +
+ configs/HYGCN_SMOKE.ini                            |   8 +
+ configs/paper_metrics.json                         |  34 +-
+ configs/paper_parameter_baseline.json              |  18 +
+ configs/paper_workloads.json                       |  53 ++
+ docs/paper-reproduction.md                         |  51 +-
+ hygcn/paper_sim.cpp                                | 641 ++++++++++++++++++---
+ hygcn/paper_sim.h                                  |  39 +-
+ hygcn_test/test.cpp                                |  23 +-
+ hygcn_test/unit.cpp                                | 122 +++-
+ .../reproduce-hygcn-paper-performance/design.md    |  13 +-
+ .../specs/hybrid-architecture-simulation/spec.md   |  10 +-
+ .../specs/paper-performance-validation/spec.md     |  21 +-
+ .../reproduce-hygcn-paper-performance/tasks.md     |  10 +
+ tools/check_determinism.py                         |  10 +-
+ tools/paper_benchmark.py                           | 410 ++++++++++---
+ tools/partition_sensitivity.py                     | 230 ++++++++
+ tools/test_paper_benchmark.py                      |  52 +-
+ tools/validate_reference_metrics.py                |   4 +
+ 22 files changed, 1551 insertions(+), 229 deletions(-)

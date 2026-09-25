@@ -85,4 +85,4 @@
 - [x] 10.4 新增 Table 5 layer-0 workload manifest，确保 Fig. 15-17 不包含隐式 `128→num_class` 分类层
 - [x] 10.5 生成 priority-only、mapping-only、combined 分解消融，并保存请求 timeline 与 channel/bank 分布
 - [x] 10.6 将行为参数纳入配置和自动 baseline diff，禁止硬编码 `parameter_recalibration`
-- [ ] 10.7 保持 F-01 至 F-04、CTest、legacy 与现有因果回归通过，并完成三数据集强制 benchmark
+- [x] 10.7 保持 F-01 至 F-04、CTest、legacy 与现有因果回归通过，并完成三数据集强制 benchmark

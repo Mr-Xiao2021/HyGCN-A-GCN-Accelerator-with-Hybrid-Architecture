@@ -1,0 +1,20 @@
+{
+  "citeseer": {
+    "alignment": "block",
+    "intermediate_read_bytes": 49399296,
+    "intermediate_write_bytes": 49399296,
+    "producer_bytes": 49399296
+  },
+  "cora": {
+    "alignment": "block",
+    "intermediate_read_bytes": 15598080,
+    "intermediate_write_bytes": 15598080,
+    "producer_bytes": 15598080
+  },
+  "pubmed": {
+    "alignment": "block",
+    "intermediate_read_bytes": 40380416,
+    "intermediate_write_bytes": 40380416,
+    "producer_bytes": 40380416
+  }
+}
