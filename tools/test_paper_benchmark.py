@@ -14,9 +14,19 @@ def load_benchmark_module(root):
     return module
 
 
+def load_partition_module(root, benchmark):
+    path = root / "tools/partition_sensitivity.py"
+    spec = importlib.util.spec_from_file_location("partition_sensitivity", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["paper_benchmark"] = benchmark
+    spec.loader.exec_module(module)
+    return module
+
+
 def main():
     root = Path(__file__).resolve().parents[1]
     benchmark = load_benchmark_module(root)
+    partition = load_partition_module(root, benchmark)
     with (root / "configs/paper_workloads.json").open(encoding="utf-8") as stream:
         workloads = json.load(stream)
     with (root / "configs/paper_parameter_baseline.json").open(encoding="utf-8") as stream:
@@ -25,8 +35,13 @@ def main():
         definition = workloads["figures"][figure]
         if definition["selected_layer"] != "0" or definition["output_features"] != 128:
             raise RuntimeError(f"{figure} is not bound to the Table 5 layer-0 shape")
-    if workloads["memory_ablation"]["row_first_bank_interleave"] != 2:
-        raise RuntimeError("row-first baseline must expose the audited HBM command lanes")
+    if workloads["memory_ablation"]["row_first_bank_interleave"] != 1:
+        raise RuntimeError("row-first baseline must not add unsupported bank striping")
+    if "Section 4.5.2" not in workloads["memory_ablation"]["priority_order_source"]:
+        raise RuntimeError("batch-class ordering must retain its paper provenance")
+    if workloads["graph_partition"]["calibration_datasets"] != ["cora", "citeseer"] or \
+            workloads["graph_partition"]["holdout_datasets"] != ["pubmed"]:
+        raise RuntimeError("partition calibration and hold-out datasets must be explicit")
     if workloads["graph_partition"]["aggregation_shard_capacity_bytes"] != 5242880:
         raise RuntimeError("graph partition scheduler cap must be versioned")
     optimized = {
@@ -36,6 +51,8 @@ def main():
         "total_aggregation_dram_bytes": 100,
         "total_input_dram_bytes": 80,
         "bandwidth_utilization": 0.5,
+        "active_bandwidth_utilization": 0.5,
+        "row_hit_rate": 0.8,
     }
     sparse_optimized = dict(optimized)
     sparse_base = dict(optimized)
@@ -47,11 +64,26 @@ def main():
     pipeline_base = dict(optimized)
     pipeline_base.update({"total_cycles": 2000, "total_dram_bytes": 1000})
     coordination_base = dict(optimized)
-    coordination_base.update({"total_cycles": 3000, "bandwidth_utilization": 0.1})
+    coordination_base.update({
+        "total_cycles": 3000,
+        "bandwidth_utilization": 0.1,
+        "active_bandwidth_utilization": 0.1,
+        "row_hit_rate": 0.7,
+    })
     priority_only = dict(optimized)
-    priority_only.update({"total_cycles": 2000, "bandwidth_utilization": 0.2})
+    priority_only.update({
+        "total_cycles": 2000,
+        "bandwidth_utilization": 0.2,
+        "active_bandwidth_utilization": 0.2,
+        "row_hit_rate": 0.8,
+    })
     mapping_only = dict(optimized)
-    mapping_only.update({"total_cycles": 1500, "bandwidth_utilization": 0.25})
+    mapping_only.update({
+        "total_cycles": 1500,
+        "bandwidth_utilization": 0.25,
+        "active_bandwidth_utilization": 0.3,
+        "row_hit_rate": 0.75,
+    })
 
     metrics = benchmark.calculate_metrics(
         optimized,
@@ -70,10 +102,17 @@ def main():
         "pipeline_dram_ratio": 0.5,
         "priority_speedup": 1.5,
         "priority_bandwidth_gain": 2.0,
+        "priority_incremental_speedup": 1.5,
+        "priority_incremental_speedup_aggregate": 1.5,
+        "priority_incremental_bandwidth_gain": 2.0,
+        "priority_incremental_bandwidth_gain_aggregate": 2.0,
+        "priority_incremental_row_hit_ratio": 0.8 / 0.75,
+        "priority_incremental_row_hit_ratio_aggregate": 0.8 / 0.75,
         "mapping_speedup": 2.0,
         "mapping_bandwidth_gain": 2.5,
         "coordination_speedup": 3.0,
         "coordination_bandwidth_gain": 5.0,
+        "coordination_active_bandwidth_gain": 5.0,
     }
     for name, value in expected.items():
         if not math.isclose(metrics[name], value, rel_tol=0.0, abs_tol=1e-12):
@@ -96,14 +135,21 @@ def main():
         "aggregation_shard_capacity_bytes": 5242880,
         "batch_launch_interval_cycles": 1,
         "edge_ping_pong_regions": 2,
+        "hbm_transaction_queue_entries_per_channel": 32,
+        "coordinator_issue_blocks_per_cycle": 4,
         "input_ping_pong_regions": 2,
         "neighbor_index_ready_cycles": 2,
-        "row_first_bank_interleave": 2,
+        "row_first_bank_interleave": 1,
         "sequential_spill_alignment": "block",
     }
     audit = benchmark.parameter_audit(architecture, workloads, parameter_baseline)
     if audit["parameter_recalibration"] != bool(audit["differences"]) or not audit["differences"]:
         raise RuntimeError("parameter recalibration must be derived from a non-empty diff")
+    external_binary = Path("/tmp/hygcn-external-build/hygcntest")
+    if partition.display_path(root, external_binary) != str(external_binary):
+        raise RuntimeError("external absolute binary paths must remain printable")
+    if partition.display_path(root, root / "build/hygcntest") != "build/hygcntest":
+        raise RuntimeError("repository-local binary paths must remain relative")
     print("F04_ae_only_and_R3_workload_scope=PASS")
     return 0
 

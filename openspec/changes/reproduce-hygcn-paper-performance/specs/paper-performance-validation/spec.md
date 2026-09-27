@@ -62,11 +62,11 @@
 
 #### Scenario: 协调器分解消融
 - **WHEN** 验收 Fig. 17
-- **THEN** 报告 priority-only、mapping-only 和 combined 三组结果，分别保持非目标机制不变，并保存 priority 请求 timeline 与 mapping channel/bank 分布
+- **THEN** 报告 priority-only、mapping-only 和 combined 三组结果，分别保持非目标机制不变，并保存同一 low-bits mapping 上 optimized/mapping-only 的请求 timeline、各类别 row hit/miss 与 mapping channel/bank 分布；逐数据集周期和完整区间带宽 MUST 位于显式的 `0.01%` 尾部边界容差内，row-hit MUST 不退化，三数据集平均 MUST 显示正增量
 
 #### Scenario: 带宽与总执行时间解耦
 - **WHEN** 请求时间线包含等待 AE/CE producer 且没有 HBM 请求在途的空闲区间
-- **THEN** 总执行周期保留该区间，带宽利用率只使用 in-flight request 区间并集，并在结果中同时记录 wall-clock memory cycles 和 active memory cycles
+- **THEN** required 带宽利用率使用周期 0 到最终 completion 的统一 memory-service 区间并保留该空闲区间；in-flight request 区间并集只作为 active diagnostic，同时保存 producer 延迟导致端到端利用率下降但 active 利用率反升的反例
 
 ### Requirement: 参数差异可审计
 系统 SHALL 从版本化参数基线和当前有效配置自动计算参数差异。`parameter_recalibration` MUST 由差异结果生成，不得写死；报告 MUST 包含 workload/config/source 行为参数的 baseline、current 和来源。
@@ -77,7 +77,7 @@
 
 #### Scenario: 图分区占用上限重标定
 - **WHEN** scheduler shard cap 相对上一验收基线变化
-- **THEN** 报告将其与物理 Aggregation Buffer 容量分开记录，并保存同一配置族在三个数据集上的邻近值敏感性结果
+- **THEN** 报告将其与物理 Aggregation Buffer 容量分开记录，只用 Cora/Citeseer 选择 calibration 点，并把 PubMed 作为未参与选择的 hold-out；未公开时序和替代 mapping 参数另存诊断敏感性
 
 ### Requirement: 因果与请求切分不变量
 同一有序 block 流的内存完成时间、row hit/miss 和 channel/bank 事务计数 MUST 不受上层请求切分影响。Output 请求 MUST 在对应 CE producer-ready 后入队；Intermediate Read MUST 访问对应 Write 的同一地址和字节范围，并等待该 Write 完成。已经进入请求级时间线的 intermediate 流量 MUST NOT 再以解析延迟重复计时。

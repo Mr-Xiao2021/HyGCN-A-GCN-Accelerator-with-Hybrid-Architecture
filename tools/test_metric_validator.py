@@ -47,6 +47,11 @@ def main():
         for name, definition in reference["metrics"].items()
         if definition["validation"] == "aggregate_relative_error"
     }
+    valid.update({
+        name: definition["reference_min"]
+        for name, definition in reference["metrics"].items()
+        if definition["validation"] == "aggregate_minimum"
+    })
     per_dataset = {}
     for dataset in reference["datasets"]:
         per_dataset[dataset] = {"metrics": {}}
@@ -57,6 +62,8 @@ def main():
                 per_dataset[dataset]["metrics"][name] = (
                     definition["reference_min"] + definition["reference_max"]
                 ) / 2
+            elif definition["validation"] == "per_dataset_minimum":
+                per_dataset[dataset]["metrics"][name] = definition["reference_min"]
             elif definition["validation"] == "diagnostic_only":
                 per_dataset[dataset]["metrics"][name] = 0.75
     with tempfile.TemporaryDirectory(prefix="hygcn-validator-") as temp:

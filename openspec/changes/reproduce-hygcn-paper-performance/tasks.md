@@ -74,7 +74,7 @@
 - [x] 9.4 增加第一层 AE-only scope，保证 Fig. 15 固定图、层和 AE 工作量，只切换连续窗口稀疏优化
 - [x] 9.5 数字化 Fig. 15/16 逐数据集 SVG 柱值，保存来源 URL、SHA256 和坐标，并按逐柱相对误差执行 ±20% 门禁
 - [x] 9.6 修正 Combination Module 单 batch 顶点组并行度，并验证跨 batch producer/RAW 依赖保持约束
-- [x] 9.7 在 JSON 中记录派生驻留容量、producer 时间线和窗口证据，声明 `parameter_recalibration=false` 且论文配置文件未修改
+- [x] 9.7 在 JSON 中记录派生驻留容量、producer 时间线和窗口证据，并由当时版本化 baseline diff 自动生成 `parameter_recalibration`
 - [x] 9.8 从整改提交执行干净 Release 构建、默认 CTest、legacy 回归、严格 OpenSpec 和强制三数据集 benchmark，保存正式复跑产物并推送远端
 
 ## 10. Review v3 工作负载、流量与协调器整改
@@ -86,3 +86,11 @@
 - [x] 10.5 生成 priority-only、mapping-only、combined 分解消融，并保存请求 timeline 与 channel/bank 分布
 - [x] 10.6 将行为参数纳入配置和自动 baseline diff，禁止硬编码 `parameter_recalibration`
 - [x] 10.7 保持 F-01 至 F-04、CTest、legacy 与现有因果回归通过，并完成三数据集强制 benchmark
+
+## 11. Review v4 带宽口径、仲裁因果与校准整改
+
+- [x] 11.1 将 Fig. 17 required 带宽改为完整 memory-service 区间，active-interval 仅作诊断，并增加 producer-idle 反例
+- [x] 11.2 修正 FIFO 与 batch-class 为统一工作保持仲裁，在同一 ready-cycle 内验证 batch/class 与 open-row 优先级的增量贡献
+- [x] 11.3 删除 row-first 无来源双 bank striping，增加 optimized/mapping-only 增量与 row-hit required 门禁
+- [x] 11.4 显式区分 Cora/Citeseer calibration 与 PubMed hold-out，增加无来源时序和映射参数敏感性
+- [ ] 11.5 修复仓库外绝对 binary 路径，清理 evidence CRLF/行尾空白，并完成全量复跑、提交与推送

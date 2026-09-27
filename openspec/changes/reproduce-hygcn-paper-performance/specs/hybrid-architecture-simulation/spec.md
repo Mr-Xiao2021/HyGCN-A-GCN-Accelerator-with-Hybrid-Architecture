@@ -66,7 +66,7 @@
 - **THEN** 中间 Write 在 AE 阶段完成后按真实 producer bytes 的 block 对齐值发射，Read 等待对应 Write 完成，CE 再启动
 
 ### Requirement: Batch-aware 访存协调
-Memory Access Coordinator SHALL 支持 Edge、Input、Weight、Output 四类 HBM 请求及 Aggregation Buffer 请求。Input MUST 等待对应 Edge 完成和邻居索引 ready。priority 与 address mapping MUST 可独立切换；同一 batch 的优先级 MUST 为 Edge、Input、Weight、Output，且同优先级请求 SHOULD 延续已打开 row。低位 mapping MUST 对应论文 §4.5.2；row-first 基线的 bank striping 宽度 MUST 进入配置和报告，并区分历史对照值、DRAMSim3 HBM 双命令宽度近似与真实 bank 配对语义，不得保留源码隐藏常数或宣称双命令固定配对相邻 bank。系统 SHALL 报告请求 producer、入队、发射、完成、重排次数和 channel/bank 分布。
+Memory Access Coordinator SHALL 支持 Edge、Input、Weight、Output 四类 HBM 请求及 Aggregation Buffer 请求。Input MUST 等待对应 Edge 完成和邻居索引 ready。请求 MUST 展平为 64B block；FIFO MUST 在地址映射前轮转四个并发 buffer port，并只能在由 HBM peak bytes/cycle 与 block size 派生的 issue window 内绕过 blocked channel。batch-class MUST 按 batch、类别和地址组装，只能在同 batch/class/row 内利用 DRAMSim3 HBM `trans_queue_size=32` 对应的每 channel 可接收项；bank 侧 open-row 延续 MUST 保持同 batch/class。priority 与 address mapping MUST 可独立切换；低位 mapping MUST 对应论文 §4.5.2；row-first required 基线 MUST 直接对应 `rorabgbachco`，不得增加无来源的相邻 bank striping。系统 SHALL 报告请求 producer、入队、发射、完成、重排次数、各类别 row hit/miss 和 channel/bank 分布。
 
 #### Scenario: 同批次优先级
 - **WHEN** 同一 batch 同时存在 Edge、Input、Weight 和 Output 请求

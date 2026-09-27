@@ -59,6 +59,7 @@ struct ArchitectureConfig {
     int hbm_channels = 0;
     int hbm_banks_per_channel = 0;
     uint64_t hbm_row_bytes = 0;
+    int hbm_transaction_queue_entries_per_channel = 0;
     int hbm_row_hit_cycles = 0;
     int hbm_row_miss_cycles = 0;
     int edram_latency_cycles = 0;
@@ -177,6 +178,8 @@ struct MemoryTimingResult {
     std::array<uint64_t, kRequestClassCount> request_counts{};
     std::array<uint64_t, kRequestClassCount> request_bytes{};
     std::array<uint64_t, kRequestClassCount> request_wait_cycles{};
+    std::array<uint64_t, kRequestClassCount> row_buffer_hits_by_class{};
+    std::array<uint64_t, kRequestClassCount> row_buffer_misses_by_class{};
     std::array<uint64_t, kRequestClassCount> class_completion_cycles{};
     std::map<int, std::array<uint64_t, kRequestClassCount>> batch_completion_cycles;
     std::vector<MemoryRequestTrace> request_traces;
@@ -318,6 +321,8 @@ struct LayerMetrics {
     std::array<uint64_t, kRequestClassCount> request_counts{};
     std::array<uint64_t, kRequestClassCount> request_bytes{};
     std::array<uint64_t, kRequestClassCount> request_wait_cycles{};
+    std::array<uint64_t, kRequestClassCount> row_buffer_hits_by_class{};
+    std::array<uint64_t, kRequestClassCount> row_buffer_misses_by_class{};
     std::vector<InputWindowTrace> input_window_traces;
     std::vector<MemoryRequestTrace> memory_request_traces;
     std::vector<MemoryRequestTrace> producer_request_traces;
@@ -326,6 +331,7 @@ struct LayerMetrics {
     double simd_utilization = 0.0;
     double array_utilization = 0.0;
     double bandwidth_utilization = 0.0;
+    double active_bandwidth_utilization = 0.0;
     double channel_imbalance = 0.0;
     double bank_imbalance = 0.0;
 
@@ -351,6 +357,7 @@ struct ExperimentResult {
     uint64_t TotalAggregationDramBytes() const;
     uint64_t TotalInputDramBytes() const;
     double BandwidthUtilization() const;
+    double ActiveBandwidthUtilization() const;
 };
 
 class PaperSimulator {

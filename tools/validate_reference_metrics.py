@@ -14,10 +14,17 @@ REQUIRED_METRICS = {
     "pipeline_dram_ratio",
     "priority_speedup",
     "priority_bandwidth_gain",
+    "priority_incremental_speedup",
+    "priority_incremental_speedup_aggregate",
+    "priority_incremental_bandwidth_gain",
+    "priority_incremental_bandwidth_gain_aggregate",
+    "priority_incremental_row_hit_ratio",
+    "priority_incremental_row_hit_ratio_aggregate",
     "mapping_speedup",
     "mapping_bandwidth_gain",
     "coordination_speedup",
     "coordination_bandwidth_gain",
+    "coordination_active_bandwidth_gain",
 }
 REQUIRED_DATASETS = {"cora", "citeseer", "pubmed"}
 
@@ -37,8 +44,8 @@ def main():
     with path.open(encoding="utf-8") as stream:
         manifest = json.load(stream)
 
-    if manifest.get("schema_version") != 3 or not manifest.get("reference_version"):
-        raise ValueError("reference manifest requires schema_version=3 and reference_version")
+    if manifest.get("schema_version") != 4 or not manifest.get("reference_version"):
+        raise ValueError("reference manifest requires schema_version=4 and reference_version")
     tolerance = manifest.get("tolerance")
     if not isinstance(tolerance, (int, float)) or not math.isfinite(tolerance) or tolerance != 0.20:
         raise ValueError("reference manifest tolerance must be 0.20")
@@ -90,6 +97,20 @@ def main():
                 raise ValueError(f"{name} has an invalid reference range")
             if definition["aggregation"] != "per_dataset":
                 raise ValueError(f"{name} range validation must be per-dataset")
+        elif validation == "per_dataset_minimum":
+            lower = definition.get("reference_min")
+            if (not isinstance(lower, (int, float)) or not math.isfinite(lower) or
+                    lower <= 0):
+                raise ValueError(f"{name} has an invalid per-dataset minimum")
+            if definition["aggregation"] != "per_dataset":
+                raise ValueError(f"{name} minimum validation must be per-dataset")
+        elif validation == "aggregate_minimum":
+            lower = definition.get("reference_min")
+            if (not isinstance(lower, (int, float)) or not math.isfinite(lower) or
+                    lower <= 0):
+                raise ValueError(f"{name} has an invalid aggregate minimum")
+            if definition["aggregation"] != "arithmetic_mean_over_datasets":
+                raise ValueError(f"{name} must use arithmetic mean aggregation")
         elif validation == "diagnostic_only":
             if definition["required"]:
                 raise ValueError(f"{name} diagnostic-only metric cannot be required")

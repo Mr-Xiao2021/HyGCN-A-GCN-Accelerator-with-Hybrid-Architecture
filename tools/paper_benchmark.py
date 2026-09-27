@@ -276,6 +276,16 @@ def mean(values):
     return sum(values) / len(values)
 
 
+def summarize_result(result):
+    summary = dict(result["summary"])
+    row_hits = sum(layer["row_buffer_hits"] for layer in result["layers"])
+    row_misses = sum(layer["row_buffer_misses"] for layer in result["layers"])
+    summary["row_buffer_hits"] = row_hits
+    summary["row_buffer_misses"] = row_misses
+    summary["row_hit_rate"] = ratio(row_hits, row_hits + row_misses, "row_hit_rate")
+    return summary
+
+
 def validate_pair(optimized, baseline, allowed, dataset, name):
     optimized_manifest = optimized["manifest"]
     baseline_manifest = baseline["manifest"]
@@ -338,6 +348,36 @@ def calculate_metrics(
             coordination_base["bandwidth_utilization"],
             "priority_bandwidth_gain",
         ),
+        "priority_incremental_speedup": ratio(
+            mapping_only["total_cycles"],
+            optimized["total_cycles"],
+            "priority_incremental_speedup",
+        ),
+        "priority_incremental_speedup_aggregate": ratio(
+            mapping_only["total_cycles"],
+            optimized["total_cycles"],
+            "priority_incremental_speedup_aggregate",
+        ),
+        "priority_incremental_bandwidth_gain": ratio(
+            optimized["bandwidth_utilization"],
+            mapping_only["bandwidth_utilization"],
+            "priority_incremental_bandwidth_gain",
+        ),
+        "priority_incremental_bandwidth_gain_aggregate": ratio(
+            optimized["bandwidth_utilization"],
+            mapping_only["bandwidth_utilization"],
+            "priority_incremental_bandwidth_gain_aggregate",
+        ),
+        "priority_incremental_row_hit_ratio": ratio(
+            optimized["row_hit_rate"],
+            mapping_only["row_hit_rate"],
+            "priority_incremental_row_hit_ratio",
+        ),
+        "priority_incremental_row_hit_ratio_aggregate": ratio(
+            optimized["row_hit_rate"],
+            mapping_only["row_hit_rate"],
+            "priority_incremental_row_hit_ratio_aggregate",
+        ),
         "mapping_speedup": ratio(
             coordination_base["total_cycles"],
             mapping_only["total_cycles"],
@@ -357,6 +397,11 @@ def calculate_metrics(
             optimized["bandwidth_utilization"],
             coordination_base["bandwidth_utilization"],
             "coordination_bandwidth_gain",
+        ),
+        "coordination_active_bandwidth_gain": ratio(
+            optimized["active_bandwidth_utilization"],
+            coordination_base["active_bandwidth_utilization"],
+            "coordination_active_bandwidth_gain",
         ),
     }
 
@@ -378,9 +423,9 @@ def validate_sequential_traffic(dataset, run):
     }
 
 
-def priority_trace_evidence(dataset, priority_only, coordination_baseline):
-    optimized_layer = priority_only["layers"][0]
-    baseline_layer = coordination_baseline["layers"][0]
+def priority_trace_evidence(dataset, optimized, mapping_only):
+    optimized_layer = optimized["layers"][0]
+    baseline_layer = mapping_only["layers"][0]
     baseline_by_sequence = {
         trace["sequence"]: trace for trace in baseline_layer["memory_requests"]
     }
@@ -411,6 +456,11 @@ def priority_trace_evidence(dataset, priority_only, coordination_baseline):
         raise ValueError(f"{dataset} priority-only ablation has no observable trace effect")
     return {
         "priority_reorders": optimized_layer["priority_reorders"],
+        "address_mapping": optimized["manifest"]["address_mapping"],
+        "optimized_row_buffer_hits": optimized_layer["row_buffer_hits"],
+        "optimized_row_buffer_misses": optimized_layer["row_buffer_misses"],
+        "fifo_row_buffer_hits": baseline_layer["row_buffer_hits"],
+        "fifo_row_buffer_misses": baseline_layer["row_buffer_misses"],
         "changed_requests": changed,
     }
 
@@ -423,6 +473,10 @@ def current_parameters(architecture, workloads):
         "benchmark_selected_layer": workloads["figures"]["figure_17"]["selected_layer"],
         "edge_input_dependency": "edge_completion_plus_neighbor_index_ready",
         "edge_ping_pong_regions": architecture["edge_ping_pong_regions"],
+        "hbm_transaction_queue_entries_per_channel":
+            architecture["hbm_transaction_queue_entries_per_channel"],
+        "coordinator_issue_blocks_per_cycle":
+            architecture["coordinator_issue_blocks_per_cycle"],
         "input_ping_pong_regions": architecture["input_ping_pong_regions"],
         "neighbor_index_ready_cycles": architecture["neighbor_index_ready_cycles"],
         "row_first_bank_interleave": architecture["row_first_bank_interleave"],
@@ -499,7 +553,7 @@ def main():
                 runs[optimized_name], runs[baseline_name], allowed, dataset, baseline_name
             )
         architecture = runs["optimized"]["architecture"]
-        summaries = {name: result["summary"] for name, result in runs.items()}
+        summaries = {name: summarize_result(result) for name, result in runs.items()}
         metrics = calculate_metrics(
             summaries["optimized"],
             summaries["sparsity_optimized"],
@@ -517,7 +571,7 @@ def main():
                 dataset, runs["pipeline_baseline"]
             ),
             "priority_trace_evidence": priority_trace_evidence(
-                dataset, runs["priority_only"], runs["coordination_baseline"]
+                dataset, runs["optimized"], runs["mapping_only"]
             ),
             "mapping_evidence": {
                 "baseline_channel_blocks": runs["coordination_baseline"]["layers"][0][

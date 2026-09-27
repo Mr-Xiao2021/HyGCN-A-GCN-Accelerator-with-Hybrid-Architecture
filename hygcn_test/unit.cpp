@@ -84,12 +84,16 @@ void TestConfig() {
               paper.aggregation_ping_pong_regions == 2,
           "paper profile audits all ping-pong region counts");
     Check(paper.aggregation_shard_capacity_bytes == 5ULL * 1024 * 1024 &&
-              paper.row_first_bank_interleave == 2,
-          "paper profile audits aggregation partitioning and row-first bank lanes");
+              paper.row_first_bank_interleave == 1,
+          "paper profile avoids unsupported row-first bank striping");
     Check(paper.batch_launch_interval_cycles == 1 &&
               paper.neighbor_index_ready_cycles == 2 &&
               paper.sequential_spill_alignment == "block",
           "paper profile audits request release and spill behavior");
+    Check(paper.hbm_transaction_queue_entries_per_channel == 32,
+          "paper profile uses the DRAMSim3 HBM transaction queue depth");
+    Check(static_cast<uint64_t>(paper.HbmBytesPerCycle()) / paper.block_size == 4,
+          "paper profile derives four 64-byte coordinator issues per cycle");
     Check(std::abs(paper.HbmBytesPerCycle() - 256.0) < 1e-9,
           "paper profile exposes 256 bytes per cycle HBM bandwidth");
 
@@ -305,7 +309,18 @@ void TestHbmLayoutAndMapping() {
     Check(row_first.channel_blocks == std::vector<uint64_t>({32, 32, 32, 32}),
           "row-first baseline stripes complete rows across channels");
     Check(row_first.bank_blocks == std::vector<uint64_t>({64, 64, 0, 0}),
-          "versioned row-first baseline exposes its two-lane bank approximation");
+          "row-first baseline advances banks only after complete row spans");
+
+    mapping_config.row_first_bank_interleave = 1;
+    const std::vector<MemoryRequest> one_row = {
+        {0, RequestClass::INPUT, 1024, 0, 0, 0},
+    };
+    const auto exact_row_first = MemoryCoordinatorModel::Simulate(
+        one_row, mapping_config, MemoryPriorityMode::FIFO,
+        AddressMappingMode::ROW_FIRST);
+    Check(exact_row_first.channel_blocks == std::vector<uint64_t>({16, 0, 0, 0}) &&
+              exact_row_first.bank_blocks == std::vector<uint64_t>({16, 0, 0, 0}),
+          "rorabgbachco keeps one contiguous row span in one channel and bank");
 }
 
 void TestCoordinator() {
@@ -396,13 +411,58 @@ void TestCoordinator() {
           "dynamic priority records an observable arbitration reorder");
     Check(dynamic_priority.active_cycles > 0 &&
               dynamic_priority.active_cycles <= dynamic_priority.cycles,
-          "HBM active cycles exclude producer-idle gaps from bandwidth utilization");
+          "HBM active cycles remain an explicitly bounded diagnostic");
     std::cout << "priority_trace_evidence={\"edge0_complete\":"
               << priority_edge0.completion_cycle << ",\"input0_enqueue\":"
               << priority_input0.enqueue_cycle << ",\"priority_input_issue\":"
               << priority_input0.first_issue_cycle << ",\"fifo_input_issue\":"
               << fifo_input0.first_issue_cycle << ",\"priority_reorders\":"
               << dynamic_priority.priority_reorders << "}\n";
+}
+
+void TestMemoryServiceBandwidthScope() {
+    auto config = ArchitectureConfig::Load("configs/HYGCN_SMOKE.ini");
+    config.hbm_channels = 1;
+    config.hbm_banks_per_channel = 1;
+    config.row_first_bank_interleave = 1;
+    config.hbm_row_bytes = 256;
+    config.block_size = 64;
+    config.Validate();
+
+    auto requests = std::vector<MemoryRequest>{
+        {0, RequestClass::EDGE, 64, 0, 0, 0},
+        {0, RequestClass::INPUT, 64, 256, 0, 1, 0, 0, 0},
+        {0, RequestClass::OUTPUT, 64, 64, 30, 2},
+    };
+    const auto immediate = MemoryCoordinatorModel::Simulate(
+        requests, config, MemoryPriorityMode::FIFO,
+        AddressMappingMode::LOW_BITS);
+    requests[1].producer_delay_cycles = 100;
+    const auto delayed = MemoryCoordinatorModel::Simulate(
+        requests, config, MemoryPriorityMode::FIFO,
+        AddressMappingMode::LOW_BITS);
+
+    const double immediate_wall = 192.0 /
+        (immediate.cycles * config.HbmBytesPerCycle());
+    const double delayed_wall = 192.0 /
+        (delayed.cycles * config.HbmBytesPerCycle());
+    const double immediate_active = 192.0 /
+        (immediate.active_cycles * config.HbmBytesPerCycle());
+    const double delayed_active = 192.0 /
+        (delayed.active_cycles * config.HbmBytesPerCycle());
+    Check(delayed.cycles > immediate.cycles && delayed_wall < immediate_wall,
+          "producer idle reduces end-to-end memory throughput");
+    Check(delayed.active_cycles < immediate.active_cycles &&
+              delayed_active > immediate_active,
+          "active-interval utilization can rise while end-to-end throughput falls");
+    std::cout << "bandwidth_scope_counterexample={\"immediate_service_cycles\":"
+              << immediate.cycles << ",\"delayed_service_cycles\":" << delayed.cycles
+              << ",\"immediate_active_cycles\":" << immediate.active_cycles
+              << ",\"delayed_active_cycles\":" << delayed.active_cycles
+              << ",\"immediate_wall_utilization\":" << immediate_wall
+              << ",\"delayed_wall_utilization\":" << delayed_wall
+              << ",\"immediate_active_utilization\":" << immediate_active
+              << ",\"delayed_active_utilization\":" << delayed_active << "}\n";
 }
 
 void TestFragmentationInvariant() {
@@ -763,6 +823,7 @@ int main() {
         RunNamedTest("systolic_model", TestSystolicModel);
         RunNamedTest("hbm_layout_mapping", TestHbmLayoutAndMapping);
         RunNamedTest("coordinator_ordering", TestCoordinator);
+        RunNamedTest("V4_01_memory_service_bandwidth_scope", TestMemoryServiceBandwidthScope);
         RunNamedTest("F02_fragmentation_invariance", TestFragmentationInvariant);
         RunNamedTest("aggregation_buffer", TestAggregationBuffer);
         RunNamedTest("event_spm_guards", TestEventAndSpmGuards);

@@ -25,6 +25,7 @@ def parse_args():
     parser.add_argument("--binary", default="build/hygcntest")
     parser.add_argument("--profile", default="configs/HYGCN_PAPER.ini")
     parser.add_argument("--reference", default="configs/paper_metrics.json")
+    parser.add_argument("--workloads", default="configs/paper_workloads.json")
     parser.add_argument("--output-dir", default="res/partition-sensitivity")
     parser.add_argument("--capacities-mib", nargs="+", type=int, default=[4, 5, 6])
     parser.add_argument("--datasets", nargs="+", default=["cora", "citeseer", "pubmed"])
@@ -37,13 +38,20 @@ def resolve(root, value):
     return path if path.is_absolute() else root / path
 
 
+def display_path(root, path):
+    try:
+        return str(path.relative_to(root))
+    except ValueError:
+        return str(path)
+
+
 def write_profile(source, destination, capacity_bytes):
     parser = configparser.ConfigParser()
     with source.open(encoding="utf-8") as stream:
         parser.read_file(stream)
     parser["model"]["aggregation_shard_capacity_bytes"] = str(capacity_bytes)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with destination.open("w", encoding="utf-8") as stream:
+    with destination.open("w", encoding="utf-8", newline="\n") as stream:
         parser.write(stream)
 
 
@@ -131,17 +139,26 @@ def main():
     binary = resolve(root, args.binary)
     source_profile = resolve(root, args.profile)
     reference_path = resolve(root, args.reference)
+    workload_path = resolve(root, args.workloads)
     output_dir = resolve(root, args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     reference = paper_benchmark.load_json(reference_path)
+    workloads = paper_benchmark.load_json(workload_path)
+    partition_manifest = workloads["graph_partition"]
+    calibration_datasets = partition_manifest["calibration_datasets"]
+    holdout_datasets = partition_manifest["holdout_datasets"]
+    if set(args.datasets) != set(calibration_datasets + holdout_datasets):
+        raise ValueError("datasets must match the versioned calibration and hold-out split")
 
     report = {
         "schema_version": 1,
-        "base_profile": str(source_profile.relative_to(root)),
+        "base_profile": display_path(root, source_profile),
         "base_profile_sha256": paper_benchmark.sha256_digest(source_profile),
-        "binary": str(binary.relative_to(root)),
+        "binary": display_path(root, binary),
         "binary_sha256": paper_benchmark.sha256_digest(binary),
         "datasets": args.datasets,
+        "workload_manifest": display_path(root, workload_path),
+        "workload_manifest_sha256": paper_benchmark.sha256_digest(workload_path),
         "fixed_parameters": {
             "physical_aggregation_buffer_bytes": 16 * 1024 * 1024,
             "aggregation_ping_pong_regions": 2,
@@ -214,8 +231,62 @@ def main():
             ),
         }
 
+    def dataset_pass(capacity_mib, datasets):
+        return all(
+            metric["pass"]
+            for dataset in datasets
+            for metric in report["capacities"][str(capacity_mib)]["per_dataset"][dataset].values()
+        )
+
+    def calibration_error(capacity_mib):
+        metrics = [
+            metric["relative_error"]
+            for dataset in calibration_datasets
+            for metric in report["capacities"][str(capacity_mib)]["per_dataset"][dataset].values()
+        ]
+        return sum(metrics) / len(metrics)
+
+    calibration_rows = {
+        str(capacity_mib): {
+            "all_required_pass": dataset_pass(capacity_mib, calibration_datasets),
+            "mean_relative_error": calibration_error(capacity_mib),
+        }
+        for capacity_mib in args.capacities_mib
+    }
+    passing = [
+        capacity_mib for capacity_mib in args.capacities_mib
+        if calibration_rows[str(capacity_mib)]["all_required_pass"]
+    ]
+    if not passing:
+        raise ValueError("no capacity passes the calibration datasets")
+    selected_capacity = min(
+        passing,
+        key=lambda value: (calibration_rows[str(value)]["mean_relative_error"], value),
+    )
+    configured_capacity = partition_manifest["aggregation_shard_capacity_bytes"] // (1024 * 1024)
+    if selected_capacity != configured_capacity:
+        raise ValueError(
+            f"calibration selects {selected_capacity} MiB but workload config uses "
+            f"{configured_capacity} MiB"
+        )
+    report["calibration"] = {
+        "datasets": calibration_datasets,
+        "selection_method": (
+            "among capacities passing every required Figure 15-16 calibration row, "
+            "select the minimum mean relative error; ties select the smaller capacity"
+        ),
+        "candidates": calibration_rows,
+        "selected_capacity_mib": selected_capacity,
+    }
+    report["holdout"] = {
+        "datasets": holdout_datasets,
+        "selected_capacity_mib": selected_capacity,
+        "all_required_pass": dataset_pass(selected_capacity, holdout_datasets),
+        "used_for_selection": False,
+    }
+
     report_path = output_dir / "partition_sensitivity.json"
-    with report_path.open("w", encoding="utf-8") as stream:
+    with report_path.open("w", encoding="utf-8", newline="\n") as stream:
         json.dump(report, stream, indent=2, sort_keys=True)
         stream.write("\n")
     print(report_path)

@@ -55,7 +55,7 @@
 
 ### 5. Coordinator 使用 batch 仲裁、低位交织映射和请求级 HBM 时序
 
-每个 DRAM 请求携带 batch ID、请求类别、地址、字节数、producer sequence、producer-ready 与入队周期。Input 由对应 Edge completion 加邻居索引延迟动态释放。模型把请求推进为统一 block 流，保证同一地址/事务序列的完成时间不依赖上层请求切分。priority 与 mapping 独立：batch-class 选择最早 batch、请求类别并在同优先级内延续 open row；FIFO 作为排序基线；low-bits 对应论文 §4.5.2；row-first 保留 review v3 的完整 row 优先对照布局。二路 bank striping 从隐藏常数变为显式配置，其依据是历史基线和 DRAMSim3 HBM 双命令宽度的请求级近似，不声称双命令固定作用于相邻 bank。
+每个 DRAM 请求携带 batch ID、请求类别、地址、字节数、producer sequence、producer-ready 与入队周期。Input 由对应 Edge completion 加邻居索引延迟动态释放。模型把请求推进为统一 64B block 流，保证同一地址/事务序列的完成时间不依赖上层请求切分。映射前，FIFO 轮转 Edge、Input、Weight、Output 四个并发端口，只在由峰值接口宽度派生的四 block issue window 内绕过 blocked channel；batch-class 按 batch、类别和地址组装，并只在同 batch/class/row 内利用 controller 可接收项。事务进入 DRAMSim3 HBM `trans_queue_size=32` 对应的每 channel/controller 有限队列后，bank 侧只延续同优先级 open row，不跨 RAW、batch 或 class 组绕行。priority 与 mapping 独立；low-bits 对应论文 §4.5.2；row-first 直接折叠 `rorabgbachco`，一个 row span 不再使用无来源的二路 bank striping。
 
 该规则对应论文“当前批次低优先级请求先于后续批次高优先级请求”的描述，避免现有全局严格优先级造成跨批次饥饿。
 
@@ -67,7 +67,7 @@
 - `dram_ratio = optimized_dram_bytes / baseline_dram_bytes`
 - `bandwidth_gain = optimized_bandwidth_util / baseline_bandwidth_util`
 
-`bandwidth_util` 使用至少一个 HBM 请求已经 first-issue 且尚未 completion 的区间并集作为服务窗口；没有在途请求、仅等待 AE/CE producer 的空闲周期仍属于总执行时间，但不计作 HBM 服务窗口。
+required `bandwidth_util` 使用从周期 0 到最后一个请求 completion 的统一 memory-service 区间，包含 producer-idle。in-flight request 区间并集单独输出为 active diagnostic；反例测试要求 producer 延迟导致端到端利用率下降时，active 指标可保持不变或反升而不得用于验收。
 
 参考清单保存 Fig. 15/16 arXiv SVG 的 URL、SHA256、坐标提取方法和逐数据集柱值；Fig. 17 使用论文正文给出的跨数据集平均值。版本化 workload manifest 将 Fig. 15-17 固定到 Table 5 的 GCN layer 0（dataset feature width → 128），排除未映射到论文的 `128 → num_class` 分类层。Fig. 15 使用 AE-only scope；Fig. 16 使用完整 layer-0 执行；Fig. 17 combined 按正文平均值验收，priority-only 和 mapping-only 作为因果诊断。
 
@@ -78,7 +78,7 @@
 结构参数来自论文，不允许基准脚本修改。论文未给出的 HBM row hit/miss 延迟、row 大小、channel/bank 数、请求释放延迟、ping-pong 区数和图分区调度占用上限集中在配置中，具有明确单位并写入运行清单。物理 16 MiB Aggregation Buffer 与低于单个 8 MiB 半区的 scheduler shard cap 分别记录，后者不得伪装成物理容量。基准报告从版本化 review v3 参数基线自动生成 config/source diff；`parameter_recalibration` 不得硬编码。priority/mapping 不得选择预设效率，流水开关不得选择固定重叠率，sequential 不得使用经验 spill 系数。
 
 禁止在结果生成阶段乘全局“论文修正系数”或按数据集写特例。Cora、Citeseer、PubMed 必须使用同一结构和时序参数执行成对消融。
-如果调度占用上限相对验收基线变化，正式证据必须保留跨三个数据集的邻近值敏感性结果，不能只报告单一通过点。
+如果调度占用上限相对验收基线变化，正式证据必须只用 Cora/Citeseer calibration 选择邻近值，并把 PubMed 作为未参与选择的 hold-out。未公开的 producer 延迟和 HBM hit/miss 时序必须保留固定邻域敏感性；替代 row-first interleave 只能作为诊断，不得替换有外部配置依据的 required 基线。
 
 ### 8. 参数化 CLI 与结构化输出
 

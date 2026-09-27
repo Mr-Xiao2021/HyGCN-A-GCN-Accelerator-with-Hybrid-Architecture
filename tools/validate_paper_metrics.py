@@ -89,6 +89,23 @@ def main():
                 failed = failed or (required and not passed)
                 rows.append((name, dataset, f"{lower:.6f}-{upper:.6f}", measured, error,
                              passed, definition["source"]))
+        elif validation == "per_dataset_minimum":
+            lower = float(definition["reference_min"])
+            for dataset in reference["datasets"]:
+                measured = per_dataset.get(dataset, {}).get("metrics", {}).get(name)
+                error = range_error(measured, lower, math.inf)
+                passed = error == 0.0
+                failed = failed or (required and not passed)
+                rows.append((name, dataset, f">={lower:.6f}", measured, error,
+                             passed, definition["source"]))
+        elif validation == "aggregate_minimum":
+            lower = float(definition["reference_min"])
+            measured = aggregate.get(name)
+            error = range_error(measured, lower, math.inf)
+            passed = error == 0.0
+            failed = failed or (required and not passed)
+            rows.append((name, "aggregate", f">={lower:.6f}", measured, error,
+                         passed, definition["source"]))
         elif validation == "diagnostic_only":
             for dataset in reference["datasets"]:
                 measured = per_dataset.get(dataset, {}).get("metrics", {}).get(name)
