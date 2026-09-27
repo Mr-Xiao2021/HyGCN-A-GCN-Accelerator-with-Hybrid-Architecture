@@ -92,5 +92,14 @@
 - [x] 11.1 将 Fig. 17 required 带宽改为完整 memory-service 区间，active-interval 仅作诊断，并增加 producer-idle 反例
 - [x] 11.2 修正 FIFO 与 batch-class 为统一工作保持仲裁，在同一 ready-cycle 内验证 batch/class 与 open-row 优先级的增量贡献
 - [x] 11.3 删除 row-first 无来源双 bank striping，增加 optimized/mapping-only 增量与 row-hit required 门禁
-- [x] 11.4 显式区分 Cora/Citeseer calibration 与 PubMed hold-out，增加无来源时序和映射参数敏感性
+- [x] 11.4 当时区分 Cora/Citeseer calibration 与 PubMed hold-out；review v5 发现历史暴露后由 12.4 纠正，并保留时序和映射参数敏感性
 - [x] 11.5 修复仓库外绝对 binary 路径，清理 evidence CRLF/行尾空白，并完成全量复跑、提交与推送
+
+## 12. Review v5 admission、校准声明与时序依据整改
+
+- [x] 12.1 为 FIFO 与 batch-class 增加统一全局 admission 时钟，严格限制四端口合计每周期最多 4 个 block，并保存 admission cycle、总占用和每 channel 峰值 trace
+- [x] 12.2 将每 channel transaction queue 与每 bank command queue 分别绑定 DRAMSim3 `trans_queue_size=32` 和 `cmd_queue_size=8`，补充容量与因果单测
+- [x] 12.3 恢复论文 §4.5.2 的四端口并发 FIFO 与 batch-by-batch `Edge > Input > Weight > Output` 组装，在同一 low-bits mapping 上建立周期、带宽、row-hit 和 issue/completion 反例门禁
+- [x] 12.4 取消 PubMed hold-out 声明，将三数据集 14 项论文数值标记为 calibrated fit，并继续输出 4/5/6 MiB partition sensitivity
+- [x] 12.5 从 bundled DRAMSim3 HBM 推导 14/28/42 row hit/miss/conflict 时序，保留相邻 timing profile 与 mapping 反事实敏感性
+- [x] 12.6 将验收报告固定拆分为 14 项论文数值与 12 项内部因果检查，不以 26/26 扩大外部证据

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import concurrent.futures
+import configparser
 import hashlib
 import json
 import math
@@ -155,6 +156,71 @@ def sha256_digest(path):
 def load_json(path):
     with path.open(encoding="utf-8") as stream:
         return json.load(stream)
+
+
+def derive_dramsim3_timing(root, profile_path, workloads):
+    definition = workloads["memory_ablation"]["dram_timing"]
+    dram_path = Path(definition["config"])
+    if not dram_path.is_absolute():
+        dram_path = root / dram_path
+    profile = configparser.ConfigParser()
+    dram = configparser.ConfigParser()
+    with profile_path.open(encoding="utf-8") as stream:
+        profile.read_file(stream)
+    with dram_path.open(encoding="utf-8") as stream:
+        dram.read_file(stream)
+    frequency_ghz = profile.getfloat("architecture", "frequency_ghz")
+    model_cycle_ns = 1.0 / frequency_ghz
+    tck_ns = dram.getfloat("timing", "tCK")
+    cl = dram.getint("timing", "CL")
+    trcdrd = dram.getint("timing", "tRCDRD")
+    trp = dram.getint("timing", "tRP")
+    row_hit_cycles = math.ceil(cl * tck_ns / model_cycle_ns - 1e-12)
+    row_miss_cycles = math.ceil((trcdrd + cl) * tck_ns / model_cycle_ns - 1e-12)
+    row_conflict_cycles = math.ceil(
+        (trp + trcdrd + cl) * tck_ns / model_cycle_ns - 1e-12
+    )
+    configured_hit = profile.getint("memory", "hbm_row_hit_cycles")
+    configured_miss = profile.getint("memory", "hbm_row_miss_cycles")
+    configured_conflict = profile.getint("memory", "hbm_row_conflict_cycles")
+    transaction_queue_entries = dram.getint("system", "trans_queue_size")
+    command_queue_entries = dram.getint("system", "cmd_queue_size")
+    configured_transaction_queue = profile.getint(
+        "memory", "hbm_transaction_queue_entries_per_channel"
+    )
+    configured_command_queue = profile.getint(
+        "memory", "hbm_command_queue_entries_per_bank"
+    )
+    if (configured_hit, configured_miss, configured_conflict) != (
+            row_hit_cycles, row_miss_cycles, row_conflict_cycles):
+        raise ValueError(
+            "paper HBM timing does not match the DRAMSim3-derived hit/miss/conflict "
+            f"cycles: configured={configured_hit}/{configured_miss}/{configured_conflict} "
+            f"derived={row_hit_cycles}/{row_miss_cycles}/{row_conflict_cycles}"
+        )
+    if (configured_transaction_queue, configured_command_queue) != (
+            transaction_queue_entries, command_queue_entries):
+        raise ValueError(
+            "paper HBM queue capacities do not match DRAMSim3: "
+            f"configured={configured_transaction_queue}/{configured_command_queue} "
+            f"source={transaction_queue_entries}/{command_queue_entries}"
+        )
+    return {
+        "config": str(dram_path.relative_to(root)),
+        "config_sha256": sha256_digest(dram_path),
+        "tck_ns": tck_ns,
+        "cl": cl,
+        "trcdrd": trcdrd,
+        "trp": trp,
+        "model_frequency_ghz": frequency_ghz,
+        "model_cycle_ns": model_cycle_ns,
+        "derived_row_hit_cycles": row_hit_cycles,
+        "derived_row_miss_cycles": row_miss_cycles,
+        "derived_row_conflict_cycles": row_conflict_cycles,
+        "transaction_queue_entries_per_channel": transaction_queue_entries,
+        "command_queue_entries_per_bank": command_queue_entries,
+        "formula": definition,
+    }
 
 
 def expected_graph_digest(root, dataset):
@@ -423,6 +489,84 @@ def validate_sequential_traffic(dataset, run):
     }
 
 
+def validate_transaction_admission(dataset, variant, run):
+    architecture = run["architecture"]
+    issue_limit = architecture["coordinator_issue_blocks_per_cycle"]
+    queue_capacity = architecture["hbm_transaction_queue_entries_per_channel"]
+    channels = architecture["hbm_channels"]
+    block_size = architecture["block_size"]
+    admitted_total = 0
+    expected_total = 0
+    max_total_occupancy = 0
+    admission_cycles = 0
+    for layer in run["layers"]:
+        summary = layer["transaction_admission_trace"]
+        traces = summary["trace_samples"]
+        previous_cycle = None
+        for trace in traces:
+            admitted = trace["admitted_blocks"]
+            if admitted <= 0 or admitted > issue_limit:
+                raise ValueError(
+                    f"{dataset} {variant} admits {admitted} blocks in one cycle; "
+                    f"limit is {issue_limit}"
+                )
+            if previous_cycle is not None and trace["cycle"] <= previous_cycle:
+                raise ValueError(f"{dataset} {variant} admission cycles are not increasing")
+            if trace["max_channel_occupancy_after"] > queue_capacity:
+                raise ValueError(f"{dataset} {variant} sample exceeds a channel queue capacity")
+            previous_cycle = trace["cycle"]
+        peaks = summary["max_channel_queue_occupancy"]
+        if len(peaks) != channels or any(value > queue_capacity for value in peaks):
+            raise ValueError(f"{dataset} {variant} exceeds a channel queue capacity")
+        if summary["max_blocks_admitted_per_cycle"] > issue_limit:
+            raise ValueError(f"{dataset} {variant} exceeds the shared admission bandwidth")
+        admitted_total += summary["admitted_blocks"]
+        admission_cycles += summary["cycle_count"]
+        max_total_occupancy = max(
+            max_total_occupancy, summary["max_total_queue_occupancy"]
+        )
+        for request in layer["memory_requests"]:
+            expected_total += math.ceil(request["bytes"] / block_size)
+            if not (
+                request["first_admission_cycle"] >= request["enqueue_cycle"]
+                and request["last_admission_cycle"] >= request["first_admission_cycle"]
+                and request["first_issue_cycle"] >= request["first_admission_cycle"]
+            ):
+                raise ValueError(f"{dataset} {variant} request admission violates causality")
+    if admitted_total != expected_total:
+        raise ValueError(
+            f"{dataset} {variant} admission trace covers {admitted_total} blocks, "
+            f"expected {expected_total}"
+        )
+    return {
+        "admitted_blocks": admitted_total,
+        "admission_cycles": admission_cycles,
+        "max_blocks_admitted_per_cycle": max(
+            layer["transaction_admission_trace"]["max_blocks_admitted_per_cycle"]
+            for layer in run["layers"]
+        ),
+        "issue_limit_blocks_per_cycle": issue_limit,
+        "max_total_queue_occupancy": max_total_occupancy,
+        "total_queue_capacity": channels * queue_capacity,
+    }
+
+
+def evidence_counts(reference):
+    counts = {"paper_metric_rows": 0, "internal_check_rows": 0}
+    for definition in reference["metrics"].values():
+        if not definition["required"]:
+            continue
+        validation = definition["validation"]
+        rows = len(reference["datasets"]) if validation.startswith("per_dataset") else 1
+        key = (
+            "paper_metric_rows"
+            if definition["evidence_class"] == "paper_metric"
+            else "internal_check_rows"
+        )
+        counts[key] += rows
+    return counts
+
+
 def priority_trace_evidence(dataset, optimized, mapping_only):
     optimized_layer = optimized["layers"][0]
     baseline_layer = mapping_only["layers"][0]
@@ -475,6 +619,11 @@ def current_parameters(architecture, workloads):
         "edge_ping_pong_regions": architecture["edge_ping_pong_regions"],
         "hbm_transaction_queue_entries_per_channel":
             architecture["hbm_transaction_queue_entries_per_channel"],
+        "hbm_command_queue_entries_per_bank":
+            architecture["hbm_command_queue_entries_per_bank"],
+        "hbm_row_hit_cycles": architecture["hbm_row_hit_cycles"],
+        "hbm_row_miss_cycles": architecture["hbm_row_miss_cycles"],
+        "hbm_row_conflict_cycles": architecture["hbm_row_conflict_cycles"],
         "coordinator_issue_blocks_per_cycle":
             architecture["coordinator_issue_blocks_per_cycle"],
         "input_ping_pong_regions": architecture["input_ping_pong_regions"],
@@ -525,6 +674,7 @@ def main():
     reference = load_json(reference_path)
     workloads = load_json(workload_path)
     parameter_baseline = load_json(baseline_path)
+    dram_timing_basis = derive_dramsim3_timing(root, profile_path, workloads)
     datasets = args.datasets or reference["datasets"]
     per_dataset = {}
     metric_values = {name: [] for name in reference["metrics"]}
@@ -553,6 +703,10 @@ def main():
                 runs[optimized_name], runs[baseline_name], allowed, dataset, baseline_name
             )
         architecture = runs["optimized"]["architecture"]
+        admission_oracles = {
+            name: validate_transaction_admission(dataset, name, result)
+            for name, result in runs.items()
+        }
         summaries = {name: summarize_result(result) for name, result in runs.items()}
         metrics = calculate_metrics(
             summaries["optimized"],
@@ -587,6 +741,7 @@ def main():
                     "bank_blocks"
                 ],
             },
+            "transaction_admission_oracles": admission_oracles,
         }
         for name, value in metrics.items():
             metric_values[name].append(value)
@@ -608,6 +763,8 @@ def main():
         "aggregate": aggregate,
         "per_dataset": per_dataset,
         "memory_ablation": workloads["memory_ablation"],
+        "dram_timing_basis": dram_timing_basis,
+        "evidence_counts": evidence_counts(reference),
         "parameter_audit": audit,
         "parameter_recalibration": audit["parameter_recalibration"],
         "scope": {

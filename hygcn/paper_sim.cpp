@@ -140,10 +140,13 @@ json ArchitectureJson(const ArchitectureConfig& architecture) {
         {"hbm_row_bytes", architecture.hbm_row_bytes},
         {"hbm_transaction_queue_entries_per_channel",
          architecture.hbm_transaction_queue_entries_per_channel},
+        {"hbm_command_queue_entries_per_bank",
+         architecture.hbm_command_queue_entries_per_bank},
         {"coordinator_issue_blocks_per_cycle",
          CoordinatorIssueBlocksPerCycle(architecture)},
         {"hbm_row_hit_cycles", architecture.hbm_row_hit_cycles},
         {"hbm_row_miss_cycles", architecture.hbm_row_miss_cycles},
+        {"hbm_row_conflict_cycles", architecture.hbm_row_conflict_cycles},
         {"edram_latency_cycles", architecture.edram_latency_cycles},
         {"edram_transactions_per_cycle", architecture.edram_transactions_per_cycle},
         {"simd_efficiency", architecture.simd_efficiency},
@@ -179,6 +182,8 @@ json LayerJson(const LayerMetrics& layer) {
             {"bytes", trace.bytes},
             {"producer_ready_cycle", trace.producer_ready_cycle},
             {"enqueue_cycle", trace.enqueue_cycle},
+            {"first_admission_cycle", trace.first_admission_cycle},
+            {"last_admission_cycle", trace.last_admission_cycle},
             {"first_issue_cycle", trace.first_issue_cycle},
             {"completion_cycle", trace.completion_cycle},
             {"producer_sequence", trace.producer_sequence.has_value()
@@ -195,12 +200,58 @@ json LayerJson(const LayerMetrics& layer) {
             {"bytes", trace.bytes},
             {"producer_ready_cycle", trace.producer_ready_cycle},
             {"enqueue_cycle", trace.enqueue_cycle},
+            {"first_admission_cycle", trace.first_admission_cycle},
+            {"last_admission_cycle", trace.last_admission_cycle},
             {"first_issue_cycle", trace.first_issue_cycle},
             {"completion_cycle", trace.completion_cycle},
             {"producer_sequence", trace.producer_sequence.has_value()
                 ? json(*trace.producer_sequence) : json(nullptr)},
         });
     }
+    json admission_samples = json::array();
+    std::array<uint64_t, 5> admission_histogram{};
+    uint64_t admitted_blocks = 0;
+    uint64_t max_total_occupancy = 0;
+    uint64_t admission_checksum = 1469598103934665603ULL;
+    for (std::size_t index = 0; index < layer.transaction_admission_traces.size(); ++index) {
+        const auto& trace = layer.transaction_admission_traces[index];
+        if (trace.admitted_blocks < admission_histogram.size()) {
+            ++admission_histogram[trace.admitted_blocks];
+        }
+        admitted_blocks += trace.admitted_blocks;
+        max_total_occupancy = std::max(max_total_occupancy, trace.total_occupancy_after);
+        for (const uint64_t value : {trace.cycle, trace.admitted_blocks,
+                                     trace.total_occupancy_before,
+                                     trace.total_occupancy_after,
+                                     trace.max_channel_occupancy_after}) {
+            admission_checksum ^= value;
+            admission_checksum *= 1099511628211ULL;
+        }
+        if (index < 16 || index + 16 >= layer.transaction_admission_traces.size()) {
+            admission_samples.push_back({
+                {"cycle", trace.cycle},
+                {"admitted_blocks", trace.admitted_blocks},
+                {"total_occupancy_before", trace.total_occupancy_before},
+                {"total_occupancy_after", trace.total_occupancy_after},
+                {"max_channel_occupancy_after", trace.max_channel_occupancy_after},
+            });
+        }
+    }
+    json admission_summary = {
+        {"cycle_count", layer.transaction_admission_traces.size()},
+        {"first_cycle", layer.transaction_admission_traces.empty()
+            ? 0 : layer.transaction_admission_traces.front().cycle},
+        {"last_cycle", layer.transaction_admission_traces.empty()
+            ? 0 : layer.transaction_admission_traces.back().cycle},
+        {"admitted_blocks", admitted_blocks},
+        {"max_blocks_admitted_per_cycle", admission_histogram[4] > 0 ? 4 :
+            admission_histogram[3] > 0 ? 3 : admission_histogram[2] > 0 ? 2 : 1},
+        {"admitted_blocks_histogram", admission_histogram},
+        {"max_total_queue_occupancy", max_total_occupancy},
+        {"max_channel_queue_occupancy", layer.max_channel_queue_occupancy},
+        {"trace_checksum_fnv1a64", Hex64(admission_checksum)},
+        {"trace_samples", admission_samples},
+    };
     json input_windows = json::array();
     for (const auto& trace : layer.input_window_traces) {
         input_windows.push_back({
@@ -274,6 +325,7 @@ json LayerJson(const LayerMetrics& layer) {
         {"input_window_requests", input_windows},
         {"memory_requests", memory_requests},
         {"producer_dependent_requests", producer_requests},
+        {"transaction_admission_trace", admission_summary},
         {"channel_blocks", layer.channel_blocks},
         {"bank_blocks", layer.bank_blocks},
         {"simd_utilization", layer.simd_utilization},
@@ -318,8 +370,12 @@ ArchitectureConfig ArchitectureConfig::Load(const std::string& path) {
     config.hbm_row_bytes = reader.GetInteger("memory", "hbm_row_bytes", -1);
     config.hbm_transaction_queue_entries_per_channel = reader.GetInteger(
         "memory", "hbm_transaction_queue_entries_per_channel", -1);
+    config.hbm_command_queue_entries_per_bank = reader.GetInteger(
+        "memory", "hbm_command_queue_entries_per_bank", -1);
     config.hbm_row_hit_cycles = reader.GetInteger("memory", "hbm_row_hit_cycles", -1);
     config.hbm_row_miss_cycles = reader.GetInteger("memory", "hbm_row_miss_cycles", -1);
+    config.hbm_row_conflict_cycles = reader.GetInteger(
+        "memory", "hbm_row_conflict_cycles", -1);
     config.edram_latency_cycles = reader.GetInteger("memory", "edram_latency_cycles", -1);
     config.edram_transactions_per_cycle = reader.GetInteger("memory", "edram_transactions_per_cycle", -1);
 
@@ -393,9 +449,13 @@ void ArchitectureConfig::Validate() const {
                      "hbm_row_bytes");
     require_positive(hbm_transaction_queue_entries_per_channel > 0,
                      "hbm_transaction_queue_entries_per_channel");
+    require_positive(hbm_command_queue_entries_per_bank > 0,
+                     "hbm_command_queue_entries_per_bank");
     require_positive(hbm_row_hit_cycles > 0, "hbm_row_hit_cycles");
     require_positive(hbm_row_miss_cycles > hbm_row_hit_cycles,
                      "hbm_row_miss_cycles");
+    require_positive(hbm_row_conflict_cycles > hbm_row_miss_cycles,
+                     "hbm_row_conflict_cycles");
     require_positive(edram_latency_cycles >= 0, "edram_latency_cycles");
     require_positive(edram_transactions_per_cycle > 0, "edram_transactions_per_cycle");
     require_positive(simd_efficiency > 0.0 && simd_efficiency <= 1.0, "simd_efficiency");
@@ -581,6 +641,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     MemoryTimingResult result;
     result.channel_blocks.assign(architecture.hbm_channels, 0);
     result.bank_blocks.assign(architecture.hbm_banks_per_channel, 0);
+    result.max_channel_queue_occupancy.assign(architecture.hbm_channels, 0);
     if (requests.empty()) {
         return result;
     }
@@ -598,6 +659,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         uint64_t admitted_blocks = 0;
         uint64_t issued_blocks = 0;
         uint64_t first_issue = std::numeric_limits<uint64_t>::max();
+        uint64_t first_admission = std::numeric_limits<uint64_t>::max();
+        uint64_t last_admission = 0;
         uint64_t completion = 0;
         uint64_t effective_producer_ready = 0;
         uint64_t effective_enqueue = 0;
@@ -608,6 +671,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         uint64_t start_cycle = 0;
         uint64_t producer_ready_cycle = 0;
         uint64_t enqueue_cycle = 0;
+        uint64_t admission_cycle = std::numeric_limits<uint64_t>::max();
+        uint64_t controller_dispatch_cycle = std::numeric_limits<uint64_t>::max();
         uint64_t admission_order = std::numeric_limits<uint64_t>::max();
         uint64_t block = 0;
         uint64_t block_offset = 0;
@@ -777,8 +842,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     };
 
     auto future_after = [&](const Candidate& lhs, const Candidate& rhs) {
-        if (lhs.enqueue_cycle != rhs.enqueue_cycle) {
-            return lhs.enqueue_cycle > rhs.enqueue_cycle;
+        if (lhs.controller_dispatch_cycle != rhs.controller_dispatch_cycle) {
+            return lhs.controller_dispatch_cycle > rhs.controller_dispatch_cycle;
         }
         return priority_less(rhs, lhs);
     };
@@ -851,6 +916,9 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     }
     std::set<std::pair<std::size_t, uint64_t>> issued_candidates;
     std::vector<std::size_t> outstanding_blocks(architecture.hbm_channels, 0);
+    std::vector<std::deque<Candidate>> controller_queues(architecture.hbm_channels);
+    std::vector<uint64_t> next_controller_dispatch_cycle(architecture.hbm_channels, 0);
+    std::vector<std::size_t> command_queue_occupancy(total_banks, 0);
     std::size_t fifo_next_port = 0;
     uint64_t next_admission_order = 0;
 
@@ -870,11 +938,10 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         }
         row->second.insert(candidate);
     };
-    auto enqueue_candidate = [&](Candidate candidate) {
-        candidate.admission_order = next_admission_order++;
+    auto enqueue_bank_candidate = [&](Candidate candidate) {
         const std::size_t flat_bank =
             candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
-        if (candidate.enqueue_cycle <= resource_ready(flat_bank)) {
+        if (candidate.controller_dispatch_cycle <= resource_ready(flat_bank)) {
             push_available(bank_queues[flat_bank], candidate);
         } else {
             bank_queues[flat_bank].future.push(candidate);
@@ -885,7 +952,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         auto& queue = bank_queues[flat_bank];
         const uint64_t ready_cycle = resource_ready(flat_bank);
         while (!queue.future.empty() &&
-               queue.future.top().enqueue_cycle <= ready_cycle) {
+               queue.future.top().controller_dispatch_cycle <= ready_cycle) {
             push_available(queue, queue.future.top());
             queue.future.pop();
         }
@@ -917,7 +984,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             }
         } else if (!queue.future.empty()) {
             choice.candidate = queue.future.top();
-            choice.candidate.start_cycle = queue.future.top().enqueue_cycle;
+            choice.candidate.start_cycle = queue.future.top().controller_dispatch_cycle;
             choice.valid = true;
         }
         return choice;
@@ -988,94 +1055,195 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             push_pending(make_candidate(index, 0), 0);
         }
     }
-    auto fill_transaction_queue = [&](uint64_t visible_cycle,
-                                      std::vector<bool>& affected_channels) {
-        const std::size_t queue_capacity = static_cast<std::size_t>(
-            architecture.hbm_transaction_queue_entries_per_channel);
-        while (true) {
-            promote_pending(visible_cycle);
-            Candidate candidate;
-            bool has_candidate = false;
-            std::size_t selected_port = 0;
-            PendingSet::iterator selected_pending;
-            if (priority == MemoryPriorityMode::BATCH_CLASS) {
-                if (!pending_priority.empty()) {
-                    const auto& head = *pending_priority.begin();
-                    const auto& head_request = states[head.request_index].request;
-                    std::size_t scanned = 0;
-                    for (auto iterator = pending_priority.begin();
-                         iterator != pending_priority.end() && scanned < queue_capacity;
-                         ++iterator, ++scanned) {
-                        const auto& request = states[iterator->request_index].request;
-                        if (request.batch_id != head_request.batch_id ||
-                            request.request_class != head_request.request_class ||
-                            iterator->row != head.row) {
-                            break;
-                        }
-                        if (outstanding_blocks[iterator->channel] < queue_capacity) {
-                            candidate = *iterator;
-                            selected_pending = iterator;
-                            has_candidate = true;
-                            break;
-                        }
-                    }
+    const std::size_t queue_capacity = static_cast<std::size_t>(
+        architecture.hbm_transaction_queue_entries_per_channel);
+    const std::size_t command_queue_capacity = static_cast<std::size_t>(
+        architecture.hbm_command_queue_entries_per_bank);
+    struct PendingChoice {
+        Candidate candidate;
+        std::size_t port = 0;
+        PendingSet::iterator iterator;
+        bool valid = false;
+    };
+    auto select_pending = [&]() {
+        PendingChoice choice;
+        if (priority == MemoryPriorityMode::BATCH_CLASS) {
+            if (pending_priority.empty()) {
+                return choice;
+            }
+            const auto& head = *pending_priority.begin();
+            const auto& head_request = states[head.request_index].request;
+            for (auto iterator = pending_priority.begin();
+                 iterator != pending_priority.end(); ++iterator) {
+                const auto& request = states[iterator->request_index].request;
+                if (request.batch_id != head_request.batch_id ||
+                    request.request_class != head_request.request_class ||
+                    iterator->row != head.row) {
+                    break;
                 }
-            } else {
-                for (std::size_t distance = 0; distance < kCoordinatorPorts; ++distance) {
-                    const std::size_t port =
-                        (fifo_next_port + distance) % kCoordinatorPorts;
-                    std::size_t scanned = 0;
-                    for (auto iterator = pending_fifo_ports[port].begin();
-                         iterator != pending_fifo_ports[port].end() &&
-                             scanned < coordinator_issue_blocks;
-                         ++iterator, ++scanned) {
-                        if (outstanding_blocks[iterator->channel] < queue_capacity) {
-                            candidate = *iterator;
-                            selected_pending = iterator;
-                            selected_port = port;
-                            has_candidate = true;
-                            break;
-                        }
-                    }
-                    if (has_candidate) {
-                        break;
-                    }
+                if (outstanding_blocks[iterator->channel] < queue_capacity) {
+                    choice.candidate = *iterator;
+                    choice.iterator = iterator;
+                    choice.valid = true;
+                    return choice;
                 }
             }
-            if (has_candidate) {
-                if (priority == MemoryPriorityMode::BATCH_CLASS) {
-                    pending_priority.erase(selected_pending);
-                } else {
-                    pending_fifo_ports[selected_port].erase(selected_pending);
-                }
-                enqueue_candidate(candidate);
-                ++outstanding_blocks[candidate.channel];
-                if (priority == MemoryPriorityMode::FIFO) {
-                    fifo_next_port = (selected_port + 1) % kCoordinatorPorts;
-                }
-                affected_channels[candidate.channel] = true;
-                auto& state = states[candidate.request_index];
-                ++state.admitted_blocks;
-                if (state.admitted_blocks < state.block_count) {
-                    push_pending(make_candidate(candidate.request_index,
-                                                state.admitted_blocks),
-                                 visible_cycle);
-                }
+            return choice;
+        }
+        for (std::size_t distance = 0; distance < kCoordinatorPorts; ++distance) {
+            const std::size_t port = (fifo_next_port + distance) % kCoordinatorPorts;
+            if (pending_fifo_ports[port].empty()) {
                 continue;
             }
-            const std::size_t total_outstanding = std::accumulate(
-                outstanding_blocks.begin(), outstanding_blocks.end(), std::size_t{0});
-            if (total_outstanding != 0) {
-                break;
+            const auto iterator = pending_fifo_ports[port].begin();
+            if (outstanding_blocks[iterator->channel] >= queue_capacity) {
+                continue;
             }
-            if (pending_future.empty()) {
-                break;
-            }
-            visible_cycle = pending_future.top().enqueue_cycle;
+            choice.candidate = *iterator;
+            choice.port = port;
+            choice.iterator = iterator;
+            choice.valid = true;
+            return choice;
         }
+        return choice;
     };
-    std::vector<bool> initial_channels(architecture.hbm_channels, false);
-    fill_transaction_queue(0, initial_channels);
+    uint64_t next_admission_cycle = 0;
+    auto next_admission_event = [&]() -> std::optional<uint64_t> {
+        if (pending_available_count() != 0) {
+            return next_admission_cycle;
+        }
+        if (!pending_future.empty()) {
+            return std::max(next_admission_cycle,
+                            pending_future.top().enqueue_cycle);
+        }
+        return std::nullopt;
+    };
+    auto admit_transaction_blocks = [&](uint64_t cycle,
+                                        std::vector<bool>& affected_channels) {
+        promote_pending(cycle);
+        const std::size_t occupancy_before = std::accumulate(
+            outstanding_blocks.begin(), outstanding_blocks.end(), std::size_t{0});
+        std::size_t admitted = 0;
+        while (admitted < coordinator_issue_blocks) {
+            PendingChoice choice = select_pending();
+            if (!choice.valid) {
+                break;
+            }
+            if (priority == MemoryPriorityMode::BATCH_CLASS) {
+                pending_priority.erase(choice.iterator);
+            } else {
+                pending_fifo_ports[choice.port].erase(choice.iterator);
+            }
+            Candidate candidate = choice.candidate;
+            if (priority == MemoryPriorityMode::FIFO) {
+                fifo_next_port = (choice.port + 1) % kCoordinatorPorts;
+            }
+            candidate.admission_cycle = cycle;
+            candidate.admission_order = next_admission_order++;
+            controller_queues[candidate.channel].push_back(candidate);
+            ++outstanding_blocks[candidate.channel];
+            auto& state = states[candidate.request_index];
+            state.first_admission = std::min(state.first_admission, cycle);
+            state.last_admission = std::max(state.last_admission, cycle);
+            ++state.admitted_blocks;
+            ++admitted;
+            if (state.admitted_blocks < state.block_count) {
+                push_pending(make_candidate(candidate.request_index,
+                                            state.admitted_blocks),
+                             cycle);
+            }
+        }
+        if (admitted != 0) {
+            TransactionAdmissionTrace trace;
+            trace.cycle = cycle;
+            trace.admitted_blocks = admitted;
+            trace.total_occupancy_before = occupancy_before;
+            trace.total_occupancy_after = std::accumulate(
+                outstanding_blocks.begin(), outstanding_blocks.end(), uint64_t{0});
+            trace.max_channel_occupancy_after = *std::max_element(
+                outstanding_blocks.begin(), outstanding_blocks.end());
+            for (std::size_t channel = 0; channel < outstanding_blocks.size(); ++channel) {
+                if (outstanding_blocks[channel] > queue_capacity) {
+                    throw std::runtime_error("transaction queue capacity exceeded");
+                }
+                result.max_channel_queue_occupancy[channel] = std::max<uint64_t>(
+                    result.max_channel_queue_occupancy[channel], outstanding_blocks[channel]);
+            }
+            result.admission_traces.push_back(std::move(trace));
+            next_admission_cycle = cycle + 1;
+        }
+        return admitted;
+    };
+    auto controller_choice = [&](std::size_t channel, uint64_t cycle) {
+        std::optional<std::size_t> selected;
+        const auto& queue = controller_queues[channel];
+        for (std::size_t index = 0; index < queue.size(); ++index) {
+            const auto& candidate = queue[index];
+            if (candidate.admission_cycle > cycle) {
+                continue;
+            }
+            const std::size_t flat_bank =
+                candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
+            if (command_queue_occupancy[flat_bank] < command_queue_capacity) {
+                selected = index;
+                break;
+            }
+        }
+        return selected;
+    };
+    auto next_controller_event = [&]() -> std::optional<uint64_t> {
+        std::optional<uint64_t> earliest;
+        for (std::size_t channel = 0; channel < controller_queues.size(); ++channel) {
+            const auto& queue = controller_queues[channel];
+            if (queue.empty()) {
+                continue;
+            }
+            uint64_t cycle = next_controller_dispatch_cycle[channel];
+            bool dispatchable = false;
+            for (const auto& candidate : queue) {
+                cycle = std::max(cycle, candidate.admission_cycle);
+                const std::size_t flat_bank =
+                    candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
+                if (command_queue_occupancy[flat_bank] < command_queue_capacity) {
+                    dispatchable = true;
+                    break;
+                }
+            }
+            if (dispatchable && (!earliest.has_value() || cycle < *earliest)) {
+                earliest = cycle;
+            }
+        }
+        return earliest;
+    };
+    auto dispatch_controllers = [&](uint64_t cycle,
+                                    std::vector<bool>& affected_channels) {
+        std::size_t dispatched = 0;
+        for (std::size_t channel = 0; channel < controller_queues.size(); ++channel) {
+            if (next_controller_dispatch_cycle[channel] > cycle) {
+                continue;
+            }
+            const auto selected = controller_choice(channel, cycle);
+            if (!selected.has_value()) {
+                continue;
+            }
+            auto& queue = controller_queues[channel];
+            Candidate candidate = queue[*selected];
+            queue.erase(queue.begin() + static_cast<std::ptrdiff_t>(*selected));
+            if (outstanding_blocks[channel] == 0) {
+                throw std::runtime_error("transaction queue occupancy underflow");
+            }
+            --outstanding_blocks[channel];
+            candidate.controller_dispatch_cycle = cycle;
+            const std::size_t flat_bank =
+                candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
+            ++command_queue_occupancy[flat_bank];
+            enqueue_bank_candidate(candidate);
+            affected_channels[channel] = true;
+            next_controller_dispatch_cycle[channel] = cycle + transfer_cycles;
+            ++dispatched;
+        }
+        return dispatched;
+    };
     for (std::size_t channel = 0; channel < channel_choices.size(); ++channel) {
         recompute_channel(channel);
     }
@@ -1086,6 +1254,42 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             if (choice_less(channel_choice, selected_choice)) {
                 selected_choice = channel_choice;
             }
+        }
+        const auto admission_event = next_admission_event();
+        const auto controller_event = next_controller_event();
+        const uint64_t bank_event = selected_choice.valid
+            ? selected_choice.candidate.start_cycle
+            : std::numeric_limits<uint64_t>::max();
+        const uint64_t controller_cycle = controller_event.value_or(
+            std::numeric_limits<uint64_t>::max());
+        if (admission_event.has_value() &&
+            *admission_event <= controller_cycle && *admission_event <= bank_event) {
+            std::vector<bool> affected_channels(architecture.hbm_channels, false);
+            const std::size_t admitted = admit_transaction_blocks(
+                *admission_event, affected_channels);
+            if (admitted != 0) {
+                for (std::size_t channel = 0; channel < affected_channels.size(); ++channel) {
+                    if (affected_channels[channel]) {
+                        recompute_channel(channel);
+                    }
+                }
+                continue;
+            }
+            next_admission_cycle = std::max(next_admission_cycle, *admission_event + 1);
+        }
+        if (controller_event.has_value() && *controller_event <= bank_event) {
+            std::vector<bool> affected_channels(architecture.hbm_channels, false);
+            const std::size_t dispatched = dispatch_controllers(
+                *controller_event, affected_channels);
+            if (dispatched == 0) {
+                throw std::runtime_error("controller dispatch event made no progress");
+            }
+            for (std::size_t channel = 0; channel < affected_channels.size(); ++channel) {
+                if (affected_channels[channel]) {
+                    recompute_channel(channel);
+                }
+            }
+            continue;
         }
         if (!selected_choice.valid) {
             std::size_t bank_available = 0;
@@ -1100,12 +1304,20 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             }
             const std::size_t total_outstanding = std::accumulate(
                 outstanding_blocks.begin(), outstanding_blocks.end(), std::size_t{0});
+            const std::size_t controller_pending = std::accumulate(
+                controller_queues.begin(), controller_queues.end(), std::size_t{0},
+                [](std::size_t count, const auto& queue) { return count + queue.size(); });
+            const std::size_t command_pending = std::accumulate(
+                command_queue_occupancy.begin(), command_queue_occupancy.end(),
+                std::size_t{0});
             throw std::runtime_error(
                 "memory request dependency cycle: remaining=" +
                 std::to_string(remaining_blocks) + " outstanding=" +
                 std::to_string(total_outstanding) + " pending_available=" +
                 std::to_string(pending_available_count()) + " pending_future=" +
-                std::to_string(pending_future.size()) + " bank_available=" +
+                std::to_string(pending_future.size()) + " controller_pending=" +
+                std::to_string(controller_pending) + " command_pending=" +
+                std::to_string(command_pending) + " bank_available=" +
                 std::to_string(bank_available) + " bank_future=" +
                 std::to_string(bank_future) + " valid_channels=" +
                 std::to_string(valid_channels));
@@ -1125,6 +1337,10 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         } else {
             selected_queue.future.pop();
         }
+        if (command_queue_occupancy[selected_choice.flat_bank] == 0) {
+            throw std::runtime_error("command queue occupancy underflow");
+        }
+        --command_queue_occupancy[selected_choice.flat_bank];
 
         auto& state = states[selected.request_index];
         while (!active_fifo.empty() &&
@@ -1147,9 +1363,11 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             state.effective_enqueue, selected.enqueue_cycle);
         state.first_issue = std::min(state.first_issue, selected.start_cycle);
         const bool row_hit = bank_state.row_open && bank_state.open_row == selected.row;
+        const bool row_conflict = bank_state.row_open && !row_hit;
         const uint64_t access_cycles = row_hit
             ? architecture.hbm_row_hit_cycles
-            : architecture.hbm_row_miss_cycles;
+            : row_conflict ? architecture.hbm_row_conflict_cycles
+                           : architecture.hbm_row_miss_cycles;
         if (row_hit) {
             ++result.row_buffer_hits;
             ++result.row_buffer_hits_by_class[static_cast<std::size_t>(
@@ -1167,7 +1385,6 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         state.completion = std::max(state.completion, completion);
         ++state.issued_blocks;
         issued_candidates.insert({selected.request_index, selected.block_offset});
-        --outstanding_blocks[selected.channel];
         --remaining_blocks;
         ++result.channel_blocks[selected.channel];
         ++result.bank_blocks[selected.bank];
@@ -1179,7 +1396,6 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                 push_pending(make_candidate(dependent, 0), selected.start_cycle);
             }
         }
-        fill_transaction_queue(selected.start_cycle, affected_channels);
         for (std::size_t channel = 0; channel < affected_channels.size(); ++channel) {
             if (affected_channels[channel]) {
                 recompute_channel(channel);
@@ -1208,6 +1424,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             request.address,
             state.effective_producer_ready,
             state.effective_enqueue,
+            state.first_admission,
+            state.last_admission,
             state.first_issue,
             state.completion,
             request.sequence,
@@ -1868,6 +2086,8 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
         metrics.channel_blocks = memory_timing.channel_blocks;
         metrics.bank_blocks = memory_timing.bank_blocks;
         metrics.memory_request_traces = memory_timing.request_traces;
+        metrics.transaction_admission_traces = memory_timing.admission_traces;
+        metrics.max_channel_queue_occupancy = memory_timing.max_channel_queue_occupancy;
         metrics.aggregation_memory_cycles = std::max(
             memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::EDGE)],
             memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::INPUT)]);

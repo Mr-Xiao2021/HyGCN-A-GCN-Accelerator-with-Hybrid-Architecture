@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "dataflow/event.h"
+#include "configuration.h"
 #include "hardware/spm.h"
 #include "paper_sim.h"
 
@@ -96,6 +97,17 @@ void TestConfig() {
           "paper profile derives four 64-byte coordinator issues per cycle");
     Check(std::abs(paper.HbmBytesPerCycle() - 256.0) < 1e-9,
           "paper profile exposes 256 bytes per cycle HBM bandwidth");
+    const dramsim3::Config dram_config("configs/HBM1_4Gb_x128.ini", ".");
+    const auto paper_cycles = [&](double dram_cycles) {
+        return static_cast<int>(std::ceil(
+            dram_cycles * dram_config.tCK * paper.frequency_ghz));
+    };
+    Check(paper.hbm_row_hit_cycles == paper_cycles(dram_config.CL) &&
+              paper.hbm_row_miss_cycles ==
+                  paper_cycles(dram_config.tRCDRD + dram_config.CL) &&
+              paper.hbm_row_conflict_cycles == paper_cycles(
+                  dram_config.tRP + dram_config.tRCDRD + dram_config.CL),
+          "paper HBM hit/miss/conflict timing is derived from the DRAMSim3 HBM config");
 
     auto invalid = paper;
     invalid.num_simd = 0;
@@ -418,6 +430,54 @@ void TestCoordinator() {
               << priority_input0.first_issue_cycle << ",\"fifo_input_issue\":"
               << fifo_input0.first_issue_cycle << ",\"priority_reorders\":"
               << dynamic_priority.priority_reorders << "}\n";
+}
+
+void TestTransactionAdmissionBandwidth() {
+    auto config = ArchitectureConfig::Load("configs/HYGCN_PAPER.ini");
+    config.hbm_channels = 4;
+    config.hbm_banks_per_channel = 1;
+    config.hbm_transaction_queue_entries_per_channel = 2;
+    config.hbm_row_bytes = 256;
+    config.row_first_bank_interleave = 1;
+    config.Validate();
+    const std::vector<MemoryRequest> requests = {
+        {0, RequestClass::EDGE, 256, 0, 0, 0},
+        {0, RequestClass::INPUT, 256, 256, 0, 1},
+        {0, RequestClass::WEIGHT, 256, 512, 0, 2},
+        {0, RequestClass::OUTPUT, 256, 768, 0, 3},
+    };
+    for (const auto priority : {MemoryPriorityMode::FIFO,
+                                MemoryPriorityMode::BATCH_CLASS}) {
+        const auto timing = MemoryCoordinatorModel::Simulate(
+            requests, config, priority, AddressMappingMode::LOW_BITS);
+        uint64_t admitted_blocks = 0;
+        uint64_t previous_cycle = 0;
+        bool first = true;
+        for (const auto& trace : timing.admission_traces) {
+            Check(trace.admitted_blocks > 0 && trace.admitted_blocks <= 4,
+                  "four coordinator ports admit at most four blocks per cycle");
+            Check(first || trace.cycle > previous_cycle,
+                  "transaction admission cycles are unique and increasing");
+            Check(trace.total_occupancy_after <= 8 &&
+                      trace.max_channel_occupancy_after <= 2,
+                  "shared admission preserves every channel queue capacity");
+            admitted_blocks += trace.admitted_blocks;
+            previous_cycle = trace.cycle;
+            first = false;
+        }
+        Check(admitted_blocks == 16,
+              "admission trace accounts for every 64-byte block");
+        Check(timing.max_channel_queue_occupancy.size() == 4 &&
+                  *std::max_element(timing.max_channel_queue_occupancy.begin(),
+                                    timing.max_channel_queue_occupancy.end()) <= 2,
+              "per-channel peak occupancy remains within the shared queue capacity");
+        for (const auto& trace : timing.request_traces) {
+            Check(trace.first_admission_cycle >= trace.enqueue_cycle &&
+                      trace.last_admission_cycle >= trace.first_admission_cycle &&
+                      trace.first_issue_cycle >= trace.first_admission_cycle,
+                  "request issue follows enqueue and bounded transaction admission");
+        }
+    }
 }
 
 void TestMemoryServiceBandwidthScope() {
@@ -823,6 +883,8 @@ int main() {
         RunNamedTest("systolic_model", TestSystolicModel);
         RunNamedTest("hbm_layout_mapping", TestHbmLayoutAndMapping);
         RunNamedTest("coordinator_ordering", TestCoordinator);
+        RunNamedTest("V5_01_transaction_admission_bandwidth",
+                     TestTransactionAdmissionBandwidth);
         RunNamedTest("V4_01_memory_service_bandwidth_scope", TestMemoryServiceBandwidthScope);
         RunNamedTest("F02_fragmentation_invariance", TestFragmentationInvariant);
         RunNamedTest("aggregation_buffer", TestAggregationBuffer);

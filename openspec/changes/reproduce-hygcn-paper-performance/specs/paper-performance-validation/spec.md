@@ -25,7 +25,7 @@
 - **THEN** 两次结构化结果中的确定性指标完全一致
 
 ### Requirement: 论文参考指标清单
-系统 SHALL 维护版本化的论文参考指标清单，记录指标名称、论文章节或图号、参考值、单位、聚合方式、实验 scope、是否强制和容差。Fig. 15/16 MUST 保存 arXiv SVG 来源 URL、SHA256、坐标提取方法和 Cora/Citeseer/PubMed 的逐数据集柱值，并按逐数据集标量验收；协调器平均 73% 时间下降（约 3.70×）和平均 4.00× 带宽提升 MUST 作为聚合指标。Fig. 15(b) MUST 验收 AE 的 Edge+Input 总 DRAM 比率；Input-only 比率 MUST 标记为诊断项，不得代替论文指标参与门禁。
+系统 SHALL 维护版本化的论文参考指标清单，记录指标名称、论文章节或图号、参考值、单位、聚合方式、实验 scope、是否强制和容差。Fig. 15/16 MUST 保存 arXiv SVG 来源 URL、SHA256、坐标提取方法和 Cora/Citeseer/PubMed 的逐数据集柱值，并按逐数据集标量验收；协调器平均 73% 时间下降（约 3.70×）和平均 4.00× 带宽提升 MUST 作为聚合指标。Fig. 15(b) MUST 验收 AE 的 Edge+Input 总 DRAM 比率；Input-only 比率 MUST 标记为诊断项，不得代替论文指标参与门禁。报告 MUST 固定区分 14 项论文数值与 12 项内部因果检查，不得以合计通过数扩大外部证据。
 
 #### Scenario: 加载参考指标
 - **WHEN** 论文验收工具启动
@@ -62,7 +62,7 @@
 
 #### Scenario: 协调器分解消融
 - **WHEN** 验收 Fig. 17
-- **THEN** 报告 priority-only、mapping-only 和 combined 三组结果，分别保持非目标机制不变，并保存同一 low-bits mapping 上 optimized/mapping-only 的请求 timeline、各类别 row hit/miss 与 mapping channel/bank 分布；逐数据集周期和完整区间带宽 MUST 位于显式的 `0.01%` 尾部边界容差内，row-hit MUST 不退化，三数据集平均 MUST 显示正增量
+- **THEN** 报告 priority-only、mapping-only 和 combined 三组结果，分别保持非目标机制不变，并保存同一 low-bits mapping 上 optimized/mapping-only 的请求 timeline、各类别 row hit/miss 与 mapping channel/bank 分布；逐数据集周期和完整区间带宽增量 MUST 至少为 `1.005x`，逐数据集 row-hit 增量 MUST 至少为 `1.03x`，三数据集平均 row-hit 增量 MUST 至少为 `1.05x`
 
 #### Scenario: 带宽与总执行时间解耦
 - **WHEN** 请求时间线包含等待 AE/CE producer 且没有 HBM 请求在途的空闲区间
@@ -77,10 +77,12 @@
 
 #### Scenario: 图分区占用上限重标定
 - **WHEN** scheduler shard cap 相对上一验收基线变化
-- **THEN** 报告将其与物理 Aggregation Buffer 容量分开记录，只用 Cora/Citeseer 选择 calibration 点，并把 PubMed 作为未参与选择的 hold-out；未公开时序和替代 mapping 参数另存诊断敏感性
+- **THEN** 报告将其与物理 Aggregation Buffer 容量分开记录，并披露 Cora/Citeseer/PubMed 均已参与历史 4/5/6 MiB 比较，14 项论文数值标记为 calibrated fit 而非独立 hold-out；DRAMSim3 派生时序、未公开 producer 延迟和替代 mapping 参数另存诊断敏感性
 
 ### Requirement: 因果与请求切分不变量
 同一有序 block 流的内存完成时间、row hit/miss 和 channel/bank 事务计数 MUST 不受上层请求切分影响。Output 请求 MUST 在对应 CE producer-ready 后入队；Intermediate Read MUST 访问对应 Write 的同一地址和字节范围，并等待该 Write 完成。已经进入请求级时间线的 intermediate 流量 MUST NOT 再以解析延迟重复计时。
+
+FIFO 与 batch-class MUST 共享全局 transaction admission 带宽和 queue capacity。四个 buffer port 每个模型周期合计进入所有 channel transaction queue 的 block 数 MUST 不超过由论文 HBM 接口宽度派生的 4；每 channel transaction queue 和每 bank command queue MUST 分别受 bundled DRAMSim3 `trans_queue_size=32` 与 `cmd_queue_size=8` 约束，并保存 admission cycle 与 occupancy trace。
 
 #### Scenario: 请求切分反例
 - **WHEN** 同一 128 个连续 block 分别封装为一个请求和 128 个请求

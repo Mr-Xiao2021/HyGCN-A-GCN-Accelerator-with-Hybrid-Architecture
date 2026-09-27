@@ -145,10 +145,13 @@ def main():
     reference = paper_benchmark.load_json(reference_path)
     workloads = paper_benchmark.load_json(workload_path)
     partition_manifest = workloads["graph_partition"]
-    calibration_datasets = partition_manifest["calibration_datasets"]
-    holdout_datasets = partition_manifest["holdout_datasets"]
-    if set(args.datasets) != set(calibration_datasets + holdout_datasets):
-        raise ValueError("datasets must match the versioned calibration and hold-out split")
+    fit_datasets = partition_manifest["calibrated_fit_datasets"]
+    holdout_datasets = partition_manifest["independent_holdout_datasets"]
+    if set(args.datasets) != set(fit_datasets) or holdout_datasets:
+        raise ValueError(
+            "datasets must match the historically exposed calibrated-fit set; "
+            "this repository has no independent scheduler-cap hold-out"
+        )
 
     report = {
         "schema_version": 1,
@@ -238,51 +241,55 @@ def main():
             for metric in report["capacities"][str(capacity_mib)]["per_dataset"][dataset].values()
         )
 
-    def calibration_error(capacity_mib):
+    def fit_error(capacity_mib):
         metrics = [
             metric["relative_error"]
-            for dataset in calibration_datasets
+            for dataset in fit_datasets
             for metric in report["capacities"][str(capacity_mib)]["per_dataset"][dataset].values()
         ]
         return sum(metrics) / len(metrics)
 
-    calibration_rows = {
+    fit_rows = {
         str(capacity_mib): {
-            "all_required_pass": dataset_pass(capacity_mib, calibration_datasets),
-            "mean_relative_error": calibration_error(capacity_mib),
+            "all_paper_rows_pass": dataset_pass(capacity_mib, fit_datasets),
+            "mean_relative_error": fit_error(capacity_mib),
         }
         for capacity_mib in args.capacities_mib
     }
     passing = [
         capacity_mib for capacity_mib in args.capacities_mib
-        if calibration_rows[str(capacity_mib)]["all_required_pass"]
+        if fit_rows[str(capacity_mib)]["all_paper_rows_pass"]
     ]
     if not passing:
-        raise ValueError("no capacity passes the calibration datasets")
+        raise ValueError("no capacity passes the historically exposed fit datasets")
     selected_capacity = min(
         passing,
-        key=lambda value: (calibration_rows[str(value)]["mean_relative_error"], value),
+        key=lambda value: (fit_rows[str(value)]["mean_relative_error"], value),
     )
     configured_capacity = partition_manifest["aggregation_shard_capacity_bytes"] // (1024 * 1024)
     if selected_capacity != configured_capacity:
         raise ValueError(
-            f"calibration selects {selected_capacity} MiB but workload config uses "
+            f"calibrated fit selects {selected_capacity} MiB but workload config uses "
             f"{configured_capacity} MiB"
         )
-    report["calibration"] = {
-        "datasets": calibration_datasets,
+    report["calibrated_fit"] = {
+        "datasets": fit_datasets,
+        "historical_exposure": partition_manifest["historical_exposure"],
         "selection_method": (
-            "among capacities passing every required Figure 15-16 calibration row, "
+            "among capacities passing every Figure 15-16 paper row on all historically "
+            "exposed datasets, "
             "select the minimum mean relative error; ties select the smaller capacity"
         ),
-        "candidates": calibration_rows,
+        "candidates": fit_rows,
         "selected_capacity_mib": selected_capacity,
     }
-    report["holdout"] = {
-        "datasets": holdout_datasets,
-        "selected_capacity_mib": selected_capacity,
-        "all_required_pass": dataset_pass(selected_capacity, holdout_datasets),
-        "used_for_selection": False,
+    report["independent_validation"] = {
+        "datasets": [],
+        "available": False,
+        "reason": (
+            "Cora, Citeseer, and PubMed were all exposed in Review v4; no retrospective "
+            "used_for_selection=false claim is made"
+        ),
     }
 
     report_path = output_dir / "partition_sensitivity.json"

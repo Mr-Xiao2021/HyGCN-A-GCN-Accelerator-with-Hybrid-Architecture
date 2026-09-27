@@ -1,6 +1,6 @@
 {
-  "schema_version": 4,
-  "reference_version": "hygcn-hpca2020-fig15-17-svg-digitized-v2",
+  "schema_version": 5,
+  "reference_version": "hygcn-hpca2020-fig15-17-svg-digitized-v3",
   "tolerance": 0.20,
   "datasets": ["cora", "citeseer", "pubmed"],
   "digitization": {
@@ -42,6 +42,7 @@
   "metrics": {
     "sparsity_speedup": {
       "required": true,
+      "evidence_class": "paper_metric",
       "validation": "per_dataset_relative_error",
       "reference": {
         "cora": 1.082102,
@@ -55,6 +56,7 @@
     },
     "sparsity_ae_dram_ratio": {
       "required": true,
+      "evidence_class": "paper_metric",
       "validation": "per_dataset_relative_error",
       "reference": {
         "cora": 0.879502,
@@ -68,6 +70,7 @@
     },
     "sparsity_input_dram_ratio": {
       "required": false,
+      "evidence_class": "internal_diagnostic",
       "validation": "diagnostic_only",
       "unit": "ratio",
       "aggregation": "per_dataset",
@@ -76,6 +79,7 @@
     },
     "pipeline_speedup": {
       "required": true,
+      "evidence_class": "paper_metric",
       "validation": "per_dataset_relative_error",
       "reference": {
         "cora": 2.125024,
@@ -89,6 +93,7 @@
     },
     "pipeline_dram_ratio": {
       "required": true,
+      "evidence_class": "paper_metric",
       "validation": "per_dataset_relative_error",
       "reference": {
         "cora": 0.501466,
@@ -102,6 +107,7 @@
     },
     "priority_speedup": {
       "required": false,
+      "evidence_class": "internal_diagnostic",
       "validation": "diagnostic_only",
       "unit": "x",
       "aggregation": "arithmetic_mean_over_datasets",
@@ -110,6 +116,7 @@
     },
     "priority_bandwidth_gain": {
       "required": false,
+      "evidence_class": "internal_diagnostic",
       "validation": "diagnostic_only",
       "unit": "x",
       "aggregation": "arithmetic_mean_over_datasets",
@@ -118,17 +125,19 @@
     },
     "priority_incremental_speedup": {
       "required": true,
+      "evidence_class": "internal_check",
       "validation": "per_dataset_minimum",
-      "reference_min": 0.9999,
+      "reference_min": 1.005,
       "unit": "x",
       "aggregation": "per_dataset",
       "experiment_scope": "optimized divided by mapping-only on the same low-bits layout, expressed as mapping-only cycles / optimized cycles",
-      "source": "Required non-regression gate for the isolated batch/class request assembly mechanism"
+      "source": "Required positive-effect gate for the isolated batch/class request assembly mechanism"
     },
     "priority_incremental_speedup_aggregate": {
       "required": true,
+      "evidence_class": "internal_check",
       "validation": "aggregate_minimum",
-      "reference_min": 1.0005,
+      "reference_min": 1.005,
       "unit": "x",
       "aggregation": "arithmetic_mean_over_datasets",
       "experiment_scope": "three-dataset arithmetic mean of optimized versus mapping-only speedup on low-bits layout",
@@ -136,17 +145,19 @@
     },
     "priority_incremental_bandwidth_gain": {
       "required": true,
+      "evidence_class": "internal_check",
       "validation": "per_dataset_minimum",
-      "reference_min": 0.9999,
+      "reference_min": 1.005,
       "unit": "x",
       "aggregation": "per_dataset",
       "experiment_scope": "optimized divided by mapping-only effective HBM bandwidth over the complete memory-service interval",
-      "source": "Required non-regression gate for the isolated batch/class request assembly mechanism"
+      "source": "Required positive-effect gate for the isolated batch/class request assembly mechanism"
     },
     "priority_incremental_bandwidth_gain_aggregate": {
       "required": true,
+      "evidence_class": "internal_check",
       "validation": "aggregate_minimum",
-      "reference_min": 1.0005,
+      "reference_min": 1.005,
       "unit": "x",
       "aggregation": "arithmetic_mean_over_datasets",
       "experiment_scope": "three-dataset arithmetic mean of optimized versus mapping-only complete-interval bandwidth gain",
@@ -154,17 +165,19 @@
     },
     "priority_incremental_row_hit_ratio": {
       "required": true,
+      "evidence_class": "internal_check",
       "validation": "per_dataset_minimum",
-      "reference_min": 1.0,
+      "reference_min": 1.03,
       "unit": "ratio",
       "aggregation": "per_dataset",
       "experiment_scope": "optimized row-hit rate divided by mapping-only row-hit rate on the same low-bits layout",
-      "source": "Required row-locality non-regression gate on the same low-bits address layout"
+      "source": "Required positive row-locality gate on the same low-bits address layout"
     },
     "priority_incremental_row_hit_ratio_aggregate": {
       "required": true,
+      "evidence_class": "internal_check",
       "validation": "aggregate_minimum",
-      "reference_min": 1.01,
+      "reference_min": 1.05,
       "unit": "ratio",
       "aggregation": "arithmetic_mean_over_datasets",
       "experiment_scope": "three-dataset arithmetic mean of optimized versus mapping-only row-hit ratio on the same low-bits layout",
@@ -172,6 +185,7 @@
     },
     "mapping_speedup": {
       "required": false,
+      "evidence_class": "internal_diagnostic",
       "validation": "diagnostic_only",
       "unit": "x",
       "aggregation": "arithmetic_mean_over_datasets",
@@ -180,6 +194,7 @@
     },
     "mapping_bandwidth_gain": {
       "required": false,
+      "evidence_class": "internal_diagnostic",
       "validation": "diagnostic_only",
       "unit": "x",
       "aggregation": "arithmetic_mean_over_datasets",
@@ -188,6 +203,7 @@
     },
     "coordination_speedup": {
       "required": true,
+      "evidence_class": "paper_metric",
       "validation": "aggregate_relative_error",
       "reference": 3.70,
       "unit": "x",
@@ -197,6 +213,7 @@
     },
     "coordination_bandwidth_gain": {
       "required": true,
+      "evidence_class": "paper_metric",
       "validation": "aggregate_relative_error",
       "reference": 4.00,
       "unit": "x",
@@ -206,6 +223,7 @@
     },
     "coordination_active_bandwidth_gain": {
       "required": false,
+      "evidence_class": "internal_diagnostic",
       "validation": "diagnostic_only",
       "unit": "x",
       "aggregation": "arithmetic_mean_over_datasets",

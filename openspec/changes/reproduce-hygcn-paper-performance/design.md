@@ -55,7 +55,7 @@
 
 ### 5. Coordinator 使用 batch 仲裁、低位交织映射和请求级 HBM 时序
 
-每个 DRAM 请求携带 batch ID、请求类别、地址、字节数、producer sequence、producer-ready 与入队周期。Input 由对应 Edge completion 加邻居索引延迟动态释放。模型把请求推进为统一 64B block 流，保证同一地址/事务序列的完成时间不依赖上层请求切分。映射前，FIFO 轮转 Edge、Input、Weight、Output 四个并发端口，只在由峰值接口宽度派生的四 block issue window 内绕过 blocked channel；batch-class 按 batch、类别和地址组装，并只在同 batch/class/row 内利用 controller 可接收项。事务进入 DRAMSim3 HBM `trans_queue_size=32` 对应的每 channel/controller 有限队列后，bank 侧只延续同优先级 open row，不跨 RAW、batch 或 class 组绕行。priority 与 mapping 独立；low-bits 对应论文 §4.5.2；row-first 直接折叠 `rorabgbachco`，一个 row span 不再使用无来源的二路 bank striping。
+每个 DRAM 请求携带 batch ID、请求类别、地址、字节数、producer sequence、producer-ready 与入队周期。Input 由对应 Edge completion 加邻居索引延迟动态释放。模型把请求推进为统一 64B block 流，保证同一地址/事务序列的完成时间不依赖上层请求切分。映射前，FIFO 逐 block 轮转 Edge、Input、Weight、Output 四个并发端口，复现论文所述未协调访问的频繁地址切换；batch-class 按 batch 和 `Edge > Input > Weight > Output` 组装连续流。两者共享全局四 block/cycle admission 带宽、每 channel 32-entry transaction queue 和每 bank 8-entry command queue，两个容量直接来自 bundled DRAMSim3 HBM 的 `trans_queue_size` 与 `cmd_queue_size`。bank 侧只在同 batch/class 内延续 open row，不跨 RAW 或优先级组绕行。priority 与 mapping 独立；low-bits 对应论文 §4.5.2；row-first 直接折叠 `rorabgbachco`，一个 row span 不再使用无来源的二路 bank striping。
 
 该规则对应论文“当前批次低优先级请求先于后续批次高优先级请求”的描述，避免现有全局严格优先级造成跨批次饥饿。
 
@@ -69,16 +69,16 @@
 
 required `bandwidth_util` 使用从周期 0 到最后一个请求 completion 的统一 memory-service 区间，包含 producer-idle。in-flight request 区间并集单独输出为 active diagnostic；反例测试要求 producer 延迟导致端到端利用率下降时，active 指标可保持不变或反升而不得用于验收。
 
-参考清单保存 Fig. 15/16 arXiv SVG 的 URL、SHA256、坐标提取方法和逐数据集柱值；Fig. 17 使用论文正文给出的跨数据集平均值。版本化 workload manifest 将 Fig. 15-17 固定到 Table 5 的 GCN layer 0（dataset feature width → 128），排除未映射到论文的 `128 → num_class` 分类层。Fig. 15 使用 AE-only scope；Fig. 16 使用完整 layer-0 执行；Fig. 17 combined 按正文平均值验收，priority-only 和 mapping-only 作为因果诊断。
+参考清单保存 Fig. 15/16 arXiv SVG 的 URL、SHA256、坐标提取方法和逐数据集柱值；Fig. 17 使用论文正文给出的跨数据集平均值。版本化 workload manifest 将 Fig. 15-17 固定到 Table 5 的 GCN layer 0（dataset feature width → 128），排除未映射到论文的 `128 → num_class` 分类层。Fig. 15 使用 AE-only scope；Fig. 16 使用完整 layer-0 执行；Fig. 17 combined 按正文平均值验收，priority-only 和 mapping-only 用于因果分解。报告固定区分 14 项论文数值与 12 项内部因果检查，不把后者计入论文指标数量。
 
 绝对周期仍被记录并用于回归，但没有可靠论文绝对值时不作为论文验收门槛。
 
 ### 7. 区分结构参数与时序参数
 
-结构参数来自论文，不允许基准脚本修改。论文未给出的 HBM row hit/miss 延迟、row 大小、channel/bank 数、请求释放延迟、ping-pong 区数和图分区调度占用上限集中在配置中，具有明确单位并写入运行清单。物理 16 MiB Aggregation Buffer 与低于单个 8 MiB 半区的 scheduler shard cap 分别记录，后者不得伪装成物理容量。基准报告从版本化 review v3 参数基线自动生成 config/source diff；`parameter_recalibration` 不得硬编码。priority/mapping 不得选择预设效率，流水开关不得选择固定重叠率，sequential 不得使用经验 spill 系数。
+结构参数来自论文，不允许基准脚本修改。HBM row hit/miss/conflict 延迟由 bundled DRAMSim3 HBM 配置中的 `CL`、`tRCDRD`、`tRP` 与 `tCK` 推导；row 大小、channel/bank 数、请求释放延迟、ping-pong 区数和图分区调度占用上限集中在配置中，具有明确单位并写入运行清单。物理 16 MiB Aggregation Buffer 与低于单个 8 MiB 半区的 scheduler shard cap 分别记录，后者不得伪装成物理容量。基准报告从版本化 review v3 参数基线自动生成 config/source diff；`parameter_recalibration` 不得硬编码。priority/mapping 不得选择预设效率，流水开关不得选择固定重叠率，sequential 不得使用经验 spill 系数。
 
 禁止在结果生成阶段乘全局“论文修正系数”或按数据集写特例。Cora、Citeseer、PubMed 必须使用同一结构和时序参数执行成对消融。
-如果调度占用上限相对验收基线变化，正式证据必须只用 Cora/Citeseer calibration 选择邻近值，并把 PubMed 作为未参与选择的 hold-out。未公开的 producer 延迟和 HBM hit/miss 时序必须保留固定邻域敏感性；替代 row-first interleave 只能作为诊断，不得替换有外部配置依据的 required 基线。
+如果调度占用上限相对验收基线变化，正式证据必须披露所有历史暴露。由于 Cora、Citeseer、PubMed 均已用于 4/5/6 MiB 比较，当前结果只能标记为 calibrated fit，不得回溯性声明 hold-out。未公开的 producer 延迟必须保留固定邻域敏感性；DRAMSim3 派生时序也保留相邻 profile 反事实。替代 row-first interleave 只能作为诊断，不得替换有外部配置依据的 required 基线。
 
 ### 8. 参数化 CLI 与结构化输出
 
@@ -99,7 +99,7 @@ required `bandwidth_util` 使用从周期 0 到最后一个请求 completion 的
 - [论文图表缺少原始数值表] → 使用版本化 SVG 坐标数字化逐柱参考，保存原图 URL、SHA256、坐标和提取方法；正文平均值仍按声明聚合规则验收。
 - [请求级模型与论文 Ramulator 存在精度差异] → 固定并记录 channel/bank/row 与延迟参数，报告明确标记为请求级复现；后续可用 DRAMSim3/Ramulator trace 对照校准时序参数。
 - [模块级组合模型低估细粒度冲突] → 将模块占用、tile、填充和写回分别计数，并用单元测试覆盖边界矩阵尺寸。
-- [为满足指标而过拟合三个数据集] → 限制可校准参数、保留 PubMed 验证集、同时报告逐数据集和平均结果。
+- [为满足指标而过拟合三个数据集] → 限制可校准参数、明确三数据集均为 calibrated fit、报告 partition/model sensitivity，并禁止将任何已暴露数据集重新标记为 hold-out。
 - [完整配置运行时间较长] → 默认测试使用 smoke 配置，完整论文套件显式触发并支持按实验缓存。
 - [GraphSAGE/GIN 当前语义不完整] → 不纳入第一阶段强制 ±20% 验收，先通过操作类型和输入完整性测试再升级其声明。
 
@@ -109,5 +109,5 @@ required `bandwidth_util` 使用从周期 0 到最后一个请求 completion 的
 2. 引入配置/CLI/结构化输出，不改变核心周期模型，确保现有 GCN Cora 可继续运行。
 3. 修复流量、地址和统计错误，增加对应单元测试。
 4. 分别升级 AE 分区与稀疏、CE 模块集群、Aggregation Buffer 流水和 Coordinator 仲裁，每阶段运行 smoke 回归。
-5. 加入论文配置和成对消融工具，先在 Cora/Citeseer 校准，再用 PubMed 验证。
+5. 加入论文配置和成对消融工具；保存所有校准历史，已暴露数据集不得作为独立验证集。
 6. 当全部强制指标通过后，生成最终验收报告；若出现回归，可切回 legacy 配置和旧调度策略定位差异。

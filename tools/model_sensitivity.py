@@ -18,10 +18,17 @@ SCENARIOS = {
     "dram_timing_fast": {
         ("memory", "hbm_row_hit_cycles"): 10,
         ("memory", "hbm_row_miss_cycles"): 24,
+        ("memory", "hbm_row_conflict_cycles"): 38,
     },
     "dram_timing_slow": {
-        ("memory", "hbm_row_hit_cycles"): 14,
-        ("memory", "hbm_row_miss_cycles"): 32,
+        ("memory", "hbm_row_hit_cycles"): 18,
+        ("memory", "hbm_row_miss_cycles"): 36,
+        ("memory", "hbm_row_conflict_cycles"): 54,
+    },
+    "legacy_12_28_timing": {
+        ("memory", "hbm_row_hit_cycles"): 12,
+        ("memory", "hbm_row_miss_cycles"): 28,
+        ("memory", "hbm_row_conflict_cycles"): 42,
     },
     "row_first_interleave_2": {("model", "row_first_bank_interleave"): 2},
 }
@@ -29,7 +36,9 @@ SCENARIOS = {
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Sweep unpublished request-release, DRAM timing, and mapping parameters"
+        description=(
+            "Sweep request-release, DRAM timing counterfactuals, and mapping parameters"
+        )
     )
     parser.add_argument("--binary", default="build/hygcntest")
     parser.add_argument("--profile", default="configs/HYGCN_PAPER.ini")
@@ -118,6 +127,9 @@ def main():
     output_dir = resolve(root, args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     workloads = paper_benchmark.load_json(workload_path)
+    dram_timing_basis = paper_benchmark.derive_dramsim3_timing(
+        root, source_profile, workloads
+    )
 
     profiles = {}
     for name, changes in SCENARIOS.items():
@@ -160,9 +172,11 @@ def main():
         "workload_manifest_sha256": paper_benchmark.sha256_digest(workload_path),
         "datasets": args.datasets,
         "selection_policy": (
-            "The required baseline uses only the versioned profile. Alternative values are "
-            "diagnostic sensitivity points and are not selected using paper targets."
+            "The required baseline is derived from the bundled DRAMSim3 HBM tCK, CL, and "
+            "tRCDRD values. Alternative values are diagnostic sensitivity points and are "
+            "not selected using paper targets."
         ),
+        "required_dram_timing_basis": dram_timing_basis,
         "scenarios": {},
     }
     for name, changes in SCENARIOS.items():
@@ -172,6 +186,7 @@ def main():
             for dataset in args.datasets
         }
         report["scenarios"][name] = {
+            "acceptance_role": "required_external_baseline" if name == "baseline" else "diagnostic",
             "changes": {
                 f"{section}.{option}": value
                 for (section, option), value in changes.items()

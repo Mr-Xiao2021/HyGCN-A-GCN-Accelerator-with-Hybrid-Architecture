@@ -39,9 +39,12 @@ def main():
         raise RuntimeError("row-first baseline must not add unsupported bank striping")
     if "Section 4.5.2" not in workloads["memory_ablation"]["priority_order_source"]:
         raise RuntimeError("batch-class ordering must retain its paper provenance")
-    if workloads["graph_partition"]["calibration_datasets"] != ["cora", "citeseer"] or \
-            workloads["graph_partition"]["holdout_datasets"] != ["pubmed"]:
-        raise RuntimeError("partition calibration and hold-out datasets must be explicit")
+    if workloads["memory_ablation"]["command_queue_entries_per_bank"] != 8:
+        raise RuntimeError("command queue depth must retain its DRAMSim3 provenance")
+    if workloads["graph_partition"]["calibrated_fit_datasets"] != [
+            "cora", "citeseer", "pubmed"] or \
+            workloads["graph_partition"]["independent_holdout_datasets"] != []:
+        raise RuntimeError("all historically exposed datasets must be labeled calibrated fit")
     if workloads["graph_partition"]["aggregation_shard_capacity_bytes"] != 5242880:
         raise RuntimeError("graph partition scheduler cap must be versioned")
     optimized = {
@@ -136,6 +139,10 @@ def main():
         "batch_launch_interval_cycles": 1,
         "edge_ping_pong_regions": 2,
         "hbm_transaction_queue_entries_per_channel": 32,
+        "hbm_command_queue_entries_per_bank": 8,
+        "hbm_row_hit_cycles": 14,
+        "hbm_row_miss_cycles": 28,
+        "hbm_row_conflict_cycles": 42,
         "coordinator_issue_blocks_per_cycle": 4,
         "input_ping_pong_regions": 2,
         "neighbor_index_ready_cycles": 2,
@@ -150,6 +157,21 @@ def main():
         raise RuntimeError("external absolute binary paths must remain printable")
     if partition.display_path(root, root / "build/hygcntest") != "build/hygcntest":
         raise RuntimeError("repository-local binary paths must remain relative")
+    timing = benchmark.derive_dramsim3_timing(
+        root, root / "configs/HYGCN_PAPER.ini", workloads
+    )
+    if timing["derived_row_hit_cycles"] != 14 or \
+            timing["derived_row_miss_cycles"] != 28 or \
+            timing["derived_row_conflict_cycles"] != 42:
+        raise RuntimeError("required HBM timing must be derived from DRAMSim3")
+    if timing["transaction_queue_entries_per_channel"] != 32 or \
+            timing["command_queue_entries_per_bank"] != 8:
+        raise RuntimeError("required HBM queue capacities must be derived from DRAMSim3")
+    with (root / "configs/paper_metrics.json").open(encoding="utf-8") as stream:
+        reference = json.load(stream)
+    if benchmark.evidence_counts(reference) != {
+            "paper_metric_rows": 14, "internal_check_rows": 12}:
+        raise RuntimeError("evidence must remain split into 14 paper rows and 12 checks")
     print("F04_ae_only_and_R3_workload_scope=PASS")
     return 0
 

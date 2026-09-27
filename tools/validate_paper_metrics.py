@@ -68,7 +68,7 @@ def main():
             passed = error <= tolerance
             failed = failed or (required and not passed)
             rows.append((name, "aggregate", f"{expected:.6f}", measured, error, passed,
-                         definition["source"]))
+                         definition["source"], definition["evidence_class"]))
         elif validation == "per_dataset_relative_error":
             references = definition["reference"]
             for dataset in reference["datasets"]:
@@ -78,7 +78,7 @@ def main():
                 passed = error <= tolerance
                 failed = failed or (required and not passed)
                 rows.append((name, dataset, f"{expected:.6f}", measured, error,
-                             passed, definition["source"]))
+                             passed, definition["source"], definition["evidence_class"]))
         elif validation == "per_dataset_range":
             lower = float(definition["reference_min"])
             upper = float(definition["reference_max"])
@@ -88,7 +88,7 @@ def main():
                 passed = error <= tolerance
                 failed = failed or (required and not passed)
                 rows.append((name, dataset, f"{lower:.6f}-{upper:.6f}", measured, error,
-                             passed, definition["source"]))
+                             passed, definition["source"], definition["evidence_class"]))
         elif validation == "per_dataset_minimum":
             lower = float(definition["reference_min"])
             for dataset in reference["datasets"]:
@@ -97,7 +97,7 @@ def main():
                 passed = error == 0.0
                 failed = failed or (required and not passed)
                 rows.append((name, dataset, f">={lower:.6f}", measured, error,
-                             passed, definition["source"]))
+                             passed, definition["source"], definition["evidence_class"]))
         elif validation == "aggregate_minimum":
             lower = float(definition["reference_min"])
             measured = aggregate.get(name)
@@ -105,7 +105,7 @@ def main():
             passed = error == 0.0
             failed = failed or (required and not passed)
             rows.append((name, "aggregate", f">={lower:.6f}", measured, error,
-                         passed, definition["source"]))
+                         passed, definition["source"], definition["evidence_class"]))
         elif validation == "diagnostic_only":
             for dataset in reference["datasets"]:
                 measured = per_dataset.get(dataset, {}).get("metrics", {}).get(name)
@@ -113,18 +113,35 @@ def main():
         else:
             raise ValueError(f"unsupported validation rule for {name}: {validation}")
 
+    paper_rows = [row for row in rows if row[7] == "paper_metric"]
+    internal_rows = [row for row in rows if row[7] == "internal_check"]
+    if len(paper_rows) != 14 or len(internal_rows) != 12:
+        raise ValueError("validation requires 14 paper metric rows and 12 internal checks")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as stream:
-        stream.write("# HyGCN Paper Metric Validation\n\n")
+        stream.write("# HyGCN Paper Metric And Internal Check Validation\n\n")
         stream.write(f"Tolerance: {tolerance:.0%}\n\n")
         stream.write(
             "Digitized bars are checked against their dataset-specific references. "
             "Paper-reported averages are checked only after applying the declared "
-            "aggregation rule. Diagnostic-only metrics do not affect acceptance.\n\n"
+            "aggregation rule. All three datasets are historically exposed calibrated-fit "
+            "workloads; this report does not claim an independent hold-out. Internal checks "
+            "and diagnostic-only metrics are not paper evidence.\n\n"
         )
+        stream.write("## Paper Metrics (14 rows)\n\n")
         stream.write("| Metric | Scope | Reference | Measured | Relative error | Status |\n")
         stream.write("|---|---|---:|---:|---:|---|\n")
-        for name, scope, expected, measured, error, passed, _ in rows:
+        for name, scope, expected, measured, error, passed, _, _ in paper_rows:
+            measured_text = "missing" if measured is None else f"{measured:.6f}"
+            error_text = "invalid" if not math.isfinite(error) else f"{error:.2%}"
+            stream.write(
+                f"| {name} | {scope} | {expected} | {measured_text} | {error_text} | "
+                f"{'PASS' if passed else 'FAIL'} |\n"
+            )
+        stream.write("\n## Internal Regression Checks (12 rows)\n\n")
+        stream.write("| Check | Scope | Threshold | Measured | Deviation | Status |\n")
+        stream.write("|---|---|---:|---:|---:|---|\n")
+        for name, scope, expected, measured, error, passed, _, _ in internal_rows:
             measured_text = "missing" if measured is None else f"{measured:.6f}"
             error_text = "invalid" if not math.isfinite(error) else f"{error:.2%}"
             stream.write(
@@ -144,13 +161,18 @@ def main():
             "area, or complete chip energy.\n"
         )
 
-    for name, scope, expected, measured, error, passed, source in rows:
+    for name, scope, expected, measured, error, passed, source, evidence_class in rows:
         measured_text = "missing" if measured is None else f"{measured:.6f}"
         error_text = "invalid" if not math.isfinite(error) else f"{error:.2%}"
         print(
             f"{name}[{scope}]: reference={expected} measured={measured_text} "
-            f"error={error_text} {'PASS' if passed else 'FAIL'} ({source})"
+            f"error={error_text} {'PASS' if passed else 'FAIL'} "
+            f"class={evidence_class} ({source})"
         )
+    paper_passed = sum(row[5] for row in paper_rows)
+    internal_passed = sum(row[5] for row in internal_rows)
+    print(f"paper_metrics={paper_passed}/14")
+    print(f"internal_checks={internal_passed}/12")
     print(f"validation_report={output_path}")
     return 1 if failed else 0
 

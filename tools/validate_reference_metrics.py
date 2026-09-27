@@ -44,8 +44,8 @@ def main():
     with path.open(encoding="utf-8") as stream:
         manifest = json.load(stream)
 
-    if manifest.get("schema_version") != 4 or not manifest.get("reference_version"):
-        raise ValueError("reference manifest requires schema_version=4 and reference_version")
+    if manifest.get("schema_version") != 5 or not manifest.get("reference_version"):
+        raise ValueError("reference manifest requires schema_version=5 and reference_version")
     tolerance = manifest.get("tolerance")
     if not isinstance(tolerance, (int, float)) or not math.isfinite(tolerance) or tolerance != 0.20:
         raise ValueError("reference manifest tolerance must be 0.20")
@@ -65,9 +65,19 @@ def main():
     metrics = manifest.get("metrics", {})
     if set(metrics) != REQUIRED_METRICS:
         raise ValueError("reference manifest does not contain the required metric set")
+    evidence_rows = {"paper_metric": 0, "internal_check": 0}
     for name, definition in metrics.items():
         if not isinstance(definition.get("required"), bool):
             raise ValueError(f"{name} is missing required flag")
+        evidence_class = definition.get("evidence_class")
+        if evidence_class not in {
+            "paper_metric", "internal_check", "internal_diagnostic"
+        }:
+            raise ValueError(f"{name} has invalid evidence_class")
+        if definition["required"] and evidence_class == "internal_diagnostic":
+            raise ValueError(f"{name} required metric cannot be diagnostic")
+        if not definition["required"] and evidence_class != "internal_diagnostic":
+            raise ValueError(f"{name} non-required metric must be diagnostic")
         for field in ("validation", "unit", "source", "aggregation", "experiment_scope"):
             if not isinstance(definition.get(field), str) or not definition[field].strip():
                 raise ValueError(f"{name} is missing {field}")
@@ -116,6 +126,13 @@ def main():
                 raise ValueError(f"{name} diagnostic-only metric cannot be required")
         else:
             raise ValueError(f"{name} uses unsupported validation {validation}")
+        if definition["required"]:
+            rows = len(REQUIRED_DATASETS) if validation.startswith("per_dataset") else 1
+            evidence_rows[evidence_class] += rows
+    if evidence_rows != {"paper_metric": 14, "internal_check": 12}:
+        raise ValueError(
+            "reference manifest must contain 14 paper metric rows and 12 internal checks"
+        )
     print(f"reference_manifest=PASS path={path}")
     return 0
 
