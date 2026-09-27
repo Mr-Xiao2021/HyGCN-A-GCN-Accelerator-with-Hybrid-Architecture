@@ -1,0 +1,233 @@
+{
+  "base_profile": "configs/HYGCN_PAPER.ini",
+  "base_profile_sha256": "12ce47e614f1c57cf0852a75ddbdf54b9b2c7208cceb6ed79bd49bc5ab333b48",
+  "binary": "build-review-v5-release-3457f40/hygcntest",
+  "binary_sha256": "5021edc233818f3c76859d74c1e021d2afd748a2e74a2ea0c8388a0f67058d4d",
+  "datasets": [
+    "cora",
+    "citeseer",
+    "pubmed"
+  ],
+  "scenarios": {
+    "baseline": {
+      "aggregate": {
+        "coordination_bandwidth_gain": 3.3377660339092903,
+        "coordination_speedup": 3.3377660339092903,
+        "priority_incremental_bandwidth_gain": 1.0006169058834538,
+        "priority_incremental_row_hit_ratio": 1.1130138063536874,
+        "priority_incremental_speedup": 1.0006169058834538
+      },
+      "changes": {},
+      "per_dataset": {
+        "citeseer": {
+          "coordination_bandwidth_gain": 3.455834463392261,
+          "coordination_speedup": 3.455834463392261,
+          "priority_incremental_bandwidth_gain": 1.0000466192156179,
+          "priority_incremental_row_hit_ratio": 1.1993699840341134,
+          "priority_incremental_speedup": 1.0000466192156179
+        },
+        "cora": {
+          "coordination_bandwidth_gain": 2.9118569938207206,
+          "coordination_speedup": 2.9118569938207206,
+          "priority_incremental_bandwidth_gain": 1.0018176711339377,
+          "priority_incremental_row_hit_ratio": 1.069778945213891,
+          "priority_incremental_speedup": 1.001817671133938
+        },
+        "pubmed": {
+          "coordination_bandwidth_gain": 3.6456066445148907,
+          "coordination_speedup": 3.6456066445148907,
+          "priority_incremental_bandwidth_gain": 0.9999864273008058,
+          "priority_incremental_row_hit_ratio": 1.069892489813058,
+          "priority_incremental_speedup": 0.9999864273008058
+        }
+      },
+      "profile_sha256": "b66702a0f4359138e825f6d0aa38395242d8febae4de237cf629f1bc88da2260"
+    },
+    "dram_timing_fast": {
+      "aggregate": {
+        "coordination_bandwidth_gain": 2.8785821818626562,
+        "coordination_speedup": 2.8785821818626562,
+        "priority_incremental_bandwidth_gain": 1.000608656354151,
+        "priority_incremental_row_hit_ratio": 1.0604686313306797,
+        "priority_incremental_speedup": 1.0006086563541507
+      },
+      "changes": {
+        "memory.hbm_row_hit_cycles": 10,
+        "memory.hbm_row_miss_cycles": 24
+      },
+      "per_dataset": {
+        "citeseer": {
+          "coordination_bandwidth_gain": 2.9695490912581155,
+          "coordination_speedup": 2.9695490912581155,
+          "priority_incremental_bandwidth_gain": 0.9999862883155882,
+          "priority_incremental_row_hit_ratio": 1.0410385400072664,
+          "priority_incremental_speedup": 0.9999862883155881
+        },
+        "cora": {
+          "coordination_bandwidth_gain": 2.5278361850341886,
+          "coordination_speedup": 2.527836185034188,
+          "priority_incremental_bandwidth_gain": 1.001849860357613,
+          "priority_incremental_row_hit_ratio": 1.0703184389263118,
+          "priority_incremental_speedup": 1.001849860357613
+        },
+        "pubmed": {
+          "coordination_bandwidth_gain": 3.1383612692956646,
+          "coordination_speedup": 3.138361269295664,
+          "priority_incremental_bandwidth_gain": 0.9999898203892513,
+          "priority_incremental_row_hit_ratio": 1.0700489150584611,
+          "priority_incremental_speedup": 0.9999898203892513
+        }
+      },
+      "profile_sha256": "6a4c05c2b66505f065b3d4c35e2e5a59143f3a4a09f6339754ce5e07c3867a53"
+    },
+    "dram_timing_slow": {
+      "aggregate": {
+        "coordination_bandwidth_gain": 3.777022426371172,
+        "coordination_speedup": 3.777022426371172,
+        "priority_incremental_bandwidth_gain": 1.0012649274248526,
+        "priority_incremental_row_hit_ratio": 1.0614239193918589,
+        "priority_incremental_speedup": 1.0012649274248526
+      },
+      "changes": {
+        "memory.hbm_row_hit_cycles": 14,
+        "memory.hbm_row_miss_cycles": 32
+      },
+      "per_dataset": {
+        "citeseer": {
+          "coordination_bandwidth_gain": 3.901643080677322,
+          "coordination_speedup": 3.901643080677322,
+          "priority_incremental_bandwidth_gain": 1.001116405012085,
+          "priority_incremental_row_hit_ratio": 1.0405221314997852,
+          "priority_incremental_speedup": 1.0011164050120853
+        },
+        "cora": {
+          "coordination_bandwidth_gain": 3.27850105418427,
+          "coordination_speedup": 3.27850105418427,
+          "priority_incremental_bandwidth_gain": 1.0023448585469092,
+          "priority_incremental_row_hit_ratio": 1.0678748440503867,
+          "priority_incremental_speedup": 1.0023448585469092
+        },
+        "pubmed": {
+          "coordination_bandwidth_gain": 4.150923144251924,
+          "coordination_speedup": 4.150923144251924,
+          "priority_incremental_bandwidth_gain": 1.0003335187155635,
+          "priority_incremental_row_hit_ratio": 1.0758747826254047,
+          "priority_incremental_speedup": 1.0003335187155635
+        }
+      },
+      "profile_sha256": "956360a25bc0873c1654cff1dd600a850689a0b442ebaf64bb387d63f4ba70d3"
+    },
+    "neighbor_delay_0": {
+      "aggregate": {
+        "coordination_bandwidth_gain": 3.33134323687931,
+        "coordination_speedup": 3.33134323687931,
+        "priority_incremental_bandwidth_gain": 1.0005996924595304,
+        "priority_incremental_row_hit_ratio": 1.0602127366483147,
+        "priority_incremental_speedup": 1.0005996924595304
+      },
+      "changes": {
+        "model.neighbor_index_ready_cycles": 0
+      },
+      "per_dataset": {
+        "citeseer": {
+          "coordination_bandwidth_gain": 3.442288680686292,
+          "coordination_speedup": 3.442288680686292,
+          "priority_incremental_bandwidth_gain": 0.999983546114072,
+          "priority_incremental_row_hit_ratio": 1.0409811290577085,
+          "priority_incremental_speedup": 0.999983546114072
+        },
+        "cora": {
+          "coordination_bandwidth_gain": 2.9059498110088358,
+          "coordination_speedup": 2.9059498110088358,
+          "priority_incremental_bandwidth_gain": 1.0018257108234558,
+          "priority_incremental_row_hit_ratio": 1.0697493037939354,
+          "priority_incremental_speedup": 1.0018257108234558
+        },
+        "pubmed": {
+          "coordination_bandwidth_gain": 3.645791218942802,
+          "coordination_speedup": 3.645791218942802,
+          "priority_incremental_bandwidth_gain": 0.9999898204410633,
+          "priority_incremental_row_hit_ratio": 1.0699077770933003,
+          "priority_incremental_speedup": 0.9999898204410633
+        }
+      },
+      "profile_sha256": "453787234f78e8b0ce1498550674ada320d2164547ebfb93a4c5e4bf6d81fe34"
+    },
+    "neighbor_delay_4": {
+      "aggregate": {
+        "coordination_bandwidth_gain": 3.3340797289399866,
+        "coordination_speedup": 3.3340797289399866,
+        "priority_incremental_bandwidth_gain": 1.0006133118474776,
+        "priority_incremental_row_hit_ratio": 1.113017271870917,
+        "priority_incremental_speedup": 1.0006133118474776
+      },
+      "changes": {
+        "model.neighbor_index_ready_cycles": 4
+      },
+      "per_dataset": {
+        "citeseer": {
+          "coordination_bandwidth_gain": 3.4509122919114734,
+          "coordination_speedup": 3.4509122919114734,
+          "priority_incremental_bandwidth_gain": 1.0000438766681705,
+          "priority_incremental_row_hit_ratio": 1.1992539246722485,
+          "priority_incremental_speedup": 1.0000438766681703
+        },
+        "cora": {
+          "coordination_bandwidth_gain": 2.9051247482164495,
+          "coordination_speedup": 2.9051247482164495,
+          "priority_incremental_bandwidth_gain": 1.0018096315734564,
+          "priority_incremental_row_hit_ratio": 1.0699111338575351,
+          "priority_incremental_speedup": 1.0018096315734566
+        },
+        "pubmed": {
+          "coordination_bandwidth_gain": 3.646202146692037,
+          "coordination_speedup": 3.6462021466920365,
+          "priority_incremental_bandwidth_gain": 0.9999864273008058,
+          "priority_incremental_row_hit_ratio": 1.069886757082967,
+          "priority_incremental_speedup": 0.9999864273008058
+        }
+      },
+      "profile_sha256": "96ac9394310fa62c4c14fc8669eabd239748420e8f21ef655f124cbc8592665c"
+    },
+    "row_first_interleave_2": {
+      "aggregate": {
+        "coordination_bandwidth_gain": 2.6901616066120333,
+        "coordination_speedup": 2.690161606612033,
+        "priority_incremental_bandwidth_gain": 1.0006169058834538,
+        "priority_incremental_row_hit_ratio": 1.1130138063536874,
+        "priority_incremental_speedup": 1.0006169058834538
+      },
+      "changes": {
+        "model.row_first_bank_interleave": 2
+      },
+      "per_dataset": {
+        "citeseer": {
+          "coordination_bandwidth_gain": 2.7277986269269845,
+          "coordination_speedup": 2.7277986269269845,
+          "priority_incremental_bandwidth_gain": 1.0000466192156179,
+          "priority_incremental_row_hit_ratio": 1.1993699840341134,
+          "priority_incremental_speedup": 1.0000466192156179
+        },
+        "cora": {
+          "coordination_bandwidth_gain": 2.4266511515929703,
+          "coordination_speedup": 2.42665115159297,
+          "priority_incremental_bandwidth_gain": 1.0018176711339377,
+          "priority_incremental_row_hit_ratio": 1.069778945213891,
+          "priority_incremental_speedup": 1.001817671133938
+        },
+        "pubmed": {
+          "coordination_bandwidth_gain": 2.9160350413161447,
+          "coordination_speedup": 2.9160350413161447,
+          "priority_incremental_bandwidth_gain": 0.9999864273008058,
+          "priority_incremental_row_hit_ratio": 1.069892489813058,
+          "priority_incremental_speedup": 0.9999864273008058
+        }
+      },
+      "profile_sha256": "5d6de9b5c4b4a6f8f7557b6e9cd94936992cbe90156e7e6fc9b4bf269a7a0b8b"
+    }
+  },
+  "schema_version": 1,
+  "selection_policy": "The required baseline uses only the versioned profile. Alternative values are diagnostic sensitivity points and are not selected using paper targets.",
+  "workload_manifest": "configs/paper_workloads.json",
+  "workload_manifest_sha256": "60c5a3116a36344d4dd67ff0f678677fd7305465251f511f13914752adf43a0f"
+}

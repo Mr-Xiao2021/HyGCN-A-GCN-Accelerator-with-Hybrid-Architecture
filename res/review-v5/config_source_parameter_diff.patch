@@ -1,0 +1,1266 @@
+diff --git a/configs/HYGCN_PAPER.ini b/configs/HYGCN_PAPER.ini
+index 546ddf2..e0c4342 100644
+--- a/configs/HYGCN_PAPER.ini
++++ b/configs/HYGCN_PAPER.ini
+@@ -21,6 +21,7 @@ hbm_bandwidth_gbps = 256
+ hbm_channels = 8
+ hbm_banks_per_channel = 16
+ hbm_row_bytes = 2048
++hbm_transaction_queue_entries_per_channel = 32
+ hbm_row_hit_cycles = 12
+ hbm_row_miss_cycles = 28
+ edram_latency_cycles = 2
+@@ -37,5 +38,5 @@ aggregation_ping_pong_regions = 2
+ aggregation_shard_capacity_bytes = 5242880
+ batch_launch_interval_cycles = 1
+ neighbor_index_ready_cycles = 2
+-row_first_bank_interleave = 2
++row_first_bank_interleave = 1
+ sequential_spill_alignment = block
+diff --git a/configs/paper_metrics.json b/configs/paper_metrics.json
+index 3473112..aabec5d 100644
+--- a/configs/paper_metrics.json
++++ b/configs/paper_metrics.json
+@@ -1,6 +1,6 @@
+ {
+-  "schema_version": 3,
+-  "reference_version": "hygcn-hpca2020-fig15-17-svg-digitized-v1",
++  "schema_version": 4,
++  "reference_version": "hygcn-hpca2020-fig15-17-svg-digitized-v2",
+   "tolerance": 0.20,
+   "datasets": ["cora", "citeseer", "pubmed"],
+   "digitization": {
+@@ -116,6 +116,60 @@
+       "experiment_scope": "Fig. 17 priority-only effective HBM bandwidth with row-first baseline mapping fixed",
+       "source": "Internal causal decomposition of the paper coordinator"
+     },
++    "priority_incremental_speedup": {
++      "required": true,
++      "validation": "per_dataset_minimum",
++      "reference_min": 0.9999,
++      "unit": "x",
++      "aggregation": "per_dataset",
++      "experiment_scope": "optimized divided by mapping-only on the same low-bits layout, expressed as mapping-only cycles / optimized cycles",
++      "source": "Required non-regression gate for the isolated batch/class request assembly mechanism"
++    },
++    "priority_incremental_speedup_aggregate": {
++      "required": true,
++      "validation": "aggregate_minimum",
++      "reference_min": 1.0005,
++      "unit": "x",
++      "aggregation": "arithmetic_mean_over_datasets",
++      "experiment_scope": "three-dataset arithmetic mean of optimized versus mapping-only speedup on low-bits layout",
++      "source": "Required aggregate causal gate for the isolated batch/class request assembly mechanism"
++    },
++    "priority_incremental_bandwidth_gain": {
++      "required": true,
++      "validation": "per_dataset_minimum",
++      "reference_min": 0.9999,
++      "unit": "x",
++      "aggregation": "per_dataset",
++      "experiment_scope": "optimized divided by mapping-only effective HBM bandwidth over the complete memory-service interval",
++      "source": "Required non-regression gate for the isolated batch/class request assembly mechanism"
++    },
++    "priority_incremental_bandwidth_gain_aggregate": {
++      "required": true,
++      "validation": "aggregate_minimum",
++      "reference_min": 1.0005,
++      "unit": "x",
++      "aggregation": "arithmetic_mean_over_datasets",
++      "experiment_scope": "three-dataset arithmetic mean of optimized versus mapping-only complete-interval bandwidth gain",
++      "source": "Required aggregate causal gate for the isolated batch/class request assembly mechanism"
++    },
++    "priority_incremental_row_hit_ratio": {
++      "required": true,
++      "validation": "per_dataset_minimum",
++      "reference_min": 1.0,
++      "unit": "ratio",
++      "aggregation": "per_dataset",
++      "experiment_scope": "optimized row-hit rate divided by mapping-only row-hit rate on the same low-bits layout",
++      "source": "Required row-locality non-regression gate on the same low-bits address layout"
++    },
++    "priority_incremental_row_hit_ratio_aggregate": {
++      "required": true,
++      "validation": "aggregate_minimum",
++      "reference_min": 1.01,
++      "unit": "ratio",
++      "aggregation": "arithmetic_mean_over_datasets",
++      "experiment_scope": "three-dataset arithmetic mean of optimized versus mapping-only row-hit ratio on the same low-bits layout",
++      "source": "Required positive row-locality contribution from batch/class/address assembly"
++    },
+     "mapping_speedup": {
+       "required": false,
+       "validation": "diagnostic_only",
+@@ -147,8 +201,16 @@
+       "reference": 4.00,
+       "unit": "x",
+       "aggregation": "arithmetic_mean_over_datasets",
+-      "experiment_scope": "effective HBM bandwidth over the union of in-flight request intervals, excluding producer-idle gaps",
++      "experiment_scope": "effective HBM bandwidth over the common memory-service interval from cycle zero through the final request completion, including producer-idle gaps",
+       "source": "HyGCN HPCA 2020 Section 5.3 and Figure 17: average 4x bandwidth utilization"
++    },
++    "coordination_active_bandwidth_gain": {
++      "required": false,
++      "validation": "diagnostic_only",
++      "unit": "x",
++      "aggregation": "arithmetic_mean_over_datasets",
++      "experiment_scope": "effective HBM bandwidth over the union of in-flight request intervals, excluding producer-idle gaps",
++      "source": "Diagnostic only because excluding producer-idle gaps can invert the end-to-end throughput conclusion"
+     }
+   }
+ }
+diff --git a/configs/paper_workloads.json b/configs/paper_workloads.json
+index f48894f..e86dee1 100644
+--- a/configs/paper_workloads.json
++++ b/configs/paper_workloads.json
+@@ -1,6 +1,6 @@
+ {
+-  "schema_version": 1,
+-  "workload_version": "hygcn-hpca2020-table5-gcn-v1",
++  "schema_version": 2,
++  "workload_version": "hygcn-hpca2020-table5-gcn-v2",
+   "paper_source": "HyGCN HPCA 2020 Table 5 and Section 5.3",
+   "figures": {
+     "figure_15": {
+@@ -33,16 +33,26 @@
+     "aggregation_ping_pong_half_capacity_bytes": 8388608,
+     "policy": "fixed dataset-independent scheduler occupancy cap below one physical ping-pong half",
+     "source": "HyGCN Section 4.3.2 requires the destination interval and its aggregation results to fit the on-chip Aggregation Buffer; the paper does not publish the simulator's interval occupancy, so this request-level model reports the fixed scheduler cap separately from the 16 MiB physical capacity",
+-    "calibration_disclosure": "changed from the review-v3 implicit 4 MiB value and covered by 4/5/6 MiB sensitivity evidence"
++    "calibration_disclosure": "the capacity is selected using only Cora and Citeseer; PubMed is a hold-out and is not used for selection",
++    "calibration_datasets": ["cora", "citeseer"],
++    "holdout_datasets": ["pubmed"],
++    "candidate_capacities_mib": [4, 5, 6]
+   },
+   "memory_ablation": {
++    "transaction_queue_entries_per_channel": 32,
++    "transaction_queue_source": "configs/HBM1_4Gb_x128.ini trans_queue_size=32; DRAMSim3 instantiates one controller per channel, so the request-level model applies the same bound to each channel's 64-byte block reorder window",
++    "coordinator_issue_blocks_per_cycle": 4,
++    "coordinator_issue_width_source": "derived from the paper profile peak interface width: floor(256 bytes/cycle divided by 64 bytes/block)",
++    "coordinator_input_policy": "four-buffer round-robin FIFO with a derived four-block issue-width lookahead; batch/class/address assembly with same-row controller dispatch when priority is enabled",
++    "coordinator_input_source": "HyGCN HPCA 2020 Figure 9 and Section 4.5.2 show concurrent Edge, Input, Weight, and Output buffer requests interleaved before the coordinator and assembled into continuous batch-local streams after priority sorting",
++    "priority_order_source": "HyGCN HPCA 2020 Section 4.5.2 executes requests batch-by-batch: all requests from the current batch, including its lower-priority classes, precede high-priority requests from the next batch",
+     "priority_baseline": "fifo",
+     "priority_optimized": "batch-class",
+     "mapping_baseline": "row-first",
+     "mapping_optimized": "low-bits",
+-    "row_first_bank_interleave": 2,
+-    "row_first_source": "The review-v3 baseline used kUncoordinatedBankInterleave=2. This version preserves that baseline value for comparability but moves it into configuration and reports it explicitly. DRAMSim3 enables a second HBM command per cycle when read/write classes differ; the two-bank striping is only a request-level width approximation, not a claim that DRAMSim3 pairs adjacent banks.",
+-    "row_first_layout_basis": "configs/HBM1_4Gb_x128.ini uses address_mapping=rorabgbachco; the request-level row-first baseline preserves full-row locality before distributing rows across channels and reports the collapsed mapping formula in source and tests",
++    "row_first_bank_interleave": 1,
++    "row_first_source": "configs/HBM1_4Gb_x128.ini selects address_mapping=rorabgbachco. The collapsed request-level baseline therefore keeps every contiguous row span in one bank; it does not add an unsupported adjacent-bank striping factor.",
++    "row_first_layout_basis": "one row-sized block span stays in one bank, then the collapsed mapping advances channel and bank fields in the order represented by rorabgbachco",
+     "low_bits_source": "HyGCN HPCA 2020 Section 4.5.2: channel and bank identifiers use lower address bits"
+   },
+   "scope_limits": [
+diff --git a/hygcn/paper_sim.cpp b/hygcn/paper_sim.cpp
+index 46f71f6..415e621 100644
+--- a/hygcn/paper_sim.cpp
++++ b/hygcn/paper_sim.cpp
+@@ -88,6 +88,30 @@ std::string RequestClassName(RequestClass request_class) {
+     throw std::runtime_error("unknown request class");
+ }
+
++constexpr std::size_t kCoordinatorPorts = 4;
++
++std::size_t CoordinatorPort(RequestClass request_class) {
++    switch (request_class) {
++        case RequestClass::EDGE:
++            return 0;
++        case RequestClass::INPUT:
++        case RequestClass::INTERMEDIATE_READ:
++            return 1;
++        case RequestClass::WEIGHT:
++            return 2;
++        case RequestClass::OUTPUT:
++        case RequestClass::INTERMEDIATE_WRITE:
++            return 3;
++    }
++    throw std::runtime_error("unknown request class");
++}
++
++uint64_t CoordinatorIssueBlocksPerCycle(const ArchitectureConfig& architecture) {
++    return std::max<uint64_t>(
++        1, static_cast<uint64_t>(std::floor(
++               architecture.HbmBytesPerCycle() / architecture.block_size)));
++}
++
+ json ArchitectureJson(const ArchitectureConfig& architecture) {
+     return {
+         {"profile", architecture.profile},
+@@ -114,6 +138,10 @@ json ArchitectureJson(const ArchitectureConfig& architecture) {
+         {"hbm_channels", architecture.hbm_channels},
+         {"hbm_banks_per_channel", architecture.hbm_banks_per_channel},
+         {"hbm_row_bytes", architecture.hbm_row_bytes},
++        {"hbm_transaction_queue_entries_per_channel",
++         architecture.hbm_transaction_queue_entries_per_channel},
++        {"coordinator_issue_blocks_per_cycle",
++         CoordinatorIssueBlocksPerCycle(architecture)},
+         {"hbm_row_hit_cycles", architecture.hbm_row_hit_cycles},
+         {"hbm_row_miss_cycles", architecture.hbm_row_miss_cycles},
+         {"edram_latency_cycles", architecture.edram_latency_cycles},
+@@ -137,6 +165,8 @@ json LayerJson(const LayerMetrics& layer) {
+             {"count", layer.request_counts[index]},
+             {"bytes", layer.request_bytes[index]},
+             {"queue_wait_cycles", layer.request_wait_cycles[index]},
++            {"row_buffer_hits", layer.row_buffer_hits_by_class[index]},
++            {"row_buffer_misses", layer.row_buffer_misses_by_class[index]},
+         };
+     }
+     json producer_requests = json::array();
+@@ -208,6 +238,8 @@ json LayerJson(const LayerMetrics& layer) {
+         {"weight_cascade_bytes", layer.weight_cascade_bytes},
+         {"memory_service_cycles", layer.memory_service_cycles},
+         {"memory_active_cycles", layer.memory_active_cycles},
++        {"bandwidth_utilization", layer.bandwidth_utilization},
++        {"active_bandwidth_utilization", layer.active_bandwidth_utilization},
+         {"queue_wait_cycles", layer.queue_wait_cycles},
+         {"hbm_blocked_cycles", layer.hbm_blocked_cycles},
+         {"row_buffer_hits", layer.row_buffer_hits},
+@@ -246,7 +278,6 @@ json LayerJson(const LayerMetrics& layer) {
+         {"bank_blocks", layer.bank_blocks},
+         {"simd_utilization", layer.simd_utilization},
+         {"array_utilization", layer.array_utilization},
+-        {"bandwidth_utilization", layer.bandwidth_utilization},
+         {"channel_imbalance", layer.channel_imbalance},
+         {"bank_imbalance", layer.bank_imbalance},
+     };
+@@ -285,6 +316,8 @@ ArchitectureConfig ArchitectureConfig::Load(const std::string& path) {
+     config.hbm_channels = reader.GetInteger("memory", "hbm_channels", -1);
+     config.hbm_banks_per_channel = reader.GetInteger("memory", "hbm_banks_per_channel", -1);
+     config.hbm_row_bytes = reader.GetInteger("memory", "hbm_row_bytes", -1);
++    config.hbm_transaction_queue_entries_per_channel = reader.GetInteger(
++        "memory", "hbm_transaction_queue_entries_per_channel", -1);
+     config.hbm_row_hit_cycles = reader.GetInteger("memory", "hbm_row_hit_cycles", -1);
+     config.hbm_row_miss_cycles = reader.GetInteger("memory", "hbm_row_miss_cycles", -1);
+     config.edram_latency_cycles = reader.GetInteger("memory", "edram_latency_cycles", -1);
+@@ -358,6 +391,8 @@ void ArchitectureConfig::Validate() const {
+     require_positive(hbm_row_bytes >= static_cast<uint64_t>(block_size) &&
+                          hbm_row_bytes % block_size == 0,
+                      "hbm_row_bytes");
++    require_positive(hbm_transaction_queue_entries_per_channel > 0,
++                     "hbm_transaction_queue_entries_per_channel");
+     require_positive(hbm_row_hit_cycles > 0, "hbm_row_hit_cycles");
+     require_positive(hbm_row_miss_cycles > hbm_row_hit_cycles,
+                      "hbm_row_miss_cycles");
+@@ -560,7 +595,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         MemoryRequest request;
+         uint64_t first_block = 0;
+         uint64_t block_count = 0;
+-        uint64_t next_block = 0;
++        uint64_t admitted_blocks = 0;
++        uint64_t issued_blocks = 0;
+         uint64_t first_issue = std::numeric_limits<uint64_t>::max();
+         uint64_t completion = 0;
+         uint64_t effective_producer_ready = 0;
+@@ -572,7 +608,9 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         uint64_t start_cycle = 0;
+         uint64_t producer_ready_cycle = 0;
+         uint64_t enqueue_cycle = 0;
++        uint64_t admission_order = std::numeric_limits<uint64_t>::max();
+         uint64_t block = 0;
++        uint64_t block_offset = 0;
+         std::size_t channel = 0;
+         std::size_t bank = 0;
+         uint64_t row = 0;
+@@ -583,6 +621,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         std::max<double>(1.0, architecture.HbmBytesPerCycle() / architecture.hbm_channels);
+     const uint64_t transfer_cycles = std::max<uint64_t>(
+         1, static_cast<uint64_t>(std::ceil(architecture.block_size / bytes_per_channel_cycle)));
++    const std::size_t coordinator_issue_blocks = static_cast<std::size_t>(
++        CoordinatorIssueBlocksPerCycle(architecture));
+     std::vector<uint64_t> channel_issue_cycle(architecture.hbm_channels, 0);
+     std::vector<BankState> banks(
+         static_cast<std::size_t>(architecture.hbm_channels) *
+@@ -646,10 +686,13 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+     auto fifo_less = [&](const Candidate& lhs, const Candidate& rhs) {
+         const auto& lhs_request = states[lhs.request_index].request;
+         const auto& rhs_request = states[rhs.request_index].request;
+-        if (lhs.enqueue_cycle != rhs.enqueue_cycle) {
+-            return lhs.enqueue_cycle < rhs.enqueue_cycle;
++        if (lhs.admission_order != rhs.admission_order) {
++            return lhs.admission_order < rhs.admission_order;
++        }
++        if (lhs_request.sequence != rhs_request.sequence) {
++            return lhs_request.sequence < rhs_request.sequence;
+         }
+-        return lhs_request.sequence < rhs_request.sequence;
++        return lhs.block_offset < rhs.block_offset;
+     };
+     auto priority_less = [&](const Candidate& lhs, const Candidate& rhs) {
+         const auto& lhs_request = states[lhs.request_index].request;
+@@ -664,7 +707,16 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+             return static_cast<int>(lhs_request.request_class) <
+                    static_cast<int>(rhs_request.request_class);
+         }
+-        return lhs_request.sequence < rhs_request.sequence;
++        if (lhs.row != rhs.row) {
++            return lhs.row < rhs.row;
++        }
++        if (lhs.block != rhs.block) {
++            return lhs.block < rhs.block;
++        }
++        if (lhs_request.sequence != rhs_request.sequence) {
++            return lhs_request.sequence < rhs_request.sequence;
++        }
++        return lhs.block_offset < rhs.block_offset;
+     };
+
+     std::vector<std::vector<std::size_t>> dependents(states.size());
+@@ -675,16 +727,16 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         }
+     }
+
+-    auto make_candidate = [&](std::size_t index) {
++    auto make_candidate = [&](std::size_t index, uint64_t block_offset) {
+         const auto& state = states[index];
+-        if (state.next_block >= state.block_count) {
++        if (block_offset >= state.block_count) {
+             throw std::runtime_error("completed request cannot be scheduled");
+         }
+         uint64_t producer_ready = state.request.producer_ready_cycle;
+         if (state.request.producer_sequence.has_value()) {
+             const auto& producer = states[sequence_to_index.at(
+                 *state.request.producer_sequence)];
+-            if (producer.next_block < producer.block_count) {
++            if (producer.issued_blocks < producer.block_count) {
+                 throw std::runtime_error("dependent request released before producer completion");
+             }
+             producer_ready = std::max(
+@@ -692,8 +744,9 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+                 producer.completion + state.request.producer_delay_cycles);
+         }
+         const uint64_t enqueue = std::max(state.request.enqueue_cycle, producer_ready);
+-        auto candidate = map_block(state.first_block + state.next_block);
++        auto candidate = map_block(state.first_block + block_offset);
+         candidate.request_index = index;
++        candidate.block_offset = block_offset;
+         candidate.producer_ready_cycle = producer_ready;
+         candidate.enqueue_cycle = enqueue;
+         const auto& bank_state = banks[
+@@ -735,6 +788,46 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+     auto fifo_after = [&](const Candidate& lhs, const Candidate& rhs) {
+         return fifo_less(rhs, lhs);
+     };
++    auto pending_future_after = [&](const Candidate& lhs, const Candidate& rhs) {
++        if (lhs.enqueue_cycle != rhs.enqueue_cycle) {
++            return lhs.enqueue_cycle > rhs.enqueue_cycle;
++        }
++        const auto& lhs_request = states[lhs.request_index].request;
++        const auto& rhs_request = states[rhs.request_index].request;
++        if (lhs_request.sequence != rhs_request.sequence) {
++            return lhs_request.sequence > rhs_request.sequence;
++        }
++        return lhs.block_offset > rhs.block_offset;
++    };
++    auto pending_priority_less = [&](const Candidate& lhs, const Candidate& rhs) {
++        const auto& lhs_request = states[lhs.request_index].request;
++        const auto& rhs_request = states[rhs.request_index].request;
++        if (lhs_request.batch_id != rhs_request.batch_id) {
++            return lhs_request.batch_id < rhs_request.batch_id;
++        }
++        if (lhs_request.request_class != rhs_request.request_class) {
++            return static_cast<int>(lhs_request.request_class) <
++                   static_cast<int>(rhs_request.request_class);
++        }
++        if (lhs.row != rhs.row) {
++            return lhs.row < rhs.row;
++        }
++        if (lhs.block != rhs.block) {
++            return lhs.block < rhs.block;
++        }
++        if (lhs_request.sequence != rhs_request.sequence) {
++            return lhs_request.sequence < rhs_request.sequence;
++        }
++        return lhs.block_offset < rhs.block_offset;
++    };
++    auto pending_fifo_less = [&](const Candidate& lhs, const Candidate& rhs) {
++        const auto& lhs_request = states[lhs.request_index].request;
++        const auto& rhs_request = states[rhs.request_index].request;
++        if (lhs_request.sequence != rhs_request.sequence) {
++            return lhs_request.sequence < rhs_request.sequence;
++        }
++        return lhs.block_offset < rhs.block_offset;
++    };
+     const std::size_t total_banks =
+         static_cast<std::size_t>(architecture.hbm_channels) *
+         architecture.hbm_banks_per_channel;
+@@ -745,6 +838,21 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+     }
+     std::priority_queue<Candidate, std::vector<Candidate>, decltype(fifo_after)> active_fifo(
+         fifo_after);
++    using PendingFuture = std::priority_queue<
++        Candidate, std::vector<Candidate>, decltype(pending_future_after)>;
++    using PendingSet = std::set<Candidate, std::function<bool(
++        const Candidate&, const Candidate&)>>;
++    PendingFuture pending_future(pending_future_after);
++    PendingSet pending_priority(pending_priority_less);
++    std::vector<PendingSet> pending_fifo_ports;
++    pending_fifo_ports.reserve(kCoordinatorPorts);
++    for (std::size_t port = 0; port < kCoordinatorPorts; ++port) {
++        pending_fifo_ports.emplace_back(pending_fifo_less);
++    }
++    std::set<std::pair<std::size_t, uint64_t>> issued_candidates;
++    std::vector<std::size_t> outstanding_blocks(architecture.hbm_channels, 0);
++    std::size_t fifo_next_port = 0;
++    uint64_t next_admission_order = 0;
+
+     auto resource_ready = [&](std::size_t flat_bank) {
+         const std::size_t channel =
+@@ -762,7 +870,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         }
+         row->second.insert(candidate);
+     };
+-    auto enqueue_candidate = [&](const Candidate& candidate, bool activate_request) {
++    auto enqueue_candidate = [&](Candidate candidate) {
++        candidate.admission_order = next_admission_order++;
+         const std::size_t flat_bank =
+             candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
+         if (candidate.enqueue_cycle <= resource_ready(flat_bank)) {
+@@ -770,9 +879,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         } else {
+             bank_queues[flat_bank].future.push(candidate);
+         }
+-        if (activate_request) {
+-            active_fifo.push(candidate);
+-        }
++        active_fifo.push(candidate);
+     };
+     auto peek_bank = [&](std::size_t flat_bank) {
+         auto& queue = bank_queues[flat_bank];
+@@ -822,14 +929,6 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         if (!rhs.valid) {
+             return true;
+         }
+-        if (priority == MemoryPriorityMode::FIFO) {
+-            if (fifo_less(lhs.candidate, rhs.candidate)) {
+-                return true;
+-            }
+-            if (fifo_less(rhs.candidate, lhs.candidate)) {
+-                return false;
+-            }
+-        }
+         if (lhs.candidate.start_cycle != rhs.candidate.start_cycle) {
+             return lhs.candidate.start_cycle < rhs.candidate.start_cycle;
+         }
+@@ -843,7 +942,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+             channel * architecture.hbm_banks_per_channel;
+         for (std::size_t bank = 0;
+              bank < static_cast<std::size_t>(architecture.hbm_banks_per_channel);
+-             ++bank) {
++            ++bank) {
+             const BankChoice candidate = peek_bank(first_bank + bank);
+             if (choice_less(candidate, best)) {
+                 best = candidate;
+@@ -852,11 +951,131 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         channel_choices[channel] = best;
+     };
+
++    auto push_pending = [&](const Candidate& candidate, uint64_t visible_cycle) {
++        if (candidate.enqueue_cycle <= visible_cycle) {
++            if (priority == MemoryPriorityMode::BATCH_CLASS) {
++                pending_priority.insert(candidate);
++            } else {
++                pending_fifo_ports[CoordinatorPort(
++                    states[candidate.request_index].request.request_class)].insert(candidate);
++            }
++        } else {
++            pending_future.push(candidate);
++        }
++    };
++    auto promote_pending = [&](uint64_t visible_cycle) {
++        while (!pending_future.empty() &&
++               pending_future.top().enqueue_cycle <= visible_cycle) {
++            const Candidate candidate = pending_future.top();
++            pending_future.pop();
++            if (priority == MemoryPriorityMode::BATCH_CLASS) {
++                pending_priority.insert(candidate);
++            } else {
++                pending_fifo_ports[CoordinatorPort(
++                    states[candidate.request_index].request.request_class)].insert(candidate);
++            }
++        }
++    };
++    auto pending_available_count = [&]() {
++        std::size_t count = pending_priority.size();
++        for (const auto& port : pending_fifo_ports) {
++            count += port.size();
++        }
++        return count;
++    };
+     for (std::size_t index = 0; index < states.size(); ++index) {
+         if (!states[index].request.producer_sequence.has_value()) {
+-            enqueue_candidate(make_candidate(index), true);
++            push_pending(make_candidate(index, 0), 0);
++        }
++    }
++    auto fill_transaction_queue = [&](uint64_t visible_cycle,
++                                      std::vector<bool>& affected_channels) {
++        const std::size_t queue_capacity = static_cast<std::size_t>(
++            architecture.hbm_transaction_queue_entries_per_channel);
++        while (true) {
++            promote_pending(visible_cycle);
++            Candidate candidate;
++            bool has_candidate = false;
++            std::size_t selected_port = 0;
++            PendingSet::iterator selected_pending;
++            if (priority == MemoryPriorityMode::BATCH_CLASS) {
++                if (!pending_priority.empty()) {
++                    const auto& head = *pending_priority.begin();
++                    const auto& head_request = states[head.request_index].request;
++                    std::size_t scanned = 0;
++                    for (auto iterator = pending_priority.begin();
++                         iterator != pending_priority.end() && scanned < queue_capacity;
++                         ++iterator, ++scanned) {
++                        const auto& request = states[iterator->request_index].request;
++                        if (request.batch_id != head_request.batch_id ||
++                            request.request_class != head_request.request_class ||
++                            iterator->row != head.row) {
++                            break;
++                        }
++                        if (outstanding_blocks[iterator->channel] < queue_capacity) {
++                            candidate = *iterator;
++                            selected_pending = iterator;
++                            has_candidate = true;
++                            break;
++                        }
++                    }
++                }
++            } else {
++                for (std::size_t distance = 0; distance < kCoordinatorPorts; ++distance) {
++                    const std::size_t port =
++                        (fifo_next_port + distance) % kCoordinatorPorts;
++                    std::size_t scanned = 0;
++                    for (auto iterator = pending_fifo_ports[port].begin();
++                         iterator != pending_fifo_ports[port].end() &&
++                             scanned < coordinator_issue_blocks;
++                         ++iterator, ++scanned) {
++                        if (outstanding_blocks[iterator->channel] < queue_capacity) {
++                            candidate = *iterator;
++                            selected_pending = iterator;
++                            selected_port = port;
++                            has_candidate = true;
++                            break;
++                        }
++                    }
++                    if (has_candidate) {
++                        break;
++                    }
++                }
++            }
++            if (has_candidate) {
++                if (priority == MemoryPriorityMode::BATCH_CLASS) {
++                    pending_priority.erase(selected_pending);
++                } else {
++                    pending_fifo_ports[selected_port].erase(selected_pending);
++                }
++                enqueue_candidate(candidate);
++                ++outstanding_blocks[candidate.channel];
++                if (priority == MemoryPriorityMode::FIFO) {
++                    fifo_next_port = (selected_port + 1) % kCoordinatorPorts;
++                }
++                affected_channels[candidate.channel] = true;
++                auto& state = states[candidate.request_index];
++                ++state.admitted_blocks;
++                if (state.admitted_blocks < state.block_count) {
++                    push_pending(make_candidate(candidate.request_index,
++                                                state.admitted_blocks),
++                                 visible_cycle);
++                }
++                continue;
++            }
++            const std::size_t total_outstanding = std::accumulate(
++                outstanding_blocks.begin(), outstanding_blocks.end(), std::size_t{0});
++            if (total_outstanding != 0) {
++                break;
++            }
++            if (pending_future.empty()) {
++                break;
++            }
++            visible_cycle = pending_future.top().enqueue_cycle;
+         }
+-    }
++    };
++    std::vector<bool> initial_channels(architecture.hbm_channels, false);
++    fill_transaction_queue(0, initial_channels);
+     for (std::size_t channel = 0; channel < channel_choices.size(); ++channel) {
+         recompute_channel(channel);
+     }
+@@ -869,7 +1088,27 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+             }
+         }
+         if (!selected_choice.valid) {
+-            throw std::runtime_error("memory request dependency cycle");
++            std::size_t bank_available = 0;
++            std::size_t bank_future = 0;
++            std::size_t valid_channels = 0;
++            for (const auto& queue : bank_queues) {
++                bank_available += queue.available.size();
++                bank_future += queue.future.size();
++            }
++            for (const auto& choice : channel_choices) {
++                valid_channels += choice.valid ? 1 : 0;
++            }
++            const std::size_t total_outstanding = std::accumulate(
++                outstanding_blocks.begin(), outstanding_blocks.end(), std::size_t{0});
++            throw std::runtime_error(
++                "memory request dependency cycle: remaining=" +
++                std::to_string(remaining_blocks) + " outstanding=" +
++                std::to_string(total_outstanding) + " pending_available=" +
++                std::to_string(pending_available_count()) + " pending_future=" +
++                std::to_string(pending_future.size()) + " bank_available=" +
++                std::to_string(bank_available) + " bank_future=" +
++                std::to_string(bank_future) + " valid_channels=" +
++                std::to_string(valid_channels));
+         }
+         const Candidate selected = selected_choice.candidate;
+         auto& selected_queue = bank_queues[selected_choice.flat_bank];
+@@ -889,17 +1128,15 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+
+         auto& state = states[selected.request_index];
+         while (!active_fifo.empty() &&
+-               states[active_fifo.top().request_index].next_block >=
+-                   states[active_fifo.top().request_index].block_count) {
++               issued_candidates.count({active_fifo.top().request_index,
++                                        active_fifo.top().block_offset}) != 0) {
+             active_fifo.pop();
+         }
+         if (priority == MemoryPriorityMode::BATCH_CLASS &&
+             state.first_issue == std::numeric_limits<uint64_t>::max() &&
+             !active_fifo.empty() &&
+             active_fifo.top().request_index != selected.request_index) {
+-            const Candidate fifo_candidate = make_candidate(
+-                active_fifo.top().request_index);
+-            if (fifo_candidate.start_cycle <= selected.start_cycle) {
++            if (active_fifo.top().enqueue_cycle <= selected.start_cycle) {
+                 ++result.priority_reorders;
+             }
+         }
+@@ -915,8 +1152,12 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+             : architecture.hbm_row_miss_cycles;
+         if (row_hit) {
+             ++result.row_buffer_hits;
++            ++result.row_buffer_hits_by_class[static_cast<std::size_t>(
++                state.request.request_class)];
+         } else {
+             ++result.row_buffer_misses;
++            ++result.row_buffer_misses_by_class[static_cast<std::size_t>(
++                state.request.request_class)];
+         }
+         const uint64_t completion = selected.start_cycle + access_cycles + transfer_cycles;
+         channel_issue_cycle[selected.channel] = selected.start_cycle + transfer_cycles;
+@@ -924,24 +1165,21 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         bank_state.open_row = selected.row;
+         bank_state.row_open = true;
+         state.completion = std::max(state.completion, completion);
+-        ++state.next_block;
++        ++state.issued_blocks;
++        issued_candidates.insert({selected.request_index, selected.block_offset});
++        --outstanding_blocks[selected.channel];
+         --remaining_blocks;
+         ++result.channel_blocks[selected.channel];
+         ++result.bank_blocks[selected.bank];
+
+         std::vector<bool> affected_channels(architecture.hbm_channels, false);
+         affected_channels[selected.channel] = true;
+-        if (state.next_block < state.block_count) {
+-            const Candidate next = make_candidate(selected.request_index);
+-            enqueue_candidate(next, false);
+-            affected_channels[next.channel] = true;
+-        } else {
++        if (state.issued_blocks == state.block_count) {
+             for (std::size_t dependent : dependents[selected.request_index]) {
+-                const Candidate released = make_candidate(dependent);
+-                enqueue_candidate(released, true);
+-                affected_channels[released.channel] = true;
++                push_pending(make_candidate(dependent, 0), selected.start_cycle);
+             }
+         }
++        fill_transaction_queue(selected.start_cycle, affected_channels);
+         for (std::size_t channel = 0; channel < affected_channels.size(); ++channel) {
+             if (affected_channels[channel]) {
+                 recompute_channel(channel);
+@@ -1054,6 +1292,19 @@ uint64_t ExperimentResult::TotalInputDramBytes() const {
+ }
+
+ double ExperimentResult::BandwidthUtilization() const {
++    uint64_t memory_cycles = 0;
++    for (const auto& layer : layers) {
++        memory_cycles += layer.memory_service_cycles;
++    }
++    if (memory_cycles == 0) {
++        return 0.0;
++    }
++    return Clamp(TotalDramBytes() /
++                     (memory_cycles * architecture.HbmBytesPerCycle()),
++                 0.0, 1.0);
++}
++
++double ExperimentResult::ActiveBandwidthUtilization() const {
+     uint64_t memory_cycles = 0;
+     for (const auto& layer : layers) {
+         memory_cycles += layer.memory_active_cycles;
+@@ -1612,6 +1863,8 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+         metrics.request_counts = memory_timing.request_counts;
+         metrics.request_bytes = memory_timing.request_bytes;
+         metrics.request_wait_cycles = memory_timing.request_wait_cycles;
++        metrics.row_buffer_hits_by_class = memory_timing.row_buffer_hits_by_class;
++        metrics.row_buffer_misses_by_class = memory_timing.row_buffer_misses_by_class;
+         metrics.channel_blocks = memory_timing.channel_blocks;
+         metrics.bank_blocks = memory_timing.bank_blocks;
+         metrics.memory_request_traces = memory_timing.request_traces;
+@@ -1654,6 +1907,11 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+         metrics.channel_imbalance = Imbalance(metrics.channel_blocks);
+         metrics.bank_imbalance = Imbalance(metrics.bank_blocks);
+         metrics.bandwidth_utilization = Clamp(
++            metrics.TotalDramBytes() /
++                (std::max<uint64_t>(1, metrics.memory_service_cycles) *
++                 architecture_.HbmBytesPerCycle()),
++            0.0, 1.0);
++        metrics.active_bandwidth_utilization = Clamp(
+             metrics.TotalDramBytes() /
+                 (std::max<uint64_t>(1, metrics.memory_active_cycles) *
+                  architecture_.HbmBytesPerCycle()),
+@@ -1907,6 +2165,11 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+     metrics.channel_imbalance = Imbalance(metrics.channel_blocks);
+     metrics.bank_imbalance = Imbalance(metrics.bank_blocks);
+     metrics.bandwidth_utilization = Clamp(
++        metrics.TotalDramBytes() /
++            (std::max<uint64_t>(1, metrics.memory_service_cycles) *
++             architecture_.HbmBytesPerCycle()),
++        0.0, 1.0);
++    metrics.active_bandwidth_utilization = Clamp(
+         metrics.TotalDramBytes() /
+             (std::max<uint64_t>(1, metrics.memory_active_cycles) *
+              architecture_.HbmBytesPerCycle()),
+@@ -2099,6 +2362,7 @@ void WriteExperimentJson(const ExperimentResult& result, const std::string& path
+         {"total_aggregation_dram_bytes", result.TotalAggregationDramBytes()},
+         {"total_input_dram_bytes", result.TotalInputDramBytes()},
+         {"bandwidth_utilization", result.BandwidthUtilization()},
++        {"active_bandwidth_utilization", result.ActiveBandwidthUtilization()},
+     };
+     output["layers"] = json::array();
+     for (const auto& layer : result.layers) {
+@@ -2126,7 +2390,8 @@ void WriteExperimentCsv(const ExperimentResult& result, const std::string& path)
+               "memory_service_cycles,memory_active_cycles,edge_dram_bytes,input_dram_bytes,weight_dram_bytes,"
+               "output_dram_bytes,intermediate_dram_bytes,total_dram_bytes,mac_operations,"
+               "add_operations,compare_operations,simd_utilization,array_utilization,"
+-              "bandwidth_utilization,queue_wait_cycles,hbm_blocked_cycles,channel_imbalance,"
++              "bandwidth_utilization,active_bandwidth_utilization,queue_wait_cycles,"
++              "hbm_blocked_cycles,channel_imbalance,"
+               "bank_imbalance,ae_finish_cycle,ce_start_cycle,ce_finish_cycle,"
+               "aggregation_buffer_peak_bytes,simd_idle_lane_cycles,array_idle_lane_cycles\n";
+     for (const auto& layer : result.layers) {
+@@ -2146,6 +2411,7 @@ void WriteExperimentCsv(const ExperimentResult& result, const std::string& path)
+                << layer.mac_operations << ',' << layer.add_operations << ','
+                << layer.compare_operations << ',' << layer.simd_utilization << ','
+                << layer.array_utilization << ',' << layer.bandwidth_utilization << ','
++               << layer.active_bandwidth_utilization << ','
+                << layer.queue_wait_cycles << ',' << layer.hbm_blocked_cycles << ','
+                << layer.channel_imbalance << ',' << layer.bank_imbalance << ','
+                << layer.ae_finish_cycle << ',' << layer.ce_start_cycle << ','
+diff --git a/hygcn/paper_sim.h b/hygcn/paper_sim.h
+index e981315..add6995 100644
+--- a/hygcn/paper_sim.h
++++ b/hygcn/paper_sim.h
+@@ -59,6 +59,7 @@ struct ArchitectureConfig {
+     int hbm_channels = 0;
+     int hbm_banks_per_channel = 0;
+     uint64_t hbm_row_bytes = 0;
++    int hbm_transaction_queue_entries_per_channel = 0;
+     int hbm_row_hit_cycles = 0;
+     int hbm_row_miss_cycles = 0;
+     int edram_latency_cycles = 0;
+@@ -177,6 +178,8 @@ struct MemoryTimingResult {
+     std::array<uint64_t, kRequestClassCount> request_counts{};
+     std::array<uint64_t, kRequestClassCount> request_bytes{};
+     std::array<uint64_t, kRequestClassCount> request_wait_cycles{};
++    std::array<uint64_t, kRequestClassCount> row_buffer_hits_by_class{};
++    std::array<uint64_t, kRequestClassCount> row_buffer_misses_by_class{};
+     std::array<uint64_t, kRequestClassCount> class_completion_cycles{};
+     std::map<int, std::array<uint64_t, kRequestClassCount>> batch_completion_cycles;
+     std::vector<MemoryRequestTrace> request_traces;
+@@ -318,6 +321,8 @@ struct LayerMetrics {
+     std::array<uint64_t, kRequestClassCount> request_counts{};
+     std::array<uint64_t, kRequestClassCount> request_bytes{};
+     std::array<uint64_t, kRequestClassCount> request_wait_cycles{};
++    std::array<uint64_t, kRequestClassCount> row_buffer_hits_by_class{};
++    std::array<uint64_t, kRequestClassCount> row_buffer_misses_by_class{};
+     std::vector<InputWindowTrace> input_window_traces;
+     std::vector<MemoryRequestTrace> memory_request_traces;
+     std::vector<MemoryRequestTrace> producer_request_traces;
+@@ -326,6 +331,7 @@ struct LayerMetrics {
+     double simd_utilization = 0.0;
+     double array_utilization = 0.0;
+     double bandwidth_utilization = 0.0;
++    double active_bandwidth_utilization = 0.0;
+     double channel_imbalance = 0.0;
+     double bank_imbalance = 0.0;
+
+@@ -351,6 +357,7 @@ struct ExperimentResult {
+     uint64_t TotalAggregationDramBytes() const;
+     uint64_t TotalInputDramBytes() const;
+     double BandwidthUtilization() const;
++    double ActiveBandwidthUtilization() const;
+ };
+
+ class PaperSimulator {
+diff --git a/tools/model_sensitivity.py b/tools/model_sensitivity.py
+new file mode 100644
+index 0000000..b7ecab2
+--- /dev/null
++++ b/tools/model_sensitivity.py
+@@ -0,0 +1,202 @@
++#!/usr/bin/env python3
++import argparse
++import concurrent.futures
++import configparser
++import json
++import subprocess
++import sys
++from pathlib import Path
++
++import paper_benchmark
++
++
++VARIANTS = ("optimized", "mapping_only", "coordination_baseline")
++SCENARIOS = {
++    "baseline": {},
++    "neighbor_delay_0": {("model", "neighbor_index_ready_cycles"): 0},
++    "neighbor_delay_4": {("model", "neighbor_index_ready_cycles"): 4},
++    "dram_timing_fast": {
++        ("memory", "hbm_row_hit_cycles"): 10,
++        ("memory", "hbm_row_miss_cycles"): 24,
++    },
++    "dram_timing_slow": {
++        ("memory", "hbm_row_hit_cycles"): 14,
++        ("memory", "hbm_row_miss_cycles"): 32,
++    },
++    "row_first_interleave_2": {("model", "row_first_bank_interleave"): 2},
++}
++
++
++def parse_args():
++    parser = argparse.ArgumentParser(
++        description="Sweep unpublished request-release, DRAM timing, and mapping parameters"
++    )
++    parser.add_argument("--binary", default="build/hygcntest")
++    parser.add_argument("--profile", default="configs/HYGCN_PAPER.ini")
++    parser.add_argument("--workloads", default="configs/paper_workloads.json")
++    parser.add_argument("--output-dir", default="res/model-sensitivity")
++    parser.add_argument("--datasets", nargs="+", default=["cora", "citeseer", "pubmed"])
++    parser.add_argument("--jobs", type=int, default=4)
++    return parser.parse_args()
++
++
++def resolve(root, value):
++    path = Path(value)
++    return path if path.is_absolute() else root / path
++
++
++def display_path(root, path):
++    try:
++        return str(path.relative_to(root))
++    except ValueError:
++        return str(path)
++
++
++def write_profile(source, destination, changes):
++    parser = configparser.ConfigParser()
++    with source.open(encoding="utf-8") as stream:
++        parser.read_file(stream)
++    for (section, option), value in changes.items():
++        parser[section][option] = str(value)
++    destination.parent.mkdir(parents=True, exist_ok=True)
++    with destination.open("w", encoding="utf-8", newline="\n") as stream:
++        parser.write(stream)
++
++
++def run_variant(root, binary, profile, output_dir, dataset, variant, workloads):
++    return paper_benchmark.run_variant(
++        root,
++        binary,
++        output_dir,
++        dataset,
++        variant,
++        True,
++        profile,
++        workloads,
++    )
++
++
++def metrics(runs):
++    optimized = paper_benchmark.summarize_result(runs["optimized"])
++    mapping_only = paper_benchmark.summarize_result(runs["mapping_only"])
++    baseline = paper_benchmark.summarize_result(runs["coordination_baseline"])
++    return {
++        "coordination_speedup": paper_benchmark.ratio(
++            baseline["total_cycles"], optimized["total_cycles"], "coordination_speedup"
++        ),
++        "coordination_bandwidth_gain": paper_benchmark.ratio(
++            optimized["bandwidth_utilization"],
++            baseline["bandwidth_utilization"],
++            "coordination_bandwidth_gain",
++        ),
++        "priority_incremental_speedup": paper_benchmark.ratio(
++            mapping_only["total_cycles"],
++            optimized["total_cycles"],
++            "priority_incremental_speedup",
++        ),
++        "priority_incremental_bandwidth_gain": paper_benchmark.ratio(
++            optimized["bandwidth_utilization"],
++            mapping_only["bandwidth_utilization"],
++            "priority_incremental_bandwidth_gain",
++        ),
++        "priority_incremental_row_hit_ratio": paper_benchmark.ratio(
++            optimized["row_hit_rate"],
++            mapping_only["row_hit_rate"],
++            "priority_incremental_row_hit_ratio",
++        ),
++    }
++
++
++def main():
++    args = parse_args()
++    if args.jobs <= 0:
++        raise ValueError("--jobs must be positive")
++    root = Path(__file__).resolve().parents[1]
++    binary = resolve(root, args.binary)
++    source_profile = resolve(root, args.profile)
++    workload_path = resolve(root, args.workloads)
++    output_dir = resolve(root, args.output_dir)
++    output_dir.mkdir(parents=True, exist_ok=True)
++    workloads = paper_benchmark.load_json(workload_path)
++
++    profiles = {}
++    for name, changes in SCENARIOS.items():
++        scenario_dir = output_dir / name
++        profile = scenario_dir / "HYGCN_PAPER.ini"
++        write_profile(source_profile, profile, changes)
++        profiles[name] = (scenario_dir, profile)
++
++    runs = {
++        name: {dataset: {} for dataset in args.datasets}
++        for name in SCENARIOS
++    }
++    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
++        futures = {}
++        for name, (scenario_dir, profile) in profiles.items():
++            for dataset in args.datasets:
++                for variant in VARIANTS:
++                    future = executor.submit(
++                        run_variant,
++                        root,
++                        binary,
++                        profile,
++                        scenario_dir,
++                        dataset,
++                        variant,
++                        workloads,
++                    )
++                    futures[future] = (name, dataset, variant)
++        for future in concurrent.futures.as_completed(futures):
++            name, dataset, variant = futures[future]
++            runs[name][dataset][variant] = future.result()
++
++    report = {
++        "schema_version": 1,
++        "binary": display_path(root, binary),
++        "binary_sha256": paper_benchmark.sha256_digest(binary),
++        "base_profile": display_path(root, source_profile),
++        "base_profile_sha256": paper_benchmark.sha256_digest(source_profile),
++        "workload_manifest": display_path(root, workload_path),
++        "workload_manifest_sha256": paper_benchmark.sha256_digest(workload_path),
++        "datasets": args.datasets,
++        "selection_policy": (
++            "The required baseline uses only the versioned profile. Alternative values are "
++            "diagnostic sensitivity points and are not selected using paper targets."
++        ),
++        "scenarios": {},
++    }
++    for name, changes in SCENARIOS.items():
++        scenario_runs = runs[name]
++        per_dataset = {
++            dataset: metrics(scenario_runs[dataset])
++            for dataset in args.datasets
++        }
++        report["scenarios"][name] = {
++            "changes": {
++                f"{section}.{option}": value
++                for (section, option), value in changes.items()
++            },
++            "profile_sha256": paper_benchmark.sha256_digest(profiles[name][1]),
++            "per_dataset": per_dataset,
++            "aggregate": {
++                metric: paper_benchmark.mean([
++                    values[metric] for values in per_dataset.values()
++                ])
++                for metric in next(iter(per_dataset.values()))
++            },
++        }
++
++    report_path = output_dir / "model_sensitivity.json"
++    with report_path.open("w", encoding="utf-8", newline="\n") as stream:
++        json.dump(report, stream, indent=2, sort_keys=True)
++        stream.write("\n")
++    print(report_path)
++    return 0
++
++
++if __name__ == "__main__":
++    try:
++        sys.exit(main())
++    except (OSError, ValueError, subprocess.CalledProcessError, KeyError) as error:
++        print(f"error: {error}", file=sys.stderr)
++        sys.exit(2)
+diff --git a/tools/paper_benchmark.py b/tools/paper_benchmark.py
+index ab9d154..dde0f9e 100755
+--- a/tools/paper_benchmark.py
++++ b/tools/paper_benchmark.py
+@@ -276,6 +276,16 @@ def mean(values):
+     return sum(values) / len(values)
+
+
++def summarize_result(result):
++    summary = dict(result["summary"])
++    row_hits = sum(layer["row_buffer_hits"] for layer in result["layers"])
++    row_misses = sum(layer["row_buffer_misses"] for layer in result["layers"])
++    summary["row_buffer_hits"] = row_hits
++    summary["row_buffer_misses"] = row_misses
++    summary["row_hit_rate"] = ratio(row_hits, row_hits + row_misses, "row_hit_rate")
++    return summary
++
++
+ def validate_pair(optimized, baseline, allowed, dataset, name):
+     optimized_manifest = optimized["manifest"]
+     baseline_manifest = baseline["manifest"]
+@@ -338,6 +348,36 @@ def calculate_metrics(
+             coordination_base["bandwidth_utilization"],
+             "priority_bandwidth_gain",
+         ),
++        "priority_incremental_speedup": ratio(
++            mapping_only["total_cycles"],
++            optimized["total_cycles"],
++            "priority_incremental_speedup",
++        ),
++        "priority_incremental_speedup_aggregate": ratio(
++            mapping_only["total_cycles"],
++            optimized["total_cycles"],
++            "priority_incremental_speedup_aggregate",
++        ),
++        "priority_incremental_bandwidth_gain": ratio(
++            optimized["bandwidth_utilization"],
++            mapping_only["bandwidth_utilization"],
++            "priority_incremental_bandwidth_gain",
++        ),
++        "priority_incremental_bandwidth_gain_aggregate": ratio(
++            optimized["bandwidth_utilization"],
++            mapping_only["bandwidth_utilization"],
++            "priority_incremental_bandwidth_gain_aggregate",
++        ),
++        "priority_incremental_row_hit_ratio": ratio(
++            optimized["row_hit_rate"],
++            mapping_only["row_hit_rate"],
++            "priority_incremental_row_hit_ratio",
++        ),
++        "priority_incremental_row_hit_ratio_aggregate": ratio(
++            optimized["row_hit_rate"],
++            mapping_only["row_hit_rate"],
++            "priority_incremental_row_hit_ratio_aggregate",
++        ),
+         "mapping_speedup": ratio(
+             coordination_base["total_cycles"],
+             mapping_only["total_cycles"],
+@@ -358,6 +398,11 @@ def calculate_metrics(
+             coordination_base["bandwidth_utilization"],
+             "coordination_bandwidth_gain",
+         ),
++        "coordination_active_bandwidth_gain": ratio(
++            optimized["active_bandwidth_utilization"],
++            coordination_base["active_bandwidth_utilization"],
++            "coordination_active_bandwidth_gain",
++        ),
+     }
+
+
+@@ -378,9 +423,9 @@ def validate_sequential_traffic(dataset, run):
+     }
+
+
+-def priority_trace_evidence(dataset, priority_only, coordination_baseline):
+-    optimized_layer = priority_only["layers"][0]
+-    baseline_layer = coordination_baseline["layers"][0]
++def priority_trace_evidence(dataset, optimized, mapping_only):
++    optimized_layer = optimized["layers"][0]
++    baseline_layer = mapping_only["layers"][0]
+     baseline_by_sequence = {
+         trace["sequence"]: trace for trace in baseline_layer["memory_requests"]
+     }
+@@ -411,6 +456,11 @@ def priority_trace_evidence(dataset, priority_only, coordination_baseline):
+         raise ValueError(f"{dataset} priority-only ablation has no observable trace effect")
+     return {
+         "priority_reorders": optimized_layer["priority_reorders"],
++        "address_mapping": optimized["manifest"]["address_mapping"],
++        "optimized_row_buffer_hits": optimized_layer["row_buffer_hits"],
++        "optimized_row_buffer_misses": optimized_layer["row_buffer_misses"],
++        "fifo_row_buffer_hits": baseline_layer["row_buffer_hits"],
++        "fifo_row_buffer_misses": baseline_layer["row_buffer_misses"],
+         "changed_requests": changed,
+     }
+
+@@ -423,6 +473,10 @@ def current_parameters(architecture, workloads):
+         "benchmark_selected_layer": workloads["figures"]["figure_17"]["selected_layer"],
+         "edge_input_dependency": "edge_completion_plus_neighbor_index_ready",
+         "edge_ping_pong_regions": architecture["edge_ping_pong_regions"],
++        "hbm_transaction_queue_entries_per_channel":
++            architecture["hbm_transaction_queue_entries_per_channel"],
++        "coordinator_issue_blocks_per_cycle":
++            architecture["coordinator_issue_blocks_per_cycle"],
+         "input_ping_pong_regions": architecture["input_ping_pong_regions"],
+         "neighbor_index_ready_cycles": architecture["neighbor_index_ready_cycles"],
+         "row_first_bank_interleave": architecture["row_first_bank_interleave"],
+@@ -499,7 +553,7 @@ def main():
+                 runs[optimized_name], runs[baseline_name], allowed, dataset, baseline_name
+             )
+         architecture = runs["optimized"]["architecture"]
+-        summaries = {name: result["summary"] for name, result in runs.items()}
++        summaries = {name: summarize_result(result) for name, result in runs.items()}
+         metrics = calculate_metrics(
+             summaries["optimized"],
+             summaries["sparsity_optimized"],
+@@ -517,7 +571,7 @@ def main():
+                 dataset, runs["pipeline_baseline"]
+             ),
+             "priority_trace_evidence": priority_trace_evidence(
+-                dataset, runs["priority_only"], runs["coordination_baseline"]
++                dataset, runs["optimized"], runs["mapping_only"]
+             ),
+             "mapping_evidence": {
+                 "baseline_channel_blocks": runs["coordination_baseline"]["layers"][0][
+diff --git a/tools/partition_sensitivity.py b/tools/partition_sensitivity.py
+index 279e831..0f1a55b 100755
+--- a/tools/partition_sensitivity.py
++++ b/tools/partition_sensitivity.py
+@@ -25,6 +25,7 @@ def parse_args():
+     parser.add_argument("--binary", default="build/hygcntest")
+     parser.add_argument("--profile", default="configs/HYGCN_PAPER.ini")
+     parser.add_argument("--reference", default="configs/paper_metrics.json")
++    parser.add_argument("--workloads", default="configs/paper_workloads.json")
+     parser.add_argument("--output-dir", default="res/partition-sensitivity")
+     parser.add_argument("--capacities-mib", nargs="+", type=int, default=[4, 5, 6])
+     parser.add_argument("--datasets", nargs="+", default=["cora", "citeseer", "pubmed"])
+@@ -37,13 +38,20 @@ def resolve(root, value):
+     return path if path.is_absolute() else root / path
+
+
++def display_path(root, path):
++    try:
++        return str(path.relative_to(root))
++    except ValueError:
++        return str(path)
++
++
+ def write_profile(source, destination, capacity_bytes):
+     parser = configparser.ConfigParser()
+     with source.open(encoding="utf-8") as stream:
+         parser.read_file(stream)
+     parser["model"]["aggregation_shard_capacity_bytes"] = str(capacity_bytes)
+     destination.parent.mkdir(parents=True, exist_ok=True)
+-    with destination.open("w", encoding="utf-8") as stream:
++    with destination.open("w", encoding="utf-8", newline="\n") as stream:
+         parser.write(stream)
+
+
+@@ -131,17 +139,26 @@ def main():
+     binary = resolve(root, args.binary)
+     source_profile = resolve(root, args.profile)
+     reference_path = resolve(root, args.reference)
++    workload_path = resolve(root, args.workloads)
+     output_dir = resolve(root, args.output_dir)
+     output_dir.mkdir(parents=True, exist_ok=True)
+     reference = paper_benchmark.load_json(reference_path)
++    workloads = paper_benchmark.load_json(workload_path)
++    partition_manifest = workloads["graph_partition"]
++    calibration_datasets = partition_manifest["calibration_datasets"]
++    holdout_datasets = partition_manifest["holdout_datasets"]
++    if set(args.datasets) != set(calibration_datasets + holdout_datasets):
++        raise ValueError("datasets must match the versioned calibration and hold-out split")
+
+     report = {
+         "schema_version": 1,
+-        "base_profile": str(source_profile.relative_to(root)),
++        "base_profile": display_path(root, source_profile),
+         "base_profile_sha256": paper_benchmark.sha256_digest(source_profile),
+-        "binary": str(binary.relative_to(root)),
++        "binary": display_path(root, binary),
+         "binary_sha256": paper_benchmark.sha256_digest(binary),
+         "datasets": args.datasets,
++        "workload_manifest": display_path(root, workload_path),
++        "workload_manifest_sha256": paper_benchmark.sha256_digest(workload_path),
+         "fixed_parameters": {
+             "physical_aggregation_buffer_bytes": 16 * 1024 * 1024,
+             "aggregation_ping_pong_regions": 2,
+@@ -214,8 +231,62 @@ def main():
+             ),
+         }
+
++    def dataset_pass(capacity_mib, datasets):
++        return all(
++            metric["pass"]
++            for dataset in datasets
++            for metric in report["capacities"][str(capacity_mib)]["per_dataset"][dataset].values()
++        )
++
++    def calibration_error(capacity_mib):
++        metrics = [
++            metric["relative_error"]
++            for dataset in calibration_datasets
++            for metric in report["capacities"][str(capacity_mib)]["per_dataset"][dataset].values()
++        ]
++        return sum(metrics) / len(metrics)
++
++    calibration_rows = {
++        str(capacity_mib): {
++            "all_required_pass": dataset_pass(capacity_mib, calibration_datasets),
++            "mean_relative_error": calibration_error(capacity_mib),
++        }
++        for capacity_mib in args.capacities_mib
++    }
++    passing = [
++        capacity_mib for capacity_mib in args.capacities_mib
++        if calibration_rows[str(capacity_mib)]["all_required_pass"]
++    ]
++    if not passing:
++        raise ValueError("no capacity passes the calibration datasets")
++    selected_capacity = min(
++        passing,
++        key=lambda value: (calibration_rows[str(value)]["mean_relative_error"], value),
++    )
++    configured_capacity = partition_manifest["aggregation_shard_capacity_bytes"] // (1024 * 1024)
++    if selected_capacity != configured_capacity:
++        raise ValueError(
++            f"calibration selects {selected_capacity} MiB but workload config uses "
++            f"{configured_capacity} MiB"
++        )
++    report["calibration"] = {
++        "datasets": calibration_datasets,
++        "selection_method": (
++            "among capacities passing every required Figure 15-16 calibration row, "
++            "select the minimum mean relative error; ties select the smaller capacity"
++        ),
++        "candidates": calibration_rows,
++        "selected_capacity_mib": selected_capacity,
++    }
++    report["holdout"] = {
++        "datasets": holdout_datasets,
++        "selected_capacity_mib": selected_capacity,
++        "all_required_pass": dataset_pass(selected_capacity, holdout_datasets),
++        "used_for_selection": False,
++    }
++
+     report_path = output_dir / "partition_sensitivity.json"
+-    with report_path.open("w", encoding="utf-8") as stream:
++    with report_path.open("w", encoding="utf-8", newline="\n") as stream:
+         json.dump(report, stream, indent=2, sort_keys=True)
+         stream.write("\n")
+     print(report_path)

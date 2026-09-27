@@ -1,0 +1,25 @@
+{
+  "all_output_features_128": true,
+  "all_selected_layer_0": true,
+  "binary_digests": [
+    "26d3224e2c0284d2"
+  ],
+  "calibration_datasets": [
+    "cora",
+    "citeseer"
+  ],
+  "calibration_selected_capacity_mib": 5,
+  "causality_violation_count": 0,
+  "holdout_all_required_pass": true,
+  "holdout_datasets": [
+    "pubmed"
+  ],
+  "parameter_recalibration": true,
+  "producer_dependent_request_count": 73766,
+  "raw_json_count": 21,
+  "required_metric_passes": 26,
+  "required_metric_rows": 26,
+  "source_git_commits": [
+    "3457f4016098"
+  ]
+}

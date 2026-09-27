@@ -1,0 +1,12 @@
+{
+  "binary_path": "build-review-v5-release-3457f40/hygcntest",
+  "binary_sha256": "5021edc233818f3c76859d74c1e021d2afd748a2e74a2ea0c8388a0f67058d4d",
+  "date": "2026-09-27",
+  "implementation_commit": "3457f4016098cf1960a446539a71b926845effd8",
+  "parameter_recalibration": true,
+  "raw_benchmark_json_count": 21,
+  "reference_manifest_sha256": "51a77b834d5b8b8c6d0729fe3fb2345d4ad4a4c0bf6aed97aecc964c06602d67",
+  "required_metric_rows": 26,
+  "schema_version": 1,
+  "workload_manifest_sha256": "60c5a3116a36344d4dd67ff0f678677fd7305465251f511f13914752adf43a0f"
+}

@@ -1,0 +1,3 @@
+external_input=/tmp/hygcn-review-v5/hygcntest
+display_path=/tmp/hygcn-review-v5/hygcntest
+status=PASS

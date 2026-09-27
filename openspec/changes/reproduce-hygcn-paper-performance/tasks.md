@@ -93,4 +93,4 @@
 - [x] 11.2 修正 FIFO 与 batch-class 为统一工作保持仲裁，在同一 ready-cycle 内验证 batch/class 与 open-row 优先级的增量贡献
 - [x] 11.3 删除 row-first 无来源双 bank striping，增加 optimized/mapping-only 增量与 row-hit required 门禁
 - [x] 11.4 显式区分 Cora/Citeseer calibration 与 PubMed hold-out，增加无来源时序和映射参数敏感性
-- [ ] 11.5 修复仓库外绝对 binary 路径，清理 evidence CRLF/行尾空白，并完成全量复跑、提交与推送
+- [x] 11.5 修复仓库外绝对 binary 路径，清理 evidence CRLF/行尾空白，并完成全量复跑、提交与推送
