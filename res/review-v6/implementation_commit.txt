@@ -1,0 +1,20 @@
+7ba361f (HEAD -> run/npu) close review v5 findings
+ configs/HYGCN_LEGACY.ini                           |   2 +
+ configs/HYGCN_PAPER.ini                            |   4 +-
+ configs/HYGCN_SMOKE.ini                            |   2 +
+ configs/paper_metrics.json                         |  40 ++-
+ configs/paper_workloads.json                       |  27 +-
+ docs/paper-reproduction.md                         |  13 +-
+ hygcn/paper_sim.cpp                                | 396 ++++++++++++++++-----
+ hygcn/paper_sim.h                                  |  16 +
+ hygcn_test/unit.cpp                                |  62 ++++
+ .../reproduce-hygcn-paper-performance/design.md    |  12 +-
+ .../specs/paper-performance-validation/spec.md     |   8 +-
+ .../reproduce-hygcn-paper-performance/tasks.md     |  11 +-
+ tools/model_sensitivity.py                         |  25 +-
+ tools/paper_benchmark.py                           | 157 ++++++++
+ tools/partition_sensitivity.py                     |  51 +--
+ tools/test_paper_benchmark.py                      |  28 +-
+ tools/validate_paper_metrics.py                    |  42 ++-
+ tools/validate_reference_metrics.py                |  21 +-
+ 18 files changed, 753 insertions(+), 164 deletions(-)

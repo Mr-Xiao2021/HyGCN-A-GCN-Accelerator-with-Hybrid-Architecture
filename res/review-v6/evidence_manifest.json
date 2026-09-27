@@ -1,0 +1,20 @@
+{
+  "artifact_directory": "res/review-v6",
+  "binary_sha256": "5de7d1b85250b715f6bea4d908565556c8537f3add36f82a9fdd7cd12c935eb6",
+  "ctest": "9/9 PASS",
+  "date": "2026-09-27",
+  "implementation_commit": "7ba361fa11896e470ccc4b0aa62c06313151924a",
+  "internal_check_rows": 12,
+  "internal_checks_passed": 12,
+  "legacy": "Cora/Citeseer PASS",
+  "manifest_binary_digest": "fb0868bb77ebc297",
+  "manifest_config_digest": "9db9fcd14e456d02",
+  "manifest_git_commit": "7ba361fa1189",
+  "model_sensitivity": "PASS; DRAMSim3 14/28/42 required baseline",
+  "openspec_strict": "PASS",
+  "paper_metric_rows": 14,
+  "paper_metrics_passed": 14,
+  "partition_sensitivity": "PASS; calibrated fit only; no independent hold-out",
+  "raw_benchmark_runs": 21,
+  "schema_version": 1
+}

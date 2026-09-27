@@ -1,0 +1,4 @@
+capacity_mib,all_paper_rows_pass,mean_relative_error,selection_role,independent_holdout_available
+4,False,0.116061660,diagnostic_candidate,False
+5,True,0.082753913,selected_calibrated_fit,False
+6,False,0.112843754,diagnostic_candidate,False

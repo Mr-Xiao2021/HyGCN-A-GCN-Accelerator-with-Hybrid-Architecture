@@ -1,0 +1,7 @@
+raw_runs=21
+source_commits=['7ba361fa1189']
+binary_digests=['fb0868bb77ebc297']
+config_digests=['9db9fcd14e456d02']
+producer_violations=0
+admission_violations=0
+formal_validation=PASS

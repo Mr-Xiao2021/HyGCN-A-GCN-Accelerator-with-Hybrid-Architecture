@@ -1,0 +1,24 @@
+{
+  "graph_partition": {
+    "aggregation_ping_pong_half_capacity_bytes": 8388608,
+    "aggregation_shard_capacity_bytes": 5242880,
+    "calibrated_fit_datasets": [
+      "cora",
+      "citeseer",
+      "pubmed"
+    ],
+    "candidate_capacities_mib": [
+      4,
+      5,
+      6
+    ],
+    "fit_disclosure": "Cora, Citeseer, and PubMed were all exposed before this version; the 5 MiB scheduler cap and the 14 paper rows are reported as a calibrated fit, not independent hold-out validation",
+    "historical_exposure": "Review v4 evaluated all three datasets at 4, 5, and 6 MiB before Review v5; no dataset in this repository remains unexposed for scheduler-cap selection",
+    "independent_holdout_datasets": [],
+    "policy": "fixed dataset-independent scheduler occupancy cap below one physical ping-pong half",
+    "source": "HyGCN Section 4.3.2 requires the destination interval and its aggregation results to fit the on-chip Aggregation Buffer; the paper does not publish the simulator's interval occupancy, so this request-level model reports the fixed scheduler cap separately from the 16 MiB physical capacity"
+  },
+  "internal_check_rows": 12,
+  "paper_metric_rows": 14,
+  "parameter_recalibration": true
+}

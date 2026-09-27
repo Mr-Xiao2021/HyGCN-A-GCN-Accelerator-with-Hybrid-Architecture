@@ -1,0 +1,10 @@
+{
+  "delayed_active_cycles": 62,
+  "delayed_active_utilization": 0.0967742,
+  "delayed_service_cycles": 152,
+  "delayed_wall_utilization": 0.0394737,
+  "immediate_active_cycles": 82,
+  "immediate_active_utilization": 0.0731707,
+  "immediate_service_cycles": 82,
+  "immediate_wall_utilization": 0.0731707
+}

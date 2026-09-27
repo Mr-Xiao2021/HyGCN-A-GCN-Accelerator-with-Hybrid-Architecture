@@ -1,0 +1,272 @@
+{
+  "citeseer": {
+    "address_mapping": "low-bits",
+    "changed_requests": [
+      {
+        "batch_id": 0,
+        "fifo_completion": 148,
+        "fifo_issue": 0,
+        "optimized_completion": 63,
+        "optimized_issue": 0,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 0
+      },
+      {
+        "batch_id": 1,
+        "fifo_completion": 338,
+        "fifo_issue": 105,
+        "optimized_completion": 82400,
+        "optimized_issue": 82336,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 1
+      },
+      {
+        "batch_id": 2,
+        "fifo_completion": 544,
+        "fifo_issue": 294,
+        "optimized_completion": 82447,
+        "optimized_issue": 82384,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 2
+      },
+      {
+        "batch_id": 3,
+        "fifo_completion": 715,
+        "fifo_issue": 500,
+        "optimized_completion": 82492,
+        "optimized_issue": 82431,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 3
+      },
+      {
+        "batch_id": 4,
+        "fifo_completion": 891,
+        "fifo_issue": 672,
+        "optimized_completion": 303586,
+        "optimized_issue": 82476,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 4
+      },
+      {
+        "batch_id": 5,
+        "fifo_completion": 1106,
+        "fifo_issue": 848,
+        "optimized_completion": 380282,
+        "optimized_issue": 303543,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 5
+      },
+      {
+        "batch_id": 6,
+        "fifo_completion": 1286,
+        "fifo_issue": 1063,
+        "optimized_completion": 453878,
+        "optimized_issue": 380218,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 6
+      },
+      {
+        "batch_id": 7,
+        "fifo_completion": 1513,
+        "fifo_issue": 1242,
+        "optimized_completion": 526136,
+        "optimized_issue": 453828,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 7
+      }
+    ],
+    "fifo_row_buffer_hits": 2326648,
+    "fifo_row_buffer_misses": 330919,
+    "optimized_row_buffer_hits": 2421517,
+    "optimized_row_buffer_misses": 236050,
+    "priority_reorders": 4488
+  },
+  "cora": {
+    "address_mapping": "low-bits",
+    "changed_requests": [
+      {
+        "batch_id": 0,
+        "fifo_completion": 454,
+        "fifo_issue": 0,
+        "optimized_completion": 171,
+        "optimized_issue": 0,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 0
+      },
+      {
+        "batch_id": 1,
+        "fifo_completion": 985,
+        "fifo_issue": 410,
+        "optimized_completion": 60731,
+        "optimized_issue": 60540,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 1
+      },
+      {
+        "batch_id": 2,
+        "fifo_completion": 1595,
+        "fifo_issue": 942,
+        "optimized_completion": 118047,
+        "optimized_issue": 60702,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 2
+      },
+      {
+        "batch_id": 0,
+        "fifo_completion": 1642,
+        "fifo_issue": 662,
+        "optimized_completion": 461,
+        "optimized_issue": 174,
+        "producer_sequence": 0,
+        "request_class": "input",
+        "sequence": 3
+      },
+      {
+        "batch_id": 0,
+        "fifo_completion": 2343,
+        "fifo_issue": 1599,
+        "optimized_completion": 708,
+        "optimized_issue": 442,
+        "producer_sequence": 0,
+        "request_class": "input",
+        "sequence": 4
+      },
+      {
+        "batch_id": 0,
+        "fifo_completion": 3047,
+        "fifo_issue": 2286,
+        "optimized_completion": 956,
+        "optimized_issue": 690,
+        "producer_sequence": 0,
+        "request_class": "input",
+        "sequence": 5
+      },
+      {
+        "batch_id": 0,
+        "fifo_completion": 3693,
+        "fifo_issue": 2963,
+        "optimized_completion": 1203,
+        "optimized_issue": 938,
+        "producer_sequence": 0,
+        "request_class": "input",
+        "sequence": 6
+      },
+      {
+        "batch_id": 0,
+        "fifo_completion": 4367,
+        "fifo_issue": 3650,
+        "optimized_completion": 1463,
+        "optimized_issue": 1186,
+        "producer_sequence": 0,
+        "request_class": "input",
+        "sequence": 7
+      }
+    ],
+    "fifo_row_buffer_hits": 654234,
+    "fifo_row_buffer_misses": 61032,
+    "optimized_row_buffer_hits": 690235,
+    "optimized_row_buffer_misses": 25031,
+    "priority_reorders": 593
+  },
+  "pubmed": {
+    "address_mapping": "low-bits",
+    "changed_requests": [
+      {
+        "batch_id": 0,
+        "fifo_completion": 1365,
+        "fifo_issue": 0,
+        "optimized_completion": 542,
+        "optimized_issue": 0,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 0
+      },
+      {
+        "batch_id": 1,
+        "fifo_completion": 3127,
+        "fifo_issue": 1321,
+        "optimized_completion": 145915,
+        "optimized_issue": 145405,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 1
+      },
+      {
+        "batch_id": 2,
+        "fifo_completion": 4467,
+        "fifo_issue": 3082,
+        "optimized_completion": 293559,
+        "optimized_issue": 145898,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 2
+      },
+      {
+        "batch_id": 3,
+        "fifo_completion": 5788,
+        "fifo_issue": 4424,
+        "optimized_completion": 439415,
+        "optimized_issue": 293542,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 3
+      },
+      {
+        "batch_id": 4,
+        "fifo_completion": 7157,
+        "fifo_issue": 5744,
+        "optimized_completion": 587861,
+        "optimized_issue": 439398,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 4
+      },
+      {
+        "batch_id": 5,
+        "fifo_completion": 8428,
+        "fifo_issue": 7092,
+        "optimized_completion": 737420,
+        "optimized_issue": 587845,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 5
+      },
+      {
+        "batch_id": 6,
+        "fifo_completion": 9748,
+        "fifo_issue": 8384,
+        "optimized_completion": 885796,
+        "optimized_issue": 737403,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 6
+      },
+      {
+        "batch_id": 7,
+        "fifo_completion": 10646,
+        "fifo_issue": 9704,
+        "optimized_completion": 1033699,
+        "optimized_issue": 885779,
+        "producer_sequence": null,
+        "request_class": "edge",
+        "sequence": 7
+      }
+    ],
+    "fifo_row_buffer_hits": 4153522,
+    "fifo_row_buffer_misses": 493364,
+    "optimized_row_buffer_hits": 4480256,
+    "optimized_row_buffer_misses": 166630,
+    "priority_reorders": 3508
+  }
+}

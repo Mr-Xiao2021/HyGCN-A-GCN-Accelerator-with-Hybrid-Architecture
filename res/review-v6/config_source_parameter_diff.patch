@@ -1,0 +1,1764 @@
+diff --git a/configs/HYGCN_LEGACY.ini b/configs/HYGCN_LEGACY.ini
+index 20c71cf..cfdac1a 100644
+--- a/configs/HYGCN_LEGACY.ini
++++ b/configs/HYGCN_LEGACY.ini
+@@ -22,8 +22,10 @@ hbm_channels = 8
+ hbm_banks_per_channel = 16
+ hbm_row_bytes = 2048
+ hbm_transaction_queue_entries_per_channel = 32
++hbm_command_queue_entries_per_bank = 8
+ hbm_row_hit_cycles = 12
+ hbm_row_miss_cycles = 28
++hbm_row_conflict_cycles = 42
+ edram_latency_cycles = 1
+ edram_transactions_per_cycle = 2
+
+diff --git a/configs/HYGCN_PAPER.ini b/configs/HYGCN_PAPER.ini
+index e0c4342..da01c97 100644
+--- a/configs/HYGCN_PAPER.ini
++++ b/configs/HYGCN_PAPER.ini
+@@ -22,8 +22,10 @@ hbm_channels = 8
+ hbm_banks_per_channel = 16
+ hbm_row_bytes = 2048
+ hbm_transaction_queue_entries_per_channel = 32
+-hbm_row_hit_cycles = 12
++hbm_command_queue_entries_per_bank = 8
++hbm_row_hit_cycles = 14
+ hbm_row_miss_cycles = 28
++hbm_row_conflict_cycles = 42
+ edram_latency_cycles = 2
+ edram_transactions_per_cycle = 2
+
+diff --git a/configs/HYGCN_SMOKE.ini b/configs/HYGCN_SMOKE.ini
+index b201e15..aa03015 100644
+--- a/configs/HYGCN_SMOKE.ini
++++ b/configs/HYGCN_SMOKE.ini
+@@ -22,8 +22,10 @@ hbm_channels = 4
+ hbm_banks_per_channel = 4
+ hbm_row_bytes = 1024
+ hbm_transaction_queue_entries_per_channel = 32
++hbm_command_queue_entries_per_bank = 8
+ hbm_row_hit_cycles = 8
+ hbm_row_miss_cycles = 20
++hbm_row_conflict_cycles = 28
+ edram_latency_cycles = 2
+ edram_transactions_per_cycle = 2
+
+diff --git a/configs/paper_metrics.json b/configs/paper_metrics.json
+index aabec5d..1f3eb3f 100644
+--- a/configs/paper_metrics.json
++++ b/configs/paper_metrics.json
+@@ -1,6 +1,6 @@
+ {
+-  "schema_version": 4,
+-  "reference_version": "hygcn-hpca2020-fig15-17-svg-digitized-v2",
++  "schema_version": 5,
++  "reference_version": "hygcn-hpca2020-fig15-17-svg-digitized-v3",
+   "tolerance": 0.20,
+   "datasets": ["cora", "citeseer", "pubmed"],
+   "digitization": {
+@@ -42,6 +42,7 @@
+   "metrics": {
+     "sparsity_speedup": {
+       "required": true,
++      "evidence_class": "paper_metric",
+       "validation": "per_dataset_relative_error",
+       "reference": {
+         "cora": 1.082102,
+@@ -55,6 +56,7 @@
+     },
+     "sparsity_ae_dram_ratio": {
+       "required": true,
++      "evidence_class": "paper_metric",
+       "validation": "per_dataset_relative_error",
+       "reference": {
+         "cora": 0.879502,
+@@ -68,6 +70,7 @@
+     },
+     "sparsity_input_dram_ratio": {
+       "required": false,
++      "evidence_class": "internal_diagnostic",
+       "validation": "diagnostic_only",
+       "unit": "ratio",
+       "aggregation": "per_dataset",
+@@ -76,6 +79,7 @@
+     },
+     "pipeline_speedup": {
+       "required": true,
++      "evidence_class": "paper_metric",
+       "validation": "per_dataset_relative_error",
+       "reference": {
+         "cora": 2.125024,
+@@ -89,6 +93,7 @@
+     },
+     "pipeline_dram_ratio": {
+       "required": true,
++      "evidence_class": "paper_metric",
+       "validation": "per_dataset_relative_error",
+       "reference": {
+         "cora": 0.501466,
+@@ -102,6 +107,7 @@
+     },
+     "priority_speedup": {
+       "required": false,
++      "evidence_class": "internal_diagnostic",
+       "validation": "diagnostic_only",
+       "unit": "x",
+       "aggregation": "arithmetic_mean_over_datasets",
+@@ -110,6 +116,7 @@
+     },
+     "priority_bandwidth_gain": {
+       "required": false,
++      "evidence_class": "internal_diagnostic",
+       "validation": "diagnostic_only",
+       "unit": "x",
+       "aggregation": "arithmetic_mean_over_datasets",
+@@ -118,17 +125,19 @@
+     },
+     "priority_incremental_speedup": {
+       "required": true,
++      "evidence_class": "internal_check",
+       "validation": "per_dataset_minimum",
+-      "reference_min": 0.9999,
++      "reference_min": 1.005,
+       "unit": "x",
+       "aggregation": "per_dataset",
+       "experiment_scope": "optimized divided by mapping-only on the same low-bits layout, expressed as mapping-only cycles / optimized cycles",
+-      "source": "Required non-regression gate for the isolated batch/class request assembly mechanism"
++      "source": "Required positive-effect gate for the isolated batch/class request assembly mechanism"
+     },
+     "priority_incremental_speedup_aggregate": {
+       "required": true,
++      "evidence_class": "internal_check",
+       "validation": "aggregate_minimum",
+-      "reference_min": 1.0005,
++      "reference_min": 1.005,
+       "unit": "x",
+       "aggregation": "arithmetic_mean_over_datasets",
+       "experiment_scope": "three-dataset arithmetic mean of optimized versus mapping-only speedup on low-bits layout",
+@@ -136,17 +145,19 @@
+     },
+     "priority_incremental_bandwidth_gain": {
+       "required": true,
++      "evidence_class": "internal_check",
+       "validation": "per_dataset_minimum",
+-      "reference_min": 0.9999,
++      "reference_min": 1.005,
+       "unit": "x",
+       "aggregation": "per_dataset",
+       "experiment_scope": "optimized divided by mapping-only effective HBM bandwidth over the complete memory-service interval",
+-      "source": "Required non-regression gate for the isolated batch/class request assembly mechanism"
++      "source": "Required positive-effect gate for the isolated batch/class request assembly mechanism"
+     },
+     "priority_incremental_bandwidth_gain_aggregate": {
+       "required": true,
++      "evidence_class": "internal_check",
+       "validation": "aggregate_minimum",
+-      "reference_min": 1.0005,
++      "reference_min": 1.005,
+       "unit": "x",
+       "aggregation": "arithmetic_mean_over_datasets",
+       "experiment_scope": "three-dataset arithmetic mean of optimized versus mapping-only complete-interval bandwidth gain",
+@@ -154,17 +165,19 @@
+     },
+     "priority_incremental_row_hit_ratio": {
+       "required": true,
++      "evidence_class": "internal_check",
+       "validation": "per_dataset_minimum",
+-      "reference_min": 1.0,
++      "reference_min": 1.03,
+       "unit": "ratio",
+       "aggregation": "per_dataset",
+       "experiment_scope": "optimized row-hit rate divided by mapping-only row-hit rate on the same low-bits layout",
+-      "source": "Required row-locality non-regression gate on the same low-bits address layout"
++      "source": "Required positive row-locality gate on the same low-bits address layout"
+     },
+     "priority_incremental_row_hit_ratio_aggregate": {
+       "required": true,
++      "evidence_class": "internal_check",
+       "validation": "aggregate_minimum",
+-      "reference_min": 1.01,
++      "reference_min": 1.05,
+       "unit": "ratio",
+       "aggregation": "arithmetic_mean_over_datasets",
+       "experiment_scope": "three-dataset arithmetic mean of optimized versus mapping-only row-hit ratio on the same low-bits layout",
+@@ -172,6 +185,7 @@
+     },
+     "mapping_speedup": {
+       "required": false,
++      "evidence_class": "internal_diagnostic",
+       "validation": "diagnostic_only",
+       "unit": "x",
+       "aggregation": "arithmetic_mean_over_datasets",
+@@ -180,6 +194,7 @@
+     },
+     "mapping_bandwidth_gain": {
+       "required": false,
++      "evidence_class": "internal_diagnostic",
+       "validation": "diagnostic_only",
+       "unit": "x",
+       "aggregation": "arithmetic_mean_over_datasets",
+@@ -188,6 +203,7 @@
+     },
+     "coordination_speedup": {
+       "required": true,
++      "evidence_class": "paper_metric",
+       "validation": "aggregate_relative_error",
+       "reference": 3.70,
+       "unit": "x",
+@@ -197,6 +213,7 @@
+     },
+     "coordination_bandwidth_gain": {
+       "required": true,
++      "evidence_class": "paper_metric",
+       "validation": "aggregate_relative_error",
+       "reference": 4.00,
+       "unit": "x",
+@@ -206,6 +223,7 @@
+     },
+     "coordination_active_bandwidth_gain": {
+       "required": false,
++      "evidence_class": "internal_diagnostic",
+       "validation": "diagnostic_only",
+       "unit": "x",
+       "aggregation": "arithmetic_mean_over_datasets",
+diff --git a/configs/paper_workloads.json b/configs/paper_workloads.json
+index e86dee1..b160e1a 100644
+--- a/configs/paper_workloads.json
++++ b/configs/paper_workloads.json
+@@ -1,6 +1,6 @@
+ {
+-  "schema_version": 2,
+-  "workload_version": "hygcn-hpca2020-table5-gcn-v2",
++  "schema_version": 3,
++  "workload_version": "hygcn-hpca2020-table5-gcn-v3",
+   "paper_source": "HyGCN HPCA 2020 Table 5 and Section 5.3",
+   "figures": {
+     "figure_15": {
+@@ -33,18 +33,22 @@
+     "aggregation_ping_pong_half_capacity_bytes": 8388608,
+     "policy": "fixed dataset-independent scheduler occupancy cap below one physical ping-pong half",
+     "source": "HyGCN Section 4.3.2 requires the destination interval and its aggregation results to fit the on-chip Aggregation Buffer; the paper does not publish the simulator's interval occupancy, so this request-level model reports the fixed scheduler cap separately from the 16 MiB physical capacity",
+-    "calibration_disclosure": "the capacity is selected using only Cora and Citeseer; PubMed is a hold-out and is not used for selection",
+-    "calibration_datasets": ["cora", "citeseer"],
+-    "holdout_datasets": ["pubmed"],
++    "fit_disclosure": "Cora, Citeseer, and PubMed were all exposed before this version; the 5 MiB scheduler cap and the 14 paper rows are reported as a calibrated fit, not independent hold-out validation",
++    "calibrated_fit_datasets": ["cora", "citeseer", "pubmed"],
++    "independent_holdout_datasets": [],
++    "historical_exposure": "Review v4 evaluated all three datasets at 4, 5, and 6 MiB before Review v5; no dataset in this repository remains unexposed for scheduler-cap selection",
+     "candidate_capacities_mib": [4, 5, 6]
+   },
+   "memory_ablation": {
+     "transaction_queue_entries_per_channel": 32,
+     "transaction_queue_source": "configs/HBM1_4Gb_x128.ini trans_queue_size=32; DRAMSim3 instantiates one controller per channel, so the request-level model applies the same bound to each channel's 64-byte block reorder window",
++    "command_queue_entries_per_bank": 8,
++    "command_queue_source": "configs/HBM1_4Gb_x128.ini cmd_queue_size=8; the request-level controller bounds each bank command queue to the same depth",
+     "coordinator_issue_blocks_per_cycle": 4,
+     "coordinator_issue_width_source": "derived from the paper profile peak interface width: floor(256 bytes/cycle divided by 64 bytes/block)",
+-    "coordinator_input_policy": "four-buffer round-robin FIFO with a derived four-block issue-width lookahead; batch/class/address assembly with same-row controller dispatch when priority is enabled",
++    "coordinator_input_policy": "four-buffer block-level round-robin FIFO for the paper's concurrent uncoordinated baseline; batch-by-batch Edge > Input > Weight > Output assembly with same batch/class open-row continuation when priority is enabled",
+     "coordinator_input_source": "HyGCN HPCA 2020 Figure 9 and Section 4.5.2 show concurrent Edge, Input, Weight, and Output buffer requests interleaved before the coordinator and assembled into continuous batch-local streams after priority sorting",
++    "admission_policy": "FIFO and batch-class share one global admission clock; at most four 64-byte blocks enter all channel transaction queues per paper cycle, and each channel remains bounded by trans_queue_size",
+     "priority_order_source": "HyGCN HPCA 2020 Section 4.5.2 executes requests batch-by-batch: all requests from the current batch, including its lower-priority classes, precede high-priority requests from the next batch",
+     "priority_baseline": "fifo",
+     "priority_optimized": "batch-class",
+@@ -53,7 +57,16 @@
+     "row_first_bank_interleave": 1,
+     "row_first_source": "configs/HBM1_4Gb_x128.ini selects address_mapping=rorabgbachco. The collapsed request-level baseline therefore keeps every contiguous row span in one bank; it does not add an unsupported adjacent-bank striping factor.",
+     "row_first_layout_basis": "one row-sized block span stays in one bank, then the collapsed mapping advances channel and bank fields in the order represented by rorabgbachco",
+-    "low_bits_source": "HyGCN HPCA 2020 Section 4.5.2: channel and bank identifiers use lower address bits"
++    "low_bits_source": "HyGCN HPCA 2020 Section 4.5.2: channel and bank identifiers use lower address bits",
++    "dram_timing": {
++      "config": "configs/HBM1_4Gb_x128.ini",
++      "source": "bundled DRAMSim3 HBM timing configuration",
++      "model_cycle_ns": "1 / architecture.frequency_ghz",
++      "row_hit_formula": "ceil(CL * tCK / model_cycle_ns)",
++      "row_miss_formula": "ceil((tRCDRD + CL) * tCK / model_cycle_ns)",
++      "row_conflict_formula": "ceil((tRP + tRCDRD + CL) * tCK / model_cycle_ns)",
++      "transfer_note": "burst/block transfer is modeled separately by transfer_cycles, so BL is not duplicated in row access latency"
++    }
+   },
+   "scope_limits": [
+     "GCN only",
+diff --git a/docs/paper-reproduction.md b/docs/paper-reproduction.md
+index c2a018f..f94c815 100644
+--- a/docs/paper-reproduction.md
++++ b/docs/paper-reproduction.md
+@@ -14,7 +14,7 @@
+ - Aggregation Buffer：按 ping-pong 半区形成合法分区，在 batch 时间线上执行 ready、consume、reclaim；容量不足会阻塞 AE，CE 完成后才释放空间。
+ - AE/CE 策略：sequential 等待 AE 阶段完成，再按每批真实 producer bytes 的 block 对齐值写回和读回；Read 与对应 Write 同地址并等待写完成。latency-aware 在合法 batch ready 后启动；energy-aware 累积到目标顶点数或容量边界。Output 仅在对应 CE group 完成后入队。
+ - 动态 Input 依赖：Input 请求由对应 Edge 请求完成和邻居索引 ready 延迟共同释放，不再静态预知未来请求；跨 batch 仲裁保留实际 producer-ready、enqueue、issue 和 completion trace。
+-- Memory Access Coordinator：priority 和 address mapping 是两个独立开关。映射前的四个 buffer port 并发提供 64B block；`fifo` 按 Edge、Input、Weight、Output 端口轮转，并只在 HBM 接口派生的 `floor(256B/cycle / 64B)=4` 个 issue-width 窗口内绕过 blocked channel；`batch-class` 按论文 §4.5.2 的 batch-by-batch 约束执行当前 batch 的全部类别，再进入下一 batch，并只在同 batch/class/row 内选择可接收 channel。事务随后进入每 channel 32-entry controller queue，该深度直接对应 `configs/HBM1_4Gb_x128.ini` 的 `trans_queue_size=32`；bank 侧延续同优先级 open row，不跨 RAW 或优先级组绕行。`low-bits` 按论文 §4.5.2 把低位映射到 channel/bank；`row-first` 按 DRAMSim3 的 `rorabgbachco` 保持一个完整 row span 位于同一 channel/bank，不再使用无来源的二路 bank striping。
++- Memory Access Coordinator：priority 和 address mapping 是两个独立开关。映射前的四个 buffer port 并发提供 64B block；`fifo` 按 Edge、Input、Weight、Output 端口逐 block 轮转，复现论文 §4.5.2 所述未协调并发访问的频繁地址切换；`batch-class` 按 batch-by-batch 约束执行 `Edge > Input > Weight > Output` 连续组装。两者共享一个全局 admission 时钟，每周期合计最多接收 `floor(256B/cycle / 64B)=4` 个 block。事务进入每 channel 32-entry transaction queue，再以每 bank 8-entry command queue 发往 bank；两个深度分别对应 `configs/HBM1_4Gb_x128.ini` 的 `trans_queue_size=32` 和 `cmd_queue_size=8`。priority bank 仲裁只在同 batch/class 内延续 open row，不跨 RAW 或优先级组绕行。`low-bits` 按论文 §4.5.2 把低位映射到 channel/bank；`row-first` 按 DRAMSim3 的 `rorabgbachco` 保持一个完整 row span 位于同一 channel/bank，不再使用无来源的二路 bank striping。
+ - AE-only：`--scope aggregation --layer 0` 固定同一图、同一层和同一 AE 工作量，只切换稀疏优化，不混入 Weight 预取、CE、Output、ping-pong 排程或中间流量。
+
+ ## 配置档
+@@ -43,7 +43,7 @@
+ - Fig. 16(a)/(b) 分别验收完整层周期加速和完整层 DRAM 比率。
+ - Fig. 17 的协调器平均 `3.70x` 加速和 `4.00x` 带宽提升按三数据集算术平均验收。
+ - required 带宽利用率使用从周期 0 到最后一个 HBM 请求 completion 的统一 memory-service 区间，包含等待 AE/CE producer 的空闲时间。in-flight request 区间并集另存为 `active_bandwidth_utilization`，只作诊断，因为 producer 延迟反例可使端到端吞吐下降而 active 利用率反升。
+-- 同一 low-bits mapping 上，optimized/mapping-only 的逐数据集周期和完整区间带宽只允许 `0.01%` 的尾部边界差异（`>=0.9999x`），三数据集平均必须显示 `>=1.0005x` 正增量；row-hit 逐数据集不得退化（`>=1.0x`），平均增量必须不低于 `1.01x`。
++- 同一 low-bits mapping 上，optimized/mapping-only 的逐数据集周期和完整区间带宽必须至少改善 `0.5%`（`>=1.005x`）；row-hit 逐数据集必须至少改善 `3%`（`>=1.03x`），三数据集平均至少改善 `5%`（`>=1.05x`）。这些是 12 项内部因果检查的一部分，不是论文外部指标。
+
+ 标量参考的相对误差为：
+
+@@ -58,11 +58,14 @@ abs(measured - reference) / abs(reference)
+ benchmark 报告包含 workload manifest SHA256、逐数据集原始结果、sequential producer-byte
+ oracle、priority issue/completion 反例、mapping channel/bank 分布，以及相对 review v3 的参数差异。
+ `parameter_recalibration` 由差异列表是否为空自动计算；机制修正不会被伪装成“配置未变化”。
+-5 MiB 图分区上限相对 review v3 的隐式 4 MiB 值会被报告为重标定；正式证据只用 Cora/Citeseer
+-执行 4/5/6 MiB calibration 选择，再单独报告未参与选择的 PubMed hold-out。该上限是调度占用而非物理容量声明。
+-未由论文公开的 neighbor-index 延迟和 HBM hit/miss 时序另做固定邻域敏感性；row-first=1 是
++5 MiB 图分区上限相对 review v3 的隐式 4 MiB 值会被报告为重标定。Cora、Citeseer 和 PubMed
++在 review v4 前均已暴露，因此当前 14/14 论文数值只声明为三数据集 calibrated fit，不声明独立 hold-out。
++partition sensitivity 继续报告 4/5/6 MiB，供读者判断拟合脆弱性；该上限是调度占用而非物理容量声明。
++HBM `14/28/42` 周期分别由 bundled DRAMSim3 HBM 的 `CL`、`tRCDRD`、`tRP` 和 `tCK` 推导；未由论文公开的 neighbor-index 延迟另做固定邻域敏感性。row-first=1 是
+ `rorabgbachco` 的 required 基线，interleave=2 只作为诊断反事实，不参与目标拟合。
+
++验收报告始终分开列出 `14` 项论文数值和 `12` 项内部因果检查，不以 `26/26` 表述扩大外部证据。
++
+ ```bash
+ python3 tools/partition_sensitivity.py \
+   --binary build/hygcntest \
+diff --git a/hygcn/paper_sim.cpp b/hygcn/paper_sim.cpp
+index 415e621..cbcbb6d 100644
+--- a/hygcn/paper_sim.cpp
++++ b/hygcn/paper_sim.cpp
+@@ -140,10 +140,13 @@ json ArchitectureJson(const ArchitectureConfig& architecture) {
+         {"hbm_row_bytes", architecture.hbm_row_bytes},
+         {"hbm_transaction_queue_entries_per_channel",
+          architecture.hbm_transaction_queue_entries_per_channel},
++        {"hbm_command_queue_entries_per_bank",
++         architecture.hbm_command_queue_entries_per_bank},
+         {"coordinator_issue_blocks_per_cycle",
+          CoordinatorIssueBlocksPerCycle(architecture)},
+         {"hbm_row_hit_cycles", architecture.hbm_row_hit_cycles},
+         {"hbm_row_miss_cycles", architecture.hbm_row_miss_cycles},
++        {"hbm_row_conflict_cycles", architecture.hbm_row_conflict_cycles},
+         {"edram_latency_cycles", architecture.edram_latency_cycles},
+         {"edram_transactions_per_cycle", architecture.edram_transactions_per_cycle},
+         {"simd_efficiency", architecture.simd_efficiency},
+@@ -179,6 +182,8 @@ json LayerJson(const LayerMetrics& layer) {
+             {"bytes", trace.bytes},
+             {"producer_ready_cycle", trace.producer_ready_cycle},
+             {"enqueue_cycle", trace.enqueue_cycle},
++            {"first_admission_cycle", trace.first_admission_cycle},
++            {"last_admission_cycle", trace.last_admission_cycle},
+             {"first_issue_cycle", trace.first_issue_cycle},
+             {"completion_cycle", trace.completion_cycle},
+             {"producer_sequence", trace.producer_sequence.has_value()
+@@ -195,12 +200,58 @@ json LayerJson(const LayerMetrics& layer) {
+             {"bytes", trace.bytes},
+             {"producer_ready_cycle", trace.producer_ready_cycle},
+             {"enqueue_cycle", trace.enqueue_cycle},
++            {"first_admission_cycle", trace.first_admission_cycle},
++            {"last_admission_cycle", trace.last_admission_cycle},
+             {"first_issue_cycle", trace.first_issue_cycle},
+             {"completion_cycle", trace.completion_cycle},
+             {"producer_sequence", trace.producer_sequence.has_value()
+                 ? json(*trace.producer_sequence) : json(nullptr)},
+         });
+     }
++    json admission_samples = json::array();
++    std::array<uint64_t, 5> admission_histogram{};
++    uint64_t admitted_blocks = 0;
++    uint64_t max_total_occupancy = 0;
++    uint64_t admission_checksum = 1469598103934665603ULL;
++    for (std::size_t index = 0; index < layer.transaction_admission_traces.size(); ++index) {
++        const auto& trace = layer.transaction_admission_traces[index];
++        if (trace.admitted_blocks < admission_histogram.size()) {
++            ++admission_histogram[trace.admitted_blocks];
++        }
++        admitted_blocks += trace.admitted_blocks;
++        max_total_occupancy = std::max(max_total_occupancy, trace.total_occupancy_after);
++        for (const uint64_t value : {trace.cycle, trace.admitted_blocks,
++                                     trace.total_occupancy_before,
++                                     trace.total_occupancy_after,
++                                     trace.max_channel_occupancy_after}) {
++            admission_checksum ^= value;
++            admission_checksum *= 1099511628211ULL;
++        }
++        if (index < 16 || index + 16 >= layer.transaction_admission_traces.size()) {
++            admission_samples.push_back({
++                {"cycle", trace.cycle},
++                {"admitted_blocks", trace.admitted_blocks},
++                {"total_occupancy_before", trace.total_occupancy_before},
++                {"total_occupancy_after", trace.total_occupancy_after},
++                {"max_channel_occupancy_after", trace.max_channel_occupancy_after},
++            });
++        }
++    }
++    json admission_summary = {
++        {"cycle_count", layer.transaction_admission_traces.size()},
++        {"first_cycle", layer.transaction_admission_traces.empty()
++            ? 0 : layer.transaction_admission_traces.front().cycle},
++        {"last_cycle", layer.transaction_admission_traces.empty()
++            ? 0 : layer.transaction_admission_traces.back().cycle},
++        {"admitted_blocks", admitted_blocks},
++        {"max_blocks_admitted_per_cycle", admission_histogram[4] > 0 ? 4 :
++            admission_histogram[3] > 0 ? 3 : admission_histogram[2] > 0 ? 2 : 1},
++        {"admitted_blocks_histogram", admission_histogram},
++        {"max_total_queue_occupancy", max_total_occupancy},
++        {"max_channel_queue_occupancy", layer.max_channel_queue_occupancy},
++        {"trace_checksum_fnv1a64", Hex64(admission_checksum)},
++        {"trace_samples", admission_samples},
++    };
+     json input_windows = json::array();
+     for (const auto& trace : layer.input_window_traces) {
+         input_windows.push_back({
+@@ -274,6 +325,7 @@ json LayerJson(const LayerMetrics& layer) {
+         {"input_window_requests", input_windows},
+         {"memory_requests", memory_requests},
+         {"producer_dependent_requests", producer_requests},
++        {"transaction_admission_trace", admission_summary},
+         {"channel_blocks", layer.channel_blocks},
+         {"bank_blocks", layer.bank_blocks},
+         {"simd_utilization", layer.simd_utilization},
+@@ -318,8 +370,12 @@ ArchitectureConfig ArchitectureConfig::Load(const std::string& path) {
+     config.hbm_row_bytes = reader.GetInteger("memory", "hbm_row_bytes", -1);
+     config.hbm_transaction_queue_entries_per_channel = reader.GetInteger(
+         "memory", "hbm_transaction_queue_entries_per_channel", -1);
++    config.hbm_command_queue_entries_per_bank = reader.GetInteger(
++        "memory", "hbm_command_queue_entries_per_bank", -1);
+     config.hbm_row_hit_cycles = reader.GetInteger("memory", "hbm_row_hit_cycles", -1);
+     config.hbm_row_miss_cycles = reader.GetInteger("memory", "hbm_row_miss_cycles", -1);
++    config.hbm_row_conflict_cycles = reader.GetInteger(
++        "memory", "hbm_row_conflict_cycles", -1);
+     config.edram_latency_cycles = reader.GetInteger("memory", "edram_latency_cycles", -1);
+     config.edram_transactions_per_cycle = reader.GetInteger("memory", "edram_transactions_per_cycle", -1);
+
+@@ -393,9 +449,13 @@ void ArchitectureConfig::Validate() const {
+                      "hbm_row_bytes");
+     require_positive(hbm_transaction_queue_entries_per_channel > 0,
+                      "hbm_transaction_queue_entries_per_channel");
++    require_positive(hbm_command_queue_entries_per_bank > 0,
++                     "hbm_command_queue_entries_per_bank");
+     require_positive(hbm_row_hit_cycles > 0, "hbm_row_hit_cycles");
+     require_positive(hbm_row_miss_cycles > hbm_row_hit_cycles,
+                      "hbm_row_miss_cycles");
++    require_positive(hbm_row_conflict_cycles > hbm_row_miss_cycles,
++                     "hbm_row_conflict_cycles");
+     require_positive(edram_latency_cycles >= 0, "edram_latency_cycles");
+     require_positive(edram_transactions_per_cycle > 0, "edram_transactions_per_cycle");
+     require_positive(simd_efficiency > 0.0 && simd_efficiency <= 1.0, "simd_efficiency");
+@@ -581,6 +641,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+     MemoryTimingResult result;
+     result.channel_blocks.assign(architecture.hbm_channels, 0);
+     result.bank_blocks.assign(architecture.hbm_banks_per_channel, 0);
++    result.max_channel_queue_occupancy.assign(architecture.hbm_channels, 0);
+     if (requests.empty()) {
+         return result;
+     }
+@@ -598,6 +659,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         uint64_t admitted_blocks = 0;
+         uint64_t issued_blocks = 0;
+         uint64_t first_issue = std::numeric_limits<uint64_t>::max();
++        uint64_t first_admission = std::numeric_limits<uint64_t>::max();
++        uint64_t last_admission = 0;
+         uint64_t completion = 0;
+         uint64_t effective_producer_ready = 0;
+         uint64_t effective_enqueue = 0;
+@@ -608,6 +671,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         uint64_t start_cycle = 0;
+         uint64_t producer_ready_cycle = 0;
+         uint64_t enqueue_cycle = 0;
++        uint64_t admission_cycle = std::numeric_limits<uint64_t>::max();
++        uint64_t controller_dispatch_cycle = std::numeric_limits<uint64_t>::max();
+         uint64_t admission_order = std::numeric_limits<uint64_t>::max();
+         uint64_t block = 0;
+         uint64_t block_offset = 0;
+@@ -777,8 +842,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+     };
+
+     auto future_after = [&](const Candidate& lhs, const Candidate& rhs) {
+-        if (lhs.enqueue_cycle != rhs.enqueue_cycle) {
+-            return lhs.enqueue_cycle > rhs.enqueue_cycle;
++        if (lhs.controller_dispatch_cycle != rhs.controller_dispatch_cycle) {
++            return lhs.controller_dispatch_cycle > rhs.controller_dispatch_cycle;
+         }
+         return priority_less(rhs, lhs);
+     };
+@@ -851,6 +916,9 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+     }
+     std::set<std::pair<std::size_t, uint64_t>> issued_candidates;
+     std::vector<std::size_t> outstanding_blocks(architecture.hbm_channels, 0);
++    std::vector<std::deque<Candidate>> controller_queues(architecture.hbm_channels);
++    std::vector<uint64_t> next_controller_dispatch_cycle(architecture.hbm_channels, 0);
++    std::vector<std::size_t> command_queue_occupancy(total_banks, 0);
+     std::size_t fifo_next_port = 0;
+     uint64_t next_admission_order = 0;
+
+@@ -870,11 +938,10 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         }
+         row->second.insert(candidate);
+     };
+-    auto enqueue_candidate = [&](Candidate candidate) {
+-        candidate.admission_order = next_admission_order++;
++    auto enqueue_bank_candidate = [&](Candidate candidate) {
+         const std::size_t flat_bank =
+             candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
+-        if (candidate.enqueue_cycle <= resource_ready(flat_bank)) {
++        if (candidate.controller_dispatch_cycle <= resource_ready(flat_bank)) {
+             push_available(bank_queues[flat_bank], candidate);
+         } else {
+             bank_queues[flat_bank].future.push(candidate);
+@@ -885,7 +952,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         auto& queue = bank_queues[flat_bank];
+         const uint64_t ready_cycle = resource_ready(flat_bank);
+         while (!queue.future.empty() &&
+-               queue.future.top().enqueue_cycle <= ready_cycle) {
++               queue.future.top().controller_dispatch_cycle <= ready_cycle) {
+             push_available(queue, queue.future.top());
+             queue.future.pop();
+         }
+@@ -917,7 +984,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+             }
+         } else if (!queue.future.empty()) {
+             choice.candidate = queue.future.top();
+-            choice.candidate.start_cycle = queue.future.top().enqueue_cycle;
++            choice.candidate.start_cycle = queue.future.top().controller_dispatch_cycle;
+             choice.valid = true;
+         }
+         return choice;
+@@ -988,94 +1055,195 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+             push_pending(make_candidate(index, 0), 0);
+         }
+     }
+-    auto fill_transaction_queue = [&](uint64_t visible_cycle,
+-                                      std::vector<bool>& affected_channels) {
+-        const std::size_t queue_capacity = static_cast<std::size_t>(
+-            architecture.hbm_transaction_queue_entries_per_channel);
+-        while (true) {
+-            promote_pending(visible_cycle);
+-            Candidate candidate;
+-            bool has_candidate = false;
+-            std::size_t selected_port = 0;
+-            PendingSet::iterator selected_pending;
+-            if (priority == MemoryPriorityMode::BATCH_CLASS) {
+-                if (!pending_priority.empty()) {
+-                    const auto& head = *pending_priority.begin();
+-                    const auto& head_request = states[head.request_index].request;
+-                    std::size_t scanned = 0;
+-                    for (auto iterator = pending_priority.begin();
+-                         iterator != pending_priority.end() && scanned < queue_capacity;
+-                         ++iterator, ++scanned) {
+-                        const auto& request = states[iterator->request_index].request;
+-                        if (request.batch_id != head_request.batch_id ||
+-                            request.request_class != head_request.request_class ||
+-                            iterator->row != head.row) {
+-                            break;
+-                        }
+-                        if (outstanding_blocks[iterator->channel] < queue_capacity) {
+-                            candidate = *iterator;
+-                            selected_pending = iterator;
+-                            has_candidate = true;
+-                            break;
+-                        }
+-                    }
+-                }
+-            } else {
+-                for (std::size_t distance = 0; distance < kCoordinatorPorts; ++distance) {
+-                    const std::size_t port =
+-                        (fifo_next_port + distance) % kCoordinatorPorts;
+-                    std::size_t scanned = 0;
+-                    for (auto iterator = pending_fifo_ports[port].begin();
+-                         iterator != pending_fifo_ports[port].end() &&
+-                             scanned < coordinator_issue_blocks;
+-                         ++iterator, ++scanned) {
+-                        if (outstanding_blocks[iterator->channel] < queue_capacity) {
+-                            candidate = *iterator;
+-                            selected_pending = iterator;
+-                            selected_port = port;
+-                            has_candidate = true;
+-                            break;
+-                        }
+-                    }
+-                    if (has_candidate) {
+-                        break;
+-                    }
+-                }
++    const std::size_t queue_capacity = static_cast<std::size_t>(
++        architecture.hbm_transaction_queue_entries_per_channel);
++    const std::size_t command_queue_capacity = static_cast<std::size_t>(
++        architecture.hbm_command_queue_entries_per_bank);
++    struct PendingChoice {
++        Candidate candidate;
++        std::size_t port = 0;
++        PendingSet::iterator iterator;
++        bool valid = false;
++    };
++    auto select_pending = [&]() {
++        PendingChoice choice;
++        if (priority == MemoryPriorityMode::BATCH_CLASS) {
++            if (pending_priority.empty()) {
++                return choice;
+             }
+-            if (has_candidate) {
+-                if (priority == MemoryPriorityMode::BATCH_CLASS) {
+-                    pending_priority.erase(selected_pending);
+-                } else {
+-                    pending_fifo_ports[selected_port].erase(selected_pending);
++            const auto& head = *pending_priority.begin();
++            const auto& head_request = states[head.request_index].request;
++            for (auto iterator = pending_priority.begin();
++                 iterator != pending_priority.end(); ++iterator) {
++                const auto& request = states[iterator->request_index].request;
++                if (request.batch_id != head_request.batch_id ||
++                    request.request_class != head_request.request_class ||
++                    iterator->row != head.row) {
++                    break;
+                 }
+-                enqueue_candidate(candidate);
+-                ++outstanding_blocks[candidate.channel];
+-                if (priority == MemoryPriorityMode::FIFO) {
+-                    fifo_next_port = (selected_port + 1) % kCoordinatorPorts;
+-                }
+-                affected_channels[candidate.channel] = true;
+-                auto& state = states[candidate.request_index];
+-                ++state.admitted_blocks;
+-                if (state.admitted_blocks < state.block_count) {
+-                    push_pending(make_candidate(candidate.request_index,
+-                                                state.admitted_blocks),
+-                                 visible_cycle);
++                if (outstanding_blocks[iterator->channel] < queue_capacity) {
++                    choice.candidate = *iterator;
++                    choice.iterator = iterator;
++                    choice.valid = true;
++                    return choice;
+                 }
++            }
++            return choice;
++        }
++        for (std::size_t distance = 0; distance < kCoordinatorPorts; ++distance) {
++            const std::size_t port = (fifo_next_port + distance) % kCoordinatorPorts;
++            if (pending_fifo_ports[port].empty()) {
+                 continue;
+             }
+-            const std::size_t total_outstanding = std::accumulate(
+-                outstanding_blocks.begin(), outstanding_blocks.end(), std::size_t{0});
+-            if (total_outstanding != 0) {
++            const auto iterator = pending_fifo_ports[port].begin();
++            if (outstanding_blocks[iterator->channel] >= queue_capacity) {
++                continue;
++            }
++            choice.candidate = *iterator;
++            choice.port = port;
++            choice.iterator = iterator;
++            choice.valid = true;
++            return choice;
++        }
++        return choice;
++    };
++    uint64_t next_admission_cycle = 0;
++    auto next_admission_event = [&]() -> std::optional<uint64_t> {
++        if (pending_available_count() != 0) {
++            return next_admission_cycle;
++        }
++        if (!pending_future.empty()) {
++            return std::max(next_admission_cycle,
++                            pending_future.top().enqueue_cycle);
++        }
++        return std::nullopt;
++    };
++    auto admit_transaction_blocks = [&](uint64_t cycle,
++                                        std::vector<bool>& affected_channels) {
++        promote_pending(cycle);
++        const std::size_t occupancy_before = std::accumulate(
++            outstanding_blocks.begin(), outstanding_blocks.end(), std::size_t{0});
++        std::size_t admitted = 0;
++        while (admitted < coordinator_issue_blocks) {
++            PendingChoice choice = select_pending();
++            if (!choice.valid) {
+                 break;
+             }
+-            if (pending_future.empty()) {
++            if (priority == MemoryPriorityMode::BATCH_CLASS) {
++                pending_priority.erase(choice.iterator);
++            } else {
++                pending_fifo_ports[choice.port].erase(choice.iterator);
++            }
++            Candidate candidate = choice.candidate;
++            if (priority == MemoryPriorityMode::FIFO) {
++                fifo_next_port = (choice.port + 1) % kCoordinatorPorts;
++            }
++            candidate.admission_cycle = cycle;
++            candidate.admission_order = next_admission_order++;
++            controller_queues[candidate.channel].push_back(candidate);
++            ++outstanding_blocks[candidate.channel];
++            auto& state = states[candidate.request_index];
++            state.first_admission = std::min(state.first_admission, cycle);
++            state.last_admission = std::max(state.last_admission, cycle);
++            ++state.admitted_blocks;
++            ++admitted;
++            if (state.admitted_blocks < state.block_count) {
++                push_pending(make_candidate(candidate.request_index,
++                                            state.admitted_blocks),
++                             cycle);
++            }
++        }
++        if (admitted != 0) {
++            TransactionAdmissionTrace trace;
++            trace.cycle = cycle;
++            trace.admitted_blocks = admitted;
++            trace.total_occupancy_before = occupancy_before;
++            trace.total_occupancy_after = std::accumulate(
++                outstanding_blocks.begin(), outstanding_blocks.end(), uint64_t{0});
++            trace.max_channel_occupancy_after = *std::max_element(
++                outstanding_blocks.begin(), outstanding_blocks.end());
++            for (std::size_t channel = 0; channel < outstanding_blocks.size(); ++channel) {
++                if (outstanding_blocks[channel] > queue_capacity) {
++                    throw std::runtime_error("transaction queue capacity exceeded");
++                }
++                result.max_channel_queue_occupancy[channel] = std::max<uint64_t>(
++                    result.max_channel_queue_occupancy[channel], outstanding_blocks[channel]);
++            }
++            result.admission_traces.push_back(std::move(trace));
++            next_admission_cycle = cycle + 1;
++        }
++        return admitted;
++    };
++    auto controller_choice = [&](std::size_t channel, uint64_t cycle) {
++        std::optional<std::size_t> selected;
++        const auto& queue = controller_queues[channel];
++        for (std::size_t index = 0; index < queue.size(); ++index) {
++            const auto& candidate = queue[index];
++            if (candidate.admission_cycle > cycle) {
++                continue;
++            }
++            const std::size_t flat_bank =
++                candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
++            if (command_queue_occupancy[flat_bank] < command_queue_capacity) {
++                selected = index;
+                 break;
+             }
+-            visible_cycle = pending_future.top().enqueue_cycle;
+         }
++        return selected;
++    };
++    auto next_controller_event = [&]() -> std::optional<uint64_t> {
++        std::optional<uint64_t> earliest;
++        for (std::size_t channel = 0; channel < controller_queues.size(); ++channel) {
++            const auto& queue = controller_queues[channel];
++            if (queue.empty()) {
++                continue;
++            }
++            uint64_t cycle = next_controller_dispatch_cycle[channel];
++            bool dispatchable = false;
++            for (const auto& candidate : queue) {
++                cycle = std::max(cycle, candidate.admission_cycle);
++                const std::size_t flat_bank =
++                    candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
++                if (command_queue_occupancy[flat_bank] < command_queue_capacity) {
++                    dispatchable = true;
++                    break;
++                }
++            }
++            if (dispatchable && (!earliest.has_value() || cycle < *earliest)) {
++                earliest = cycle;
++            }
++        }
++        return earliest;
++    };
++    auto dispatch_controllers = [&](uint64_t cycle,
++                                    std::vector<bool>& affected_channels) {
++        std::size_t dispatched = 0;
++        for (std::size_t channel = 0; channel < controller_queues.size(); ++channel) {
++            if (next_controller_dispatch_cycle[channel] > cycle) {
++                continue;
++            }
++            const auto selected = controller_choice(channel, cycle);
++            if (!selected.has_value()) {
++                continue;
++            }
++            auto& queue = controller_queues[channel];
++            Candidate candidate = queue[*selected];
++            queue.erase(queue.begin() + static_cast<std::ptrdiff_t>(*selected));
++            if (outstanding_blocks[channel] == 0) {
++                throw std::runtime_error("transaction queue occupancy underflow");
++            }
++            --outstanding_blocks[channel];
++            candidate.controller_dispatch_cycle = cycle;
++            const std::size_t flat_bank =
++                candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
++            ++command_queue_occupancy[flat_bank];
++            enqueue_bank_candidate(candidate);
++            affected_channels[channel] = true;
++            next_controller_dispatch_cycle[channel] = cycle + transfer_cycles;
++            ++dispatched;
++        }
++        return dispatched;
+     };
+-    std::vector<bool> initial_channels(architecture.hbm_channels, false);
+-    fill_transaction_queue(0, initial_channels);
+     for (std::size_t channel = 0; channel < channel_choices.size(); ++channel) {
+         recompute_channel(channel);
+     }
+@@ -1087,6 +1255,42 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+                 selected_choice = channel_choice;
+             }
+         }
++        const auto admission_event = next_admission_event();
++        const auto controller_event = next_controller_event();
++        const uint64_t bank_event = selected_choice.valid
++            ? selected_choice.candidate.start_cycle
++            : std::numeric_limits<uint64_t>::max();
++        const uint64_t controller_cycle = controller_event.value_or(
++            std::numeric_limits<uint64_t>::max());
++        if (admission_event.has_value() &&
++            *admission_event <= controller_cycle && *admission_event <= bank_event) {
++            std::vector<bool> affected_channels(architecture.hbm_channels, false);
++            const std::size_t admitted = admit_transaction_blocks(
++                *admission_event, affected_channels);
++            if (admitted != 0) {
++                for (std::size_t channel = 0; channel < affected_channels.size(); ++channel) {
++                    if (affected_channels[channel]) {
++                        recompute_channel(channel);
++                    }
++                }
++                continue;
++            }
++            next_admission_cycle = std::max(next_admission_cycle, *admission_event + 1);
++        }
++        if (controller_event.has_value() && *controller_event <= bank_event) {
++            std::vector<bool> affected_channels(architecture.hbm_channels, false);
++            const std::size_t dispatched = dispatch_controllers(
++                *controller_event, affected_channels);
++            if (dispatched == 0) {
++                throw std::runtime_error("controller dispatch event made no progress");
++            }
++            for (std::size_t channel = 0; channel < affected_channels.size(); ++channel) {
++                if (affected_channels[channel]) {
++                    recompute_channel(channel);
++                }
++            }
++            continue;
++        }
+         if (!selected_choice.valid) {
+             std::size_t bank_available = 0;
+             std::size_t bank_future = 0;
+@@ -1100,12 +1304,20 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+             }
+             const std::size_t total_outstanding = std::accumulate(
+                 outstanding_blocks.begin(), outstanding_blocks.end(), std::size_t{0});
++            const std::size_t controller_pending = std::accumulate(
++                controller_queues.begin(), controller_queues.end(), std::size_t{0},
++                [](std::size_t count, const auto& queue) { return count + queue.size(); });
++            const std::size_t command_pending = std::accumulate(
++                command_queue_occupancy.begin(), command_queue_occupancy.end(),
++                std::size_t{0});
+             throw std::runtime_error(
+                 "memory request dependency cycle: remaining=" +
+                 std::to_string(remaining_blocks) + " outstanding=" +
+                 std::to_string(total_outstanding) + " pending_available=" +
+                 std::to_string(pending_available_count()) + " pending_future=" +
+-                std::to_string(pending_future.size()) + " bank_available=" +
++                std::to_string(pending_future.size()) + " controller_pending=" +
++                std::to_string(controller_pending) + " command_pending=" +
++                std::to_string(command_pending) + " bank_available=" +
+                 std::to_string(bank_available) + " bank_future=" +
+                 std::to_string(bank_future) + " valid_channels=" +
+                 std::to_string(valid_channels));
+@@ -1125,6 +1337,10 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         } else {
+             selected_queue.future.pop();
+         }
++        if (command_queue_occupancy[selected_choice.flat_bank] == 0) {
++            throw std::runtime_error("command queue occupancy underflow");
++        }
++        --command_queue_occupancy[selected_choice.flat_bank];
+
+         auto& state = states[selected.request_index];
+         while (!active_fifo.empty() &&
+@@ -1147,9 +1363,11 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+             state.effective_enqueue, selected.enqueue_cycle);
+         state.first_issue = std::min(state.first_issue, selected.start_cycle);
+         const bool row_hit = bank_state.row_open && bank_state.open_row == selected.row;
++        const bool row_conflict = bank_state.row_open && !row_hit;
+         const uint64_t access_cycles = row_hit
+             ? architecture.hbm_row_hit_cycles
+-            : architecture.hbm_row_miss_cycles;
++            : row_conflict ? architecture.hbm_row_conflict_cycles
++                           : architecture.hbm_row_miss_cycles;
+         if (row_hit) {
+             ++result.row_buffer_hits;
+             ++result.row_buffer_hits_by_class[static_cast<std::size_t>(
+@@ -1167,7 +1385,6 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         state.completion = std::max(state.completion, completion);
+         ++state.issued_blocks;
+         issued_candidates.insert({selected.request_index, selected.block_offset});
+-        --outstanding_blocks[selected.channel];
+         --remaining_blocks;
+         ++result.channel_blocks[selected.channel];
+         ++result.bank_blocks[selected.bank];
+@@ -1179,7 +1396,6 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+                 push_pending(make_candidate(dependent, 0), selected.start_cycle);
+             }
+         }
+-        fill_transaction_queue(selected.start_cycle, affected_channels);
+         for (std::size_t channel = 0; channel < affected_channels.size(); ++channel) {
+             if (affected_channels[channel]) {
+                 recompute_channel(channel);
+@@ -1208,6 +1424,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+             request.address,
+             state.effective_producer_ready,
+             state.effective_enqueue,
++            state.first_admission,
++            state.last_admission,
+             state.first_issue,
+             state.completion,
+             request.sequence,
+@@ -1868,6 +2086,8 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+         metrics.channel_blocks = memory_timing.channel_blocks;
+         metrics.bank_blocks = memory_timing.bank_blocks;
+         metrics.memory_request_traces = memory_timing.request_traces;
++        metrics.transaction_admission_traces = memory_timing.admission_traces;
++        metrics.max_channel_queue_occupancy = memory_timing.max_channel_queue_occupancy;
+         metrics.aggregation_memory_cycles = std::max(
+             memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::EDGE)],
+             memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::INPUT)]);
+diff --git a/hygcn/paper_sim.h b/hygcn/paper_sim.h
+index add6995..82ff4d0 100644
+--- a/hygcn/paper_sim.h
++++ b/hygcn/paper_sim.h
+@@ -60,8 +60,10 @@ struct ArchitectureConfig {
+     int hbm_banks_per_channel = 0;
+     uint64_t hbm_row_bytes = 0;
+     int hbm_transaction_queue_entries_per_channel = 0;
++    int hbm_command_queue_entries_per_bank = 0;
+     int hbm_row_hit_cycles = 0;
+     int hbm_row_miss_cycles = 0;
++    int hbm_row_conflict_cycles = 0;
+     int edram_latency_cycles = 0;
+     int edram_transactions_per_cycle = 0;
+
+@@ -143,12 +145,22 @@ struct MemoryRequestTrace {
+     uint64_t address = 0;
+     uint64_t producer_ready_cycle = 0;
+     uint64_t enqueue_cycle = 0;
++    uint64_t first_admission_cycle = 0;
++    uint64_t last_admission_cycle = 0;
+     uint64_t first_issue_cycle = 0;
+     uint64_t completion_cycle = 0;
+     uint64_t sequence = 0;
+     std::optional<uint64_t> producer_sequence;
+ };
+
++struct TransactionAdmissionTrace {
++    uint64_t cycle = 0;
++    uint64_t admitted_blocks = 0;
++    uint64_t total_occupancy_before = 0;
++    uint64_t total_occupancy_after = 0;
++    uint64_t max_channel_occupancy_after = 0;
++};
++
+ struct InputWindowTrace {
+     int batch_id = 0;
+     int interval_start = 0;
+@@ -183,6 +195,8 @@ struct MemoryTimingResult {
+     std::array<uint64_t, kRequestClassCount> class_completion_cycles{};
+     std::map<int, std::array<uint64_t, kRequestClassCount>> batch_completion_cycles;
+     std::vector<MemoryRequestTrace> request_traces;
++    std::vector<TransactionAdmissionTrace> admission_traces;
++    std::vector<uint64_t> max_channel_queue_occupancy;
+     std::vector<uint64_t> channel_blocks;
+     std::vector<uint64_t> bank_blocks;
+ };
+@@ -326,6 +340,8 @@ struct LayerMetrics {
+     std::vector<InputWindowTrace> input_window_traces;
+     std::vector<MemoryRequestTrace> memory_request_traces;
+     std::vector<MemoryRequestTrace> producer_request_traces;
++    std::vector<TransactionAdmissionTrace> transaction_admission_traces;
++    std::vector<uint64_t> max_channel_queue_occupancy;
+     std::vector<uint64_t> channel_blocks;
+     std::vector<uint64_t> bank_blocks;
+     double simd_utilization = 0.0;
+diff --git a/hygcn_test/unit.cpp b/hygcn_test/unit.cpp
+index 53ad4bc..43b0a2d 100644
+--- a/hygcn_test/unit.cpp
++++ b/hygcn_test/unit.cpp
+@@ -10,6 +10,7 @@
+ #include <vector>
+
+ #include "dataflow/event.h"
++#include "configuration.h"
+ #include "hardware/spm.h"
+ #include "paper_sim.h"
+
+@@ -96,6 +97,17 @@ void TestConfig() {
+           "paper profile derives four 64-byte coordinator issues per cycle");
+     Check(std::abs(paper.HbmBytesPerCycle() - 256.0) < 1e-9,
+           "paper profile exposes 256 bytes per cycle HBM bandwidth");
++    const dramsim3::Config dram_config("configs/HBM1_4Gb_x128.ini", ".");
++    const auto paper_cycles = [&](double dram_cycles) {
++        return static_cast<int>(std::ceil(
++            dram_cycles * dram_config.tCK * paper.frequency_ghz));
++    };
++    Check(paper.hbm_row_hit_cycles == paper_cycles(dram_config.CL) &&
++              paper.hbm_row_miss_cycles ==
++                  paper_cycles(dram_config.tRCDRD + dram_config.CL) &&
++              paper.hbm_row_conflict_cycles == paper_cycles(
++                  dram_config.tRP + dram_config.tRCDRD + dram_config.CL),
++          "paper HBM hit/miss/conflict timing is derived from the DRAMSim3 HBM config");
+
+     auto invalid = paper;
+     invalid.num_simd = 0;
+@@ -420,6 +432,54 @@ void TestCoordinator() {
+               << dynamic_priority.priority_reorders << "}\n";
+ }
+
++void TestTransactionAdmissionBandwidth() {
++    auto config = ArchitectureConfig::Load("configs/HYGCN_PAPER.ini");
++    config.hbm_channels = 4;
++    config.hbm_banks_per_channel = 1;
++    config.hbm_transaction_queue_entries_per_channel = 2;
++    config.hbm_row_bytes = 256;
++    config.row_first_bank_interleave = 1;
++    config.Validate();
++    const std::vector<MemoryRequest> requests = {
++        {0, RequestClass::EDGE, 256, 0, 0, 0},
++        {0, RequestClass::INPUT, 256, 256, 0, 1},
++        {0, RequestClass::WEIGHT, 256, 512, 0, 2},
++        {0, RequestClass::OUTPUT, 256, 768, 0, 3},
++    };
++    for (const auto priority : {MemoryPriorityMode::FIFO,
++                                MemoryPriorityMode::BATCH_CLASS}) {
++        const auto timing = MemoryCoordinatorModel::Simulate(
++            requests, config, priority, AddressMappingMode::LOW_BITS);
++        uint64_t admitted_blocks = 0;
++        uint64_t previous_cycle = 0;
++        bool first = true;
++        for (const auto& trace : timing.admission_traces) {
++            Check(trace.admitted_blocks > 0 && trace.admitted_blocks <= 4,
++                  "four coordinator ports admit at most four blocks per cycle");
++            Check(first || trace.cycle > previous_cycle,
++                  "transaction admission cycles are unique and increasing");
++            Check(trace.total_occupancy_after <= 8 &&
++                      trace.max_channel_occupancy_after <= 2,
++                  "shared admission preserves every channel queue capacity");
++            admitted_blocks += trace.admitted_blocks;
++            previous_cycle = trace.cycle;
++            first = false;
++        }
++        Check(admitted_blocks == 16,
++              "admission trace accounts for every 64-byte block");
++        Check(timing.max_channel_queue_occupancy.size() == 4 &&
++                  *std::max_element(timing.max_channel_queue_occupancy.begin(),
++                                    timing.max_channel_queue_occupancy.end()) <= 2,
++              "per-channel peak occupancy remains within the shared queue capacity");
++        for (const auto& trace : timing.request_traces) {
++            Check(trace.first_admission_cycle >= trace.enqueue_cycle &&
++                      trace.last_admission_cycle >= trace.first_admission_cycle &&
++                      trace.first_issue_cycle >= trace.first_admission_cycle,
++                  "request issue follows enqueue and bounded transaction admission");
++        }
++    }
++}
++
+ void TestMemoryServiceBandwidthScope() {
+     auto config = ArchitectureConfig::Load("configs/HYGCN_SMOKE.ini");
+     config.hbm_channels = 1;
+@@ -823,6 +883,8 @@ int main() {
+         RunNamedTest("systolic_model", TestSystolicModel);
+         RunNamedTest("hbm_layout_mapping", TestHbmLayoutAndMapping);
+         RunNamedTest("coordinator_ordering", TestCoordinator);
++        RunNamedTest("V5_01_transaction_admission_bandwidth",
++                     TestTransactionAdmissionBandwidth);
+         RunNamedTest("V4_01_memory_service_bandwidth_scope", TestMemoryServiceBandwidthScope);
+         RunNamedTest("F02_fragmentation_invariance", TestFragmentationInvariant);
+         RunNamedTest("aggregation_buffer", TestAggregationBuffer);
+diff --git a/openspec/changes/reproduce-hygcn-paper-performance/design.md b/openspec/changes/reproduce-hygcn-paper-performance/design.md
+index cb7d5ec..6698d77 100644
+--- a/openspec/changes/reproduce-hygcn-paper-performance/design.md
++++ b/openspec/changes/reproduce-hygcn-paper-performance/design.md
+@@ -55,7 +55,7 @@
+
+ ### 5. Coordinator 使用 batch 仲裁、低位交织映射和请求级 HBM 时序
+
+-每个 DRAM 请求携带 batch ID、请求类别、地址、字节数、producer sequence、producer-ready 与入队周期。Input 由对应 Edge completion 加邻居索引延迟动态释放。模型把请求推进为统一 64B block 流，保证同一地址/事务序列的完成时间不依赖上层请求切分。映射前，FIFO 轮转 Edge、Input、Weight、Output 四个并发端口，只在由峰值接口宽度派生的四 block issue window 内绕过 blocked channel；batch-class 按 batch、类别和地址组装，并只在同 batch/class/row 内利用 controller 可接收项。事务进入 DRAMSim3 HBM `trans_queue_size=32` 对应的每 channel/controller 有限队列后，bank 侧只延续同优先级 open row，不跨 RAW、batch 或 class 组绕行。priority 与 mapping 独立；low-bits 对应论文 §4.5.2；row-first 直接折叠 `rorabgbachco`，一个 row span 不再使用无来源的二路 bank striping。
++每个 DRAM 请求携带 batch ID、请求类别、地址、字节数、producer sequence、producer-ready 与入队周期。Input 由对应 Edge completion 加邻居索引延迟动态释放。模型把请求推进为统一 64B block 流，保证同一地址/事务序列的完成时间不依赖上层请求切分。映射前，FIFO 逐 block 轮转 Edge、Input、Weight、Output 四个并发端口，复现论文所述未协调访问的频繁地址切换；batch-class 按 batch 和 `Edge > Input > Weight > Output` 组装连续流。两者共享全局四 block/cycle admission 带宽、每 channel 32-entry transaction queue 和每 bank 8-entry command queue，两个容量直接来自 bundled DRAMSim3 HBM 的 `trans_queue_size` 与 `cmd_queue_size`。bank 侧只在同 batch/class 内延续 open row，不跨 RAW 或优先级组绕行。priority 与 mapping 独立；low-bits 对应论文 §4.5.2；row-first 直接折叠 `rorabgbachco`，一个 row span 不再使用无来源的二路 bank striping。
+
+ 该规则对应论文“当前批次低优先级请求先于后续批次高优先级请求”的描述，避免现有全局严格优先级造成跨批次饥饿。
+
+@@ -69,16 +69,16 @@
+
+ required `bandwidth_util` 使用从周期 0 到最后一个请求 completion 的统一 memory-service 区间，包含 producer-idle。in-flight request 区间并集单独输出为 active diagnostic；反例测试要求 producer 延迟导致端到端利用率下降时，active 指标可保持不变或反升而不得用于验收。
+
+-参考清单保存 Fig. 15/16 arXiv SVG 的 URL、SHA256、坐标提取方法和逐数据集柱值；Fig. 17 使用论文正文给出的跨数据集平均值。版本化 workload manifest 将 Fig. 15-17 固定到 Table 5 的 GCN layer 0（dataset feature width → 128），排除未映射到论文的 `128 → num_class` 分类层。Fig. 15 使用 AE-only scope；Fig. 16 使用完整 layer-0 执行；Fig. 17 combined 按正文平均值验收，priority-only 和 mapping-only 作为因果诊断。
++参考清单保存 Fig. 15/16 arXiv SVG 的 URL、SHA256、坐标提取方法和逐数据集柱值；Fig. 17 使用论文正文给出的跨数据集平均值。版本化 workload manifest 将 Fig. 15-17 固定到 Table 5 的 GCN layer 0（dataset feature width → 128），排除未映射到论文的 `128 → num_class` 分类层。Fig. 15 使用 AE-only scope；Fig. 16 使用完整 layer-0 执行；Fig. 17 combined 按正文平均值验收，priority-only 和 mapping-only 用于因果分解。报告固定区分 14 项论文数值与 12 项内部因果检查，不把后者计入论文指标数量。
+
+ 绝对周期仍被记录并用于回归，但没有可靠论文绝对值时不作为论文验收门槛。
+
+ ### 7. 区分结构参数与时序参数
+
+-结构参数来自论文，不允许基准脚本修改。论文未给出的 HBM row hit/miss 延迟、row 大小、channel/bank 数、请求释放延迟、ping-pong 区数和图分区调度占用上限集中在配置中，具有明确单位并写入运行清单。物理 16 MiB Aggregation Buffer 与低于单个 8 MiB 半区的 scheduler shard cap 分别记录，后者不得伪装成物理容量。基准报告从版本化 review v3 参数基线自动生成 config/source diff；`parameter_recalibration` 不得硬编码。priority/mapping 不得选择预设效率，流水开关不得选择固定重叠率，sequential 不得使用经验 spill 系数。
++结构参数来自论文，不允许基准脚本修改。HBM row hit/miss/conflict 延迟由 bundled DRAMSim3 HBM 配置中的 `CL`、`tRCDRD`、`tRP` 与 `tCK` 推导；row 大小、channel/bank 数、请求释放延迟、ping-pong 区数和图分区调度占用上限集中在配置中，具有明确单位并写入运行清单。物理 16 MiB Aggregation Buffer 与低于单个 8 MiB 半区的 scheduler shard cap 分别记录，后者不得伪装成物理容量。基准报告从版本化 review v3 参数基线自动生成 config/source diff；`parameter_recalibration` 不得硬编码。priority/mapping 不得选择预设效率，流水开关不得选择固定重叠率，sequential 不得使用经验 spill 系数。
+
+ 禁止在结果生成阶段乘全局“论文修正系数”或按数据集写特例。Cora、Citeseer、PubMed 必须使用同一结构和时序参数执行成对消融。
+-如果调度占用上限相对验收基线变化，正式证据必须只用 Cora/Citeseer calibration 选择邻近值，并把 PubMed 作为未参与选择的 hold-out。未公开的 producer 延迟和 HBM hit/miss 时序必须保留固定邻域敏感性；替代 row-first interleave 只能作为诊断，不得替换有外部配置依据的 required 基线。
++如果调度占用上限相对验收基线变化，正式证据必须披露所有历史暴露。由于 Cora、Citeseer、PubMed 均已用于 4/5/6 MiB 比较，当前结果只能标记为 calibrated fit，不得回溯性声明 hold-out。未公开的 producer 延迟必须保留固定邻域敏感性；DRAMSim3 派生时序也保留相邻 profile 反事实。替代 row-first interleave 只能作为诊断，不得替换有外部配置依据的 required 基线。
+
+ ### 8. 参数化 CLI 与结构化输出
+
+@@ -99,7 +99,7 @@ required `bandwidth_util` 使用从周期 0 到最后一个请求 completion 的
+ - [论文图表缺少原始数值表] → 使用版本化 SVG 坐标数字化逐柱参考，保存原图 URL、SHA256、坐标和提取方法；正文平均值仍按声明聚合规则验收。
+ - [请求级模型与论文 Ramulator 存在精度差异] → 固定并记录 channel/bank/row 与延迟参数，报告明确标记为请求级复现；后续可用 DRAMSim3/Ramulator trace 对照校准时序参数。
+ - [模块级组合模型低估细粒度冲突] → 将模块占用、tile、填充和写回分别计数，并用单元测试覆盖边界矩阵尺寸。
+-- [为满足指标而过拟合三个数据集] → 限制可校准参数、保留 PubMed 验证集、同时报告逐数据集和平均结果。
++- [为满足指标而过拟合三个数据集] → 限制可校准参数、明确三数据集均为 calibrated fit、报告 partition/model sensitivity，并禁止将任何已暴露数据集重新标记为 hold-out。
+ - [完整配置运行时间较长] → 默认测试使用 smoke 配置，完整论文套件显式触发并支持按实验缓存。
+ - [GraphSAGE/GIN 当前语义不完整] → 不纳入第一阶段强制 ±20% 验收，先通过操作类型和输入完整性测试再升级其声明。
+
+@@ -109,5 +109,5 @@ required `bandwidth_util` 使用从周期 0 到最后一个请求 completion 的
+ 2. 引入配置/CLI/结构化输出，不改变核心周期模型，确保现有 GCN Cora 可继续运行。
+ 3. 修复流量、地址和统计错误，增加对应单元测试。
+ 4. 分别升级 AE 分区与稀疏、CE 模块集群、Aggregation Buffer 流水和 Coordinator 仲裁，每阶段运行 smoke 回归。
+-5. 加入论文配置和成对消融工具，先在 Cora/Citeseer 校准，再用 PubMed 验证。
++5. 加入论文配置和成对消融工具；保存所有校准历史，已暴露数据集不得作为独立验证集。
+ 6. 当全部强制指标通过后，生成最终验收报告；若出现回归，可切回 legacy 配置和旧调度策略定位差异。
+diff --git a/openspec/changes/reproduce-hygcn-paper-performance/specs/paper-performance-validation/spec.md b/openspec/changes/reproduce-hygcn-paper-performance/specs/paper-performance-validation/spec.md
+index 8598282..1a732d7 100644
+--- a/openspec/changes/reproduce-hygcn-paper-performance/specs/paper-performance-validation/spec.md
++++ b/openspec/changes/reproduce-hygcn-paper-performance/specs/paper-performance-validation/spec.md
+@@ -25,7 +25,7 @@
+ - **THEN** 两次结构化结果中的确定性指标完全一致
+
+ ### Requirement: 论文参考指标清单
+-系统 SHALL 维护版本化的论文参考指标清单，记录指标名称、论文章节或图号、参考值、单位、聚合方式、实验 scope、是否强制和容差。Fig. 15/16 MUST 保存 arXiv SVG 来源 URL、SHA256、坐标提取方法和 Cora/Citeseer/PubMed 的逐数据集柱值，并按逐数据集标量验收；协调器平均 73% 时间下降（约 3.70×）和平均 4.00× 带宽提升 MUST 作为聚合指标。Fig. 15(b) MUST 验收 AE 的 Edge+Input 总 DRAM 比率；Input-only 比率 MUST 标记为诊断项，不得代替论文指标参与门禁。
++系统 SHALL 维护版本化的论文参考指标清单，记录指标名称、论文章节或图号、参考值、单位、聚合方式、实验 scope、是否强制和容差。Fig. 15/16 MUST 保存 arXiv SVG 来源 URL、SHA256、坐标提取方法和 Cora/Citeseer/PubMed 的逐数据集柱值，并按逐数据集标量验收；协调器平均 73% 时间下降（约 3.70×）和平均 4.00× 带宽提升 MUST 作为聚合指标。Fig. 15(b) MUST 验收 AE 的 Edge+Input 总 DRAM 比率；Input-only 比率 MUST 标记为诊断项，不得代替论文指标参与门禁。报告 MUST 固定区分 14 项论文数值与 12 项内部因果检查，不得以合计通过数扩大外部证据。
+
+ #### Scenario: 加载参考指标
+ - **WHEN** 论文验收工具启动
+@@ -62,7 +62,7 @@
+
+ #### Scenario: 协调器分解消融
+ - **WHEN** 验收 Fig. 17
+-- **THEN** 报告 priority-only、mapping-only 和 combined 三组结果，分别保持非目标机制不变，并保存同一 low-bits mapping 上 optimized/mapping-only 的请求 timeline、各类别 row hit/miss 与 mapping channel/bank 分布；逐数据集周期和完整区间带宽 MUST 位于显式的 `0.01%` 尾部边界容差内，row-hit MUST 不退化，三数据集平均 MUST 显示正增量
++- **THEN** 报告 priority-only、mapping-only 和 combined 三组结果，分别保持非目标机制不变，并保存同一 low-bits mapping 上 optimized/mapping-only 的请求 timeline、各类别 row hit/miss 与 mapping channel/bank 分布；逐数据集周期和完整区间带宽增量 MUST 至少为 `1.005x`，逐数据集 row-hit 增量 MUST 至少为 `1.03x`，三数据集平均 row-hit 增量 MUST 至少为 `1.05x`
+
+ #### Scenario: 带宽与总执行时间解耦
+ - **WHEN** 请求时间线包含等待 AE/CE producer 且没有 HBM 请求在途的空闲区间
+@@ -77,11 +77,13 @@
+
+ #### Scenario: 图分区占用上限重标定
+ - **WHEN** scheduler shard cap 相对上一验收基线变化
+-- **THEN** 报告将其与物理 Aggregation Buffer 容量分开记录，只用 Cora/Citeseer 选择 calibration 点，并把 PubMed 作为未参与选择的 hold-out；未公开时序和替代 mapping 参数另存诊断敏感性
++- **THEN** 报告将其与物理 Aggregation Buffer 容量分开记录，并披露 Cora/Citeseer/PubMed 均已参与历史 4/5/6 MiB 比较，14 项论文数值标记为 calibrated fit 而非独立 hold-out；DRAMSim3 派生时序、未公开 producer 延迟和替代 mapping 参数另存诊断敏感性
+
+ ### Requirement: 因果与请求切分不变量
+ 同一有序 block 流的内存完成时间、row hit/miss 和 channel/bank 事务计数 MUST 不受上层请求切分影响。Output 请求 MUST 在对应 CE producer-ready 后入队；Intermediate Read MUST 访问对应 Write 的同一地址和字节范围，并等待该 Write 完成。已经进入请求级时间线的 intermediate 流量 MUST NOT 再以解析延迟重复计时。
+
++FIFO 与 batch-class MUST 共享全局 transaction admission 带宽和 queue capacity。四个 buffer port 每个模型周期合计进入所有 channel transaction queue 的 block 数 MUST 不超过由论文 HBM 接口宽度派生的 4；每 channel transaction queue 和每 bank command queue MUST 分别受 bundled DRAMSim3 `trans_queue_size=32` 与 `cmd_queue_size=8` 约束，并保存 admission cycle 与 occupancy trace。
++
+ #### Scenario: 请求切分反例
+ - **WHEN** 同一 128 个连续 block 分别封装为一个请求和 128 个请求
+ - **THEN** 两次模拟的完成周期、row hit/miss、channel 和 bank 事务计数完全一致
+diff --git a/openspec/changes/reproduce-hygcn-paper-performance/tasks.md b/openspec/changes/reproduce-hygcn-paper-performance/tasks.md
+index 816bc8d..2b3edf7 100644
+--- a/openspec/changes/reproduce-hygcn-paper-performance/tasks.md
++++ b/openspec/changes/reproduce-hygcn-paper-performance/tasks.md
+@@ -92,5 +92,14 @@
+ - [x] 11.1 将 Fig. 17 required 带宽改为完整 memory-service 区间，active-interval 仅作诊断，并增加 producer-idle 反例
+ - [x] 11.2 修正 FIFO 与 batch-class 为统一工作保持仲裁，在同一 ready-cycle 内验证 batch/class 与 open-row 优先级的增量贡献
+ - [x] 11.3 删除 row-first 无来源双 bank striping，增加 optimized/mapping-only 增量与 row-hit required 门禁
+-- [x] 11.4 显式区分 Cora/Citeseer calibration 与 PubMed hold-out，增加无来源时序和映射参数敏感性
++- [x] 11.4 当时区分 Cora/Citeseer calibration 与 PubMed hold-out；review v5 发现历史暴露后由 12.4 纠正，并保留时序和映射参数敏感性
+ - [x] 11.5 修复仓库外绝对 binary 路径，清理 evidence CRLF/行尾空白，并完成全量复跑、提交与推送
++
++## 12. Review v5 admission、校准声明与时序依据整改
++
++- [x] 12.1 为 FIFO 与 batch-class 增加统一全局 admission 时钟，严格限制四端口合计每周期最多 4 个 block，并保存 admission cycle、总占用和每 channel 峰值 trace
++- [x] 12.2 将每 channel transaction queue 与每 bank command queue 分别绑定 DRAMSim3 `trans_queue_size=32` 和 `cmd_queue_size=8`，补充容量与因果单测
++- [x] 12.3 恢复论文 §4.5.2 的四端口并发 FIFO 与 batch-by-batch `Edge > Input > Weight > Output` 组装，在同一 low-bits mapping 上建立周期、带宽、row-hit 和 issue/completion 反例门禁
++- [x] 12.4 取消 PubMed hold-out 声明，将三数据集 14 项论文数值标记为 calibrated fit，并继续输出 4/5/6 MiB partition sensitivity
++- [x] 12.5 从 bundled DRAMSim3 HBM 推导 14/28/42 row hit/miss/conflict 时序，保留相邻 timing profile 与 mapping 反事实敏感性
++- [x] 12.6 将验收报告固定拆分为 14 项论文数值与 12 项内部因果检查，不以 26/26 扩大外部证据
+diff --git a/tools/model_sensitivity.py b/tools/model_sensitivity.py
+index b7ecab2..545abb5 100644
+--- a/tools/model_sensitivity.py
++++ b/tools/model_sensitivity.py
+@@ -18,10 +18,17 @@ SCENARIOS = {
+     "dram_timing_fast": {
+         ("memory", "hbm_row_hit_cycles"): 10,
+         ("memory", "hbm_row_miss_cycles"): 24,
++        ("memory", "hbm_row_conflict_cycles"): 38,
+     },
+     "dram_timing_slow": {
+-        ("memory", "hbm_row_hit_cycles"): 14,
+-        ("memory", "hbm_row_miss_cycles"): 32,
++        ("memory", "hbm_row_hit_cycles"): 18,
++        ("memory", "hbm_row_miss_cycles"): 36,
++        ("memory", "hbm_row_conflict_cycles"): 54,
++    },
++    "legacy_12_28_timing": {
++        ("memory", "hbm_row_hit_cycles"): 12,
++        ("memory", "hbm_row_miss_cycles"): 28,
++        ("memory", "hbm_row_conflict_cycles"): 42,
+     },
+     "row_first_interleave_2": {("model", "row_first_bank_interleave"): 2},
+ }
+@@ -29,7 +36,9 @@ SCENARIOS = {
+
+ def parse_args():
+     parser = argparse.ArgumentParser(
+-        description="Sweep unpublished request-release, DRAM timing, and mapping parameters"
++        description=(
++            "Sweep request-release, DRAM timing counterfactuals, and mapping parameters"
++        )
+     )
+     parser.add_argument("--binary", default="build/hygcntest")
+     parser.add_argument("--profile", default="configs/HYGCN_PAPER.ini")
+@@ -118,6 +127,9 @@ def main():
+     output_dir = resolve(root, args.output_dir)
+     output_dir.mkdir(parents=True, exist_ok=True)
+     workloads = paper_benchmark.load_json(workload_path)
++    dram_timing_basis = paper_benchmark.derive_dramsim3_timing(
++        root, source_profile, workloads
++    )
+
+     profiles = {}
+     for name, changes in SCENARIOS.items():
+@@ -160,9 +172,11 @@ def main():
+         "workload_manifest_sha256": paper_benchmark.sha256_digest(workload_path),
+         "datasets": args.datasets,
+         "selection_policy": (
+-            "The required baseline uses only the versioned profile. Alternative values are "
+-            "diagnostic sensitivity points and are not selected using paper targets."
++            "The required baseline is derived from the bundled DRAMSim3 HBM tCK, CL, and "
++            "tRCDRD values. Alternative values are diagnostic sensitivity points and are "
++            "not selected using paper targets."
+         ),
++        "required_dram_timing_basis": dram_timing_basis,
+         "scenarios": {},
+     }
+     for name, changes in SCENARIOS.items():
+@@ -172,6 +186,7 @@ def main():
+             for dataset in args.datasets
+         }
+         report["scenarios"][name] = {
++            "acceptance_role": "required_external_baseline" if name == "baseline" else "diagnostic",
+             "changes": {
+                 f"{section}.{option}": value
+                 for (section, option), value in changes.items()
+diff --git a/tools/paper_benchmark.py b/tools/paper_benchmark.py
+index dde0f9e..ce7bec1 100755
+--- a/tools/paper_benchmark.py
++++ b/tools/paper_benchmark.py
+@@ -1,6 +1,7 @@
+ #!/usr/bin/env python3
+ import argparse
+ import concurrent.futures
++import configparser
+ import hashlib
+ import json
+ import math
+@@ -157,6 +158,71 @@ def load_json(path):
+         return json.load(stream)
+
+
++def derive_dramsim3_timing(root, profile_path, workloads):
++    definition = workloads["memory_ablation"]["dram_timing"]
++    dram_path = Path(definition["config"])
++    if not dram_path.is_absolute():
++        dram_path = root / dram_path
++    profile = configparser.ConfigParser()
++    dram = configparser.ConfigParser()
++    with profile_path.open(encoding="utf-8") as stream:
++        profile.read_file(stream)
++    with dram_path.open(encoding="utf-8") as stream:
++        dram.read_file(stream)
++    frequency_ghz = profile.getfloat("architecture", "frequency_ghz")
++    model_cycle_ns = 1.0 / frequency_ghz
++    tck_ns = dram.getfloat("timing", "tCK")
++    cl = dram.getint("timing", "CL")
++    trcdrd = dram.getint("timing", "tRCDRD")
++    trp = dram.getint("timing", "tRP")
++    row_hit_cycles = math.ceil(cl * tck_ns / model_cycle_ns - 1e-12)
++    row_miss_cycles = math.ceil((trcdrd + cl) * tck_ns / model_cycle_ns - 1e-12)
++    row_conflict_cycles = math.ceil(
++        (trp + trcdrd + cl) * tck_ns / model_cycle_ns - 1e-12
++    )
++    configured_hit = profile.getint("memory", "hbm_row_hit_cycles")
++    configured_miss = profile.getint("memory", "hbm_row_miss_cycles")
++    configured_conflict = profile.getint("memory", "hbm_row_conflict_cycles")
++    transaction_queue_entries = dram.getint("system", "trans_queue_size")
++    command_queue_entries = dram.getint("system", "cmd_queue_size")
++    configured_transaction_queue = profile.getint(
++        "memory", "hbm_transaction_queue_entries_per_channel"
++    )
++    configured_command_queue = profile.getint(
++        "memory", "hbm_command_queue_entries_per_bank"
++    )
++    if (configured_hit, configured_miss, configured_conflict) != (
++            row_hit_cycles, row_miss_cycles, row_conflict_cycles):
++        raise ValueError(
++            "paper HBM timing does not match the DRAMSim3-derived hit/miss/conflict "
++            f"cycles: configured={configured_hit}/{configured_miss}/{configured_conflict} "
++            f"derived={row_hit_cycles}/{row_miss_cycles}/{row_conflict_cycles}"
++        )
++    if (configured_transaction_queue, configured_command_queue) != (
++            transaction_queue_entries, command_queue_entries):
++        raise ValueError(
++            "paper HBM queue capacities do not match DRAMSim3: "
++            f"configured={configured_transaction_queue}/{configured_command_queue} "
++            f"source={transaction_queue_entries}/{command_queue_entries}"
++        )
++    return {
++        "config": str(dram_path.relative_to(root)),
++        "config_sha256": sha256_digest(dram_path),
++        "tck_ns": tck_ns,
++        "cl": cl,
++        "trcdrd": trcdrd,
++        "trp": trp,
++        "model_frequency_ghz": frequency_ghz,
++        "model_cycle_ns": model_cycle_ns,
++        "derived_row_hit_cycles": row_hit_cycles,
++        "derived_row_miss_cycles": row_miss_cycles,
++        "derived_row_conflict_cycles": row_conflict_cycles,
++        "transaction_queue_entries_per_channel": transaction_queue_entries,
++        "command_queue_entries_per_bank": command_queue_entries,
++        "formula": definition,
++    }
++
++
+ def expected_graph_digest(root, dataset):
+     graph_dir = root / "gcn_dataset"
+     return (
+@@ -423,6 +489,84 @@ def validate_sequential_traffic(dataset, run):
+     }
+
+
++def validate_transaction_admission(dataset, variant, run):
++    architecture = run["architecture"]
++    issue_limit = architecture["coordinator_issue_blocks_per_cycle"]
++    queue_capacity = architecture["hbm_transaction_queue_entries_per_channel"]
++    channels = architecture["hbm_channels"]
++    block_size = architecture["block_size"]
++    admitted_total = 0
++    expected_total = 0
++    max_total_occupancy = 0
++    admission_cycles = 0
++    for layer in run["layers"]:
++        summary = layer["transaction_admission_trace"]
++        traces = summary["trace_samples"]
++        previous_cycle = None
++        for trace in traces:
++            admitted = trace["admitted_blocks"]
++            if admitted <= 0 or admitted > issue_limit:
++                raise ValueError(
++                    f"{dataset} {variant} admits {admitted} blocks in one cycle; "
++                    f"limit is {issue_limit}"
++                )
++            if previous_cycle is not None and trace["cycle"] <= previous_cycle:
++                raise ValueError(f"{dataset} {variant} admission cycles are not increasing")
++            if trace["max_channel_occupancy_after"] > queue_capacity:
++                raise ValueError(f"{dataset} {variant} sample exceeds a channel queue capacity")
++            previous_cycle = trace["cycle"]
++        peaks = summary["max_channel_queue_occupancy"]
++        if len(peaks) != channels or any(value > queue_capacity for value in peaks):
++            raise ValueError(f"{dataset} {variant} exceeds a channel queue capacity")
++        if summary["max_blocks_admitted_per_cycle"] > issue_limit:
++            raise ValueError(f"{dataset} {variant} exceeds the shared admission bandwidth")
++        admitted_total += summary["admitted_blocks"]
++        admission_cycles += summary["cycle_count"]
++        max_total_occupancy = max(
++            max_total_occupancy, summary["max_total_queue_occupancy"]
++        )
++        for request in layer["memory_requests"]:
++            expected_total += math.ceil(request["bytes"] / block_size)
++            if not (
++                request["first_admission_cycle"] >= request["enqueue_cycle"]
++                and request["last_admission_cycle"] >= request["first_admission_cycle"]
++                and request["first_issue_cycle"] >= request["first_admission_cycle"]
++            ):
++                raise ValueError(f"{dataset} {variant} request admission violates causality")
++    if admitted_total != expected_total:
++        raise ValueError(
++            f"{dataset} {variant} admission trace covers {admitted_total} blocks, "
++            f"expected {expected_total}"
++        )
++    return {
++        "admitted_blocks": admitted_total,
++        "admission_cycles": admission_cycles,
++        "max_blocks_admitted_per_cycle": max(
++            layer["transaction_admission_trace"]["max_blocks_admitted_per_cycle"]
++            for layer in run["layers"]
++        ),
++        "issue_limit_blocks_per_cycle": issue_limit,
++        "max_total_queue_occupancy": max_total_occupancy,
++        "total_queue_capacity": channels * queue_capacity,
++    }
++
++
++def evidence_counts(reference):
++    counts = {"paper_metric_rows": 0, "internal_check_rows": 0}
++    for definition in reference["metrics"].values():
++        if not definition["required"]:
++            continue
++        validation = definition["validation"]
++        rows = len(reference["datasets"]) if validation.startswith("per_dataset") else 1
++        key = (
++            "paper_metric_rows"
++            if definition["evidence_class"] == "paper_metric"
++            else "internal_check_rows"
++        )
++        counts[key] += rows
++    return counts
++
++
+ def priority_trace_evidence(dataset, optimized, mapping_only):
+     optimized_layer = optimized["layers"][0]
+     baseline_layer = mapping_only["layers"][0]
+@@ -475,6 +619,11 @@ def current_parameters(architecture, workloads):
+         "edge_ping_pong_regions": architecture["edge_ping_pong_regions"],
+         "hbm_transaction_queue_entries_per_channel":
+             architecture["hbm_transaction_queue_entries_per_channel"],
++        "hbm_command_queue_entries_per_bank":
++            architecture["hbm_command_queue_entries_per_bank"],
++        "hbm_row_hit_cycles": architecture["hbm_row_hit_cycles"],
++        "hbm_row_miss_cycles": architecture["hbm_row_miss_cycles"],
++        "hbm_row_conflict_cycles": architecture["hbm_row_conflict_cycles"],
+         "coordinator_issue_blocks_per_cycle":
+             architecture["coordinator_issue_blocks_per_cycle"],
+         "input_ping_pong_regions": architecture["input_ping_pong_regions"],
+@@ -525,6 +674,7 @@ def main():
+     reference = load_json(reference_path)
+     workloads = load_json(workload_path)
+     parameter_baseline = load_json(baseline_path)
++    dram_timing_basis = derive_dramsim3_timing(root, profile_path, workloads)
+     datasets = args.datasets or reference["datasets"]
+     per_dataset = {}
+     metric_values = {name: [] for name in reference["metrics"]}
+@@ -553,6 +703,10 @@ def main():
+                 runs[optimized_name], runs[baseline_name], allowed, dataset, baseline_name
+             )
+         architecture = runs["optimized"]["architecture"]
++        admission_oracles = {
++            name: validate_transaction_admission(dataset, name, result)
++            for name, result in runs.items()
++        }
+         summaries = {name: summarize_result(result) for name, result in runs.items()}
+         metrics = calculate_metrics(
+             summaries["optimized"],
+@@ -587,6 +741,7 @@ def main():
+                     "bank_blocks"
+                 ],
+             },
++            "transaction_admission_oracles": admission_oracles,
+         }
+         for name, value in metrics.items():
+             metric_values[name].append(value)
+@@ -608,6 +763,8 @@ def main():
+         "aggregate": aggregate,
+         "per_dataset": per_dataset,
+         "memory_ablation": workloads["memory_ablation"],
++        "dram_timing_basis": dram_timing_basis,
++        "evidence_counts": evidence_counts(reference),
+         "parameter_audit": audit,
+         "parameter_recalibration": audit["parameter_recalibration"],
+         "scope": {
+diff --git a/tools/partition_sensitivity.py b/tools/partition_sensitivity.py
+index 0f1a55b..0a7acf4 100755
+--- a/tools/partition_sensitivity.py
++++ b/tools/partition_sensitivity.py
+@@ -145,10 +145,13 @@ def main():
+     reference = paper_benchmark.load_json(reference_path)
+     workloads = paper_benchmark.load_json(workload_path)
+     partition_manifest = workloads["graph_partition"]
+-    calibration_datasets = partition_manifest["calibration_datasets"]
+-    holdout_datasets = partition_manifest["holdout_datasets"]
+-    if set(args.datasets) != set(calibration_datasets + holdout_datasets):
+-        raise ValueError("datasets must match the versioned calibration and hold-out split")
++    fit_datasets = partition_manifest["calibrated_fit_datasets"]
++    holdout_datasets = partition_manifest["independent_holdout_datasets"]
++    if set(args.datasets) != set(fit_datasets) or holdout_datasets:
++        raise ValueError(
++            "datasets must match the historically exposed calibrated-fit set; "
++            "this repository has no independent scheduler-cap hold-out"
++        )
+
+     report = {
+         "schema_version": 1,
+@@ -238,51 +241,55 @@ def main():
+             for metric in report["capacities"][str(capacity_mib)]["per_dataset"][dataset].values()
+         )
+
+-    def calibration_error(capacity_mib):
++    def fit_error(capacity_mib):
+         metrics = [
+             metric["relative_error"]
+-            for dataset in calibration_datasets
++            for dataset in fit_datasets
+             for metric in report["capacities"][str(capacity_mib)]["per_dataset"][dataset].values()
+         ]
+         return sum(metrics) / len(metrics)
+
+-    calibration_rows = {
++    fit_rows = {
+         str(capacity_mib): {
+-            "all_required_pass": dataset_pass(capacity_mib, calibration_datasets),
+-            "mean_relative_error": calibration_error(capacity_mib),
++            "all_paper_rows_pass": dataset_pass(capacity_mib, fit_datasets),
++            "mean_relative_error": fit_error(capacity_mib),
+         }
+         for capacity_mib in args.capacities_mib
+     }
+     passing = [
+         capacity_mib for capacity_mib in args.capacities_mib
+-        if calibration_rows[str(capacity_mib)]["all_required_pass"]
++        if fit_rows[str(capacity_mib)]["all_paper_rows_pass"]
+     ]
+     if not passing:
+-        raise ValueError("no capacity passes the calibration datasets")
++        raise ValueError("no capacity passes the historically exposed fit datasets")
+     selected_capacity = min(
+         passing,
+-        key=lambda value: (calibration_rows[str(value)]["mean_relative_error"], value),
++        key=lambda value: (fit_rows[str(value)]["mean_relative_error"], value),
+     )
+     configured_capacity = partition_manifest["aggregation_shard_capacity_bytes"] // (1024 * 1024)
+     if selected_capacity != configured_capacity:
+         raise ValueError(
+-            f"calibration selects {selected_capacity} MiB but workload config uses "
++            f"calibrated fit selects {selected_capacity} MiB but workload config uses "
+             f"{configured_capacity} MiB"
+         )
+-    report["calibration"] = {
+-        "datasets": calibration_datasets,
++    report["calibrated_fit"] = {
++        "datasets": fit_datasets,
++        "historical_exposure": partition_manifest["historical_exposure"],
+         "selection_method": (
+-            "among capacities passing every required Figure 15-16 calibration row, "
++            "among capacities passing every Figure 15-16 paper row on all historically "
++            "exposed datasets, "
+             "select the minimum mean relative error; ties select the smaller capacity"
+         ),
+-        "candidates": calibration_rows,
++        "candidates": fit_rows,
+         "selected_capacity_mib": selected_capacity,
+     }
+-    report["holdout"] = {
+-        "datasets": holdout_datasets,
+-        "selected_capacity_mib": selected_capacity,
+-        "all_required_pass": dataset_pass(selected_capacity, holdout_datasets),
+-        "used_for_selection": False,
++    report["independent_validation"] = {
++        "datasets": [],
++        "available": False,
++        "reason": (
++            "Cora, Citeseer, and PubMed were all exposed in Review v4; no retrospective "
++            "used_for_selection=false claim is made"
++        ),
+     }
+
+     report_path = output_dir / "partition_sensitivity.json"
+diff --git a/tools/test_paper_benchmark.py b/tools/test_paper_benchmark.py
+index ef25bf4..ef102d9 100644
+--- a/tools/test_paper_benchmark.py
++++ b/tools/test_paper_benchmark.py
+@@ -39,9 +39,12 @@ def main():
+         raise RuntimeError("row-first baseline must not add unsupported bank striping")
+     if "Section 4.5.2" not in workloads["memory_ablation"]["priority_order_source"]:
+         raise RuntimeError("batch-class ordering must retain its paper provenance")
+-    if workloads["graph_partition"]["calibration_datasets"] != ["cora", "citeseer"] or \
+-            workloads["graph_partition"]["holdout_datasets"] != ["pubmed"]:
+-        raise RuntimeError("partition calibration and hold-out datasets must be explicit")
++    if workloads["memory_ablation"]["command_queue_entries_per_bank"] != 8:
++        raise RuntimeError("command queue depth must retain its DRAMSim3 provenance")
++    if workloads["graph_partition"]["calibrated_fit_datasets"] != [
++            "cora", "citeseer", "pubmed"] or \
++            workloads["graph_partition"]["independent_holdout_datasets"] != []:
++        raise RuntimeError("all historically exposed datasets must be labeled calibrated fit")
+     if workloads["graph_partition"]["aggregation_shard_capacity_bytes"] != 5242880:
+         raise RuntimeError("graph partition scheduler cap must be versioned")
+     optimized = {
+@@ -136,6 +139,10 @@ def main():
+         "batch_launch_interval_cycles": 1,
+         "edge_ping_pong_regions": 2,
+         "hbm_transaction_queue_entries_per_channel": 32,
++        "hbm_command_queue_entries_per_bank": 8,
++        "hbm_row_hit_cycles": 14,
++        "hbm_row_miss_cycles": 28,
++        "hbm_row_conflict_cycles": 42,
+         "coordinator_issue_blocks_per_cycle": 4,
+         "input_ping_pong_regions": 2,
+         "neighbor_index_ready_cycles": 2,
+@@ -150,6 +157,21 @@ def main():
+         raise RuntimeError("external absolute binary paths must remain printable")
+     if partition.display_path(root, root / "build/hygcntest") != "build/hygcntest":
+         raise RuntimeError("repository-local binary paths must remain relative")
++    timing = benchmark.derive_dramsim3_timing(
++        root, root / "configs/HYGCN_PAPER.ini", workloads
++    )
++    if timing["derived_row_hit_cycles"] != 14 or \
++            timing["derived_row_miss_cycles"] != 28 or \
++            timing["derived_row_conflict_cycles"] != 42:
++        raise RuntimeError("required HBM timing must be derived from DRAMSim3")
++    if timing["transaction_queue_entries_per_channel"] != 32 or \
++            timing["command_queue_entries_per_bank"] != 8:
++        raise RuntimeError("required HBM queue capacities must be derived from DRAMSim3")
++    with (root / "configs/paper_metrics.json").open(encoding="utf-8") as stream:
++        reference = json.load(stream)
++    if benchmark.evidence_counts(reference) != {
++            "paper_metric_rows": 14, "internal_check_rows": 12}:
++        raise RuntimeError("evidence must remain split into 14 paper rows and 12 checks")
+     print("F04_ae_only_and_R3_workload_scope=PASS")
+     return 0
+
+diff --git a/tools/validate_paper_metrics.py b/tools/validate_paper_metrics.py
+index 4af6a9b..1f0e095 100755
+--- a/tools/validate_paper_metrics.py
++++ b/tools/validate_paper_metrics.py
+@@ -68,7 +68,7 @@ def main():
+             passed = error <= tolerance
+             failed = failed or (required and not passed)
+             rows.append((name, "aggregate", f"{expected:.6f}", measured, error, passed,
+-                         definition["source"]))
++                         definition["source"], definition["evidence_class"]))
+         elif validation == "per_dataset_relative_error":
+             references = definition["reference"]
+             for dataset in reference["datasets"]:
+@@ -78,7 +78,7 @@ def main():
+                 passed = error <= tolerance
+                 failed = failed or (required and not passed)
+                 rows.append((name, dataset, f"{expected:.6f}", measured, error,
+-                             passed, definition["source"]))
++                             passed, definition["source"], definition["evidence_class"]))
+         elif validation == "per_dataset_range":
+             lower = float(definition["reference_min"])
+             upper = float(definition["reference_max"])
+@@ -88,7 +88,7 @@ def main():
+                 passed = error <= tolerance
+                 failed = failed or (required and not passed)
+                 rows.append((name, dataset, f"{lower:.6f}-{upper:.6f}", measured, error,
+-                             passed, definition["source"]))
++                             passed, definition["source"], definition["evidence_class"]))
+         elif validation == "per_dataset_minimum":
+             lower = float(definition["reference_min"])
+             for dataset in reference["datasets"]:
+@@ -97,7 +97,7 @@ def main():
+                 passed = error == 0.0
+                 failed = failed or (required and not passed)
+                 rows.append((name, dataset, f">={lower:.6f}", measured, error,
+-                             passed, definition["source"]))
++                             passed, definition["source"], definition["evidence_class"]))
+         elif validation == "aggregate_minimum":
+             lower = float(definition["reference_min"])
+             measured = aggregate.get(name)
+@@ -105,7 +105,7 @@ def main():
+             passed = error == 0.0
+             failed = failed or (required and not passed)
+             rows.append((name, "aggregate", f">={lower:.6f}", measured, error,
+-                         passed, definition["source"]))
++                         passed, definition["source"], definition["evidence_class"]))
+         elif validation == "diagnostic_only":
+             for dataset in reference["datasets"]:
+                 measured = per_dataset.get(dataset, {}).get("metrics", {}).get(name)
+@@ -113,18 +113,35 @@ def main():
+         else:
+             raise ValueError(f"unsupported validation rule for {name}: {validation}")
+
++    paper_rows = [row for row in rows if row[7] == "paper_metric"]
++    internal_rows = [row for row in rows if row[7] == "internal_check"]
++    if len(paper_rows) != 14 or len(internal_rows) != 12:
++        raise ValueError("validation requires 14 paper metric rows and 12 internal checks")
+     output_path.parent.mkdir(parents=True, exist_ok=True)
+     with output_path.open("w", encoding="utf-8") as stream:
+-        stream.write("# HyGCN Paper Metric Validation\n\n")
++        stream.write("# HyGCN Paper Metric And Internal Check Validation\n\n")
+         stream.write(f"Tolerance: {tolerance:.0%}\n\n")
+         stream.write(
+             "Digitized bars are checked against their dataset-specific references. "
+             "Paper-reported averages are checked only after applying the declared "
+-            "aggregation rule. Diagnostic-only metrics do not affect acceptance.\n\n"
++            "aggregation rule. All three datasets are historically exposed calibrated-fit "
++            "workloads; this report does not claim an independent hold-out. Internal checks "
++            "and diagnostic-only metrics are not paper evidence.\n\n"
+         )
++        stream.write("## Paper Metrics (14 rows)\n\n")
+         stream.write("| Metric | Scope | Reference | Measured | Relative error | Status |\n")
+         stream.write("|---|---|---:|---:|---:|---|\n")
+-        for name, scope, expected, measured, error, passed, _ in rows:
++        for name, scope, expected, measured, error, passed, _, _ in paper_rows:
++            measured_text = "missing" if measured is None else f"{measured:.6f}"
++            error_text = "invalid" if not math.isfinite(error) else f"{error:.2%}"
++            stream.write(
++                f"| {name} | {scope} | {expected} | {measured_text} | {error_text} | "
++                f"{'PASS' if passed else 'FAIL'} |\n"
++            )
++        stream.write("\n## Internal Regression Checks (12 rows)\n\n")
++        stream.write("| Check | Scope | Threshold | Measured | Deviation | Status |\n")
++        stream.write("|---|---|---:|---:|---:|---|\n")
++        for name, scope, expected, measured, error, passed, _, _ in internal_rows:
+             measured_text = "missing" if measured is None else f"{measured:.6f}"
+             error_text = "invalid" if not math.isfinite(error) else f"{error:.2%}"
+             stream.write(
+@@ -144,13 +161,18 @@ def main():
+             "area, or complete chip energy.\n"
+         )
+
+-    for name, scope, expected, measured, error, passed, source in rows:
++    for name, scope, expected, measured, error, passed, source, evidence_class in rows:
+         measured_text = "missing" if measured is None else f"{measured:.6f}"
+         error_text = "invalid" if not math.isfinite(error) else f"{error:.2%}"
+         print(
+             f"{name}[{scope}]: reference={expected} measured={measured_text} "
+-            f"error={error_text} {'PASS' if passed else 'FAIL'} ({source})"
++            f"error={error_text} {'PASS' if passed else 'FAIL'} "
++            f"class={evidence_class} ({source})"
+         )
++    paper_passed = sum(row[5] for row in paper_rows)
++    internal_passed = sum(row[5] for row in internal_rows)
++    print(f"paper_metrics={paper_passed}/14")
++    print(f"internal_checks={internal_passed}/12")
+     print(f"validation_report={output_path}")
+     return 1 if failed else 0
+
+diff --git a/tools/validate_reference_metrics.py b/tools/validate_reference_metrics.py
+index fe0ce66..a33b2c8 100644
+--- a/tools/validate_reference_metrics.py
++++ b/tools/validate_reference_metrics.py
+@@ -44,8 +44,8 @@ def main():
+     with path.open(encoding="utf-8") as stream:
+         manifest = json.load(stream)
+
+-    if manifest.get("schema_version") != 4 or not manifest.get("reference_version"):
+-        raise ValueError("reference manifest requires schema_version=4 and reference_version")
++    if manifest.get("schema_version") != 5 or not manifest.get("reference_version"):
++        raise ValueError("reference manifest requires schema_version=5 and reference_version")
+     tolerance = manifest.get("tolerance")
+     if not isinstance(tolerance, (int, float)) or not math.isfinite(tolerance) or tolerance != 0.20:
+         raise ValueError("reference manifest tolerance must be 0.20")
+@@ -65,9 +65,19 @@ def main():
+     metrics = manifest.get("metrics", {})
+     if set(metrics) != REQUIRED_METRICS:
+         raise ValueError("reference manifest does not contain the required metric set")
++    evidence_rows = {"paper_metric": 0, "internal_check": 0}
+     for name, definition in metrics.items():
+         if not isinstance(definition.get("required"), bool):
+             raise ValueError(f"{name} is missing required flag")
++        evidence_class = definition.get("evidence_class")
++        if evidence_class not in {
++            "paper_metric", "internal_check", "internal_diagnostic"
++        }:
++            raise ValueError(f"{name} has invalid evidence_class")
++        if definition["required"] and evidence_class == "internal_diagnostic":
++            raise ValueError(f"{name} required metric cannot be diagnostic")
++        if not definition["required"] and evidence_class != "internal_diagnostic":
++            raise ValueError(f"{name} non-required metric must be diagnostic")
+         for field in ("validation", "unit", "source", "aggregation", "experiment_scope"):
+             if not isinstance(definition.get(field), str) or not definition[field].strip():
+                 raise ValueError(f"{name} is missing {field}")
+@@ -116,6 +126,13 @@ def main():
+                 raise ValueError(f"{name} diagnostic-only metric cannot be required")
+         else:
+             raise ValueError(f"{name} uses unsupported validation {validation}")
++        if definition["required"]:
++            rows = len(REQUIRED_DATASETS) if validation.startswith("per_dataset") else 1
++            evidence_rows[evidence_class] += rows
++    if evidence_rows != {"paper_metric": 14, "internal_check": 12}:
++        raise ValueError(
++            "reference manifest must contain 14 paper metric rows and 12 internal checks"
++        )
+     print(f"reference_manifest=PASS path={path}")
+     return 0

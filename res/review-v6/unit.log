@@ -1,0 +1,25 @@
+config=PASS
+window_evidence={"neighbors":[0,2,4,6],"window":[0,7],"address":0,"bytes":448,"internal_holes":3,"transactions":7}
+F01_window_sliding_shrinking=PASS
+edge_chunk_boundaries=PASS
+output_address=PASS
+combination_parallelism_evidence={"batches":1,"rows":64,"active_modules":8,"batch_waves":1}
+systolic_model=PASS
+hbm_layout_mapping=PASS
+priority_trace_evidence={"edge0_complete":32,"input0_enqueue":32,"priority_input_issue":62,"fifo_input_issue":152,"priority_reorders":1}
+coordinator_ordering=PASS
+V5_01_transaction_admission_bandwidth=PASS
+bandwidth_scope_counterexample={"immediate_service_cycles":82,"delayed_service_cycles":152,"immediate_active_cycles":82,"delayed_active_cycles":62,"immediate_wall_utilization":0.0731707,"delayed_wall_utilization":0.0394737,"immediate_active_utilization":0.0731707,"delayed_active_utilization":0.0967742}
+V4_01_memory_service_bandwidth_scope=PASS
+fragmentation_evidence={"blocks":128,"coalesced_cycles":278,"fragmented_cycles":278,"row_hits":64,"row_misses":64}
+F02_fragmentation_invariance=PASS
+aggregation_buffer=PASS
+event_spm_guards=PASS
+aggregation_operations=PASS
+simulation_determinism=PASS
+policy_matrix=PASS
+feature_dispersion_address_bounds=PASS
+pipeline_batching=PASS
+producer_dependency_evidence={"output_requests":5,"intermediate_pairs":5,"latest_read_completion":599,"ce_start":599}
+F03_producer_and_RAW_dependencies=PASS
+all unit tests passed

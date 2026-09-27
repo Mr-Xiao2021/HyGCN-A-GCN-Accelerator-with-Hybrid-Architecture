@@ -1,0 +1,176 @@
+{
+  "citeseer": {
+    "coordination_baseline": {
+      "admission_cycles": 1135938,
+      "admitted_blocks": 2657567,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 241,
+      "total_queue_capacity": 256
+    },
+    "mapping_only": {
+      "admission_cycles": 678990,
+      "admitted_blocks": 2657567,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 256,
+      "total_queue_capacity": 256
+    },
+    "optimized": {
+      "admission_cycles": 669606,
+      "admitted_blocks": 2657567,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 256,
+      "total_queue_capacity": 256
+    },
+    "pipeline_baseline": {
+      "admission_cycles": 1059207,
+      "admitted_blocks": 4201295,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 256,
+      "total_queue_capacity": 256
+    },
+    "priority_only": {
+      "admission_cycles": 1191830,
+      "admitted_blocks": 2657567,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 256,
+      "total_queue_capacity": 256
+    },
+    "sparsity_baseline": {
+      "admission_cycles": 1937940,
+      "admitted_blocks": 7720407,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 256,
+      "total_queue_capacity": 256
+    },
+    "sparsity_optimized": {
+      "admission_cycles": 656517,
+      "admitted_blocks": 2601327,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 256,
+      "total_queue_capacity": 256
+    }
+  },
+  "cora": {
+    "coordination_baseline": {
+      "admission_cycles": 309394,
+      "admitted_blocks": 715266,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 231,
+      "total_queue_capacity": 256
+    },
+    "mapping_only": {
+      "admission_cycles": 179656,
+      "admitted_blocks": 715266,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 256,
+      "total_queue_capacity": 256
+    },
+    "optimized": {
+      "admission_cycles": 179120,
+      "admitted_blocks": 715266,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 256,
+      "total_queue_capacity": 256
+    },
+    "pipeline_baseline": {
+      "admission_cycles": 301304,
+      "admitted_blocks": 1202706,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 256,
+      "total_queue_capacity": 256
+    },
+    "priority_only": {
+      "admission_cycles": 327966,
+      "admitted_blocks": 715266,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 254,
+      "total_queue_capacity": 256
+    },
+    "sparsity_baseline": {
+      "admission_cycles": 183800,
+      "admitted_blocks": 732988,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 256,
+      "total_queue_capacity": 256
+    },
+    "sparsity_optimized": {
+      "admission_cycles": 170830,
+      "admitted_blocks": 682138,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 256,
+      "total_queue_capacity": 256
+    }
+  },
+  "pubmed": {
+    "coordination_baseline": {
+      "admission_cycles": 1997601,
+      "admitted_blocks": 4646886,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 246,
+      "total_queue_capacity": 256
+    },
+    "mapping_only": {
+      "admission_cycles": 1179637,
+      "admitted_blocks": 4646886,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 256,
+      "total_queue_capacity": 256
+    },
+    "optimized": {
+      "admission_cycles": 1165375,
+      "admitted_blocks": 4646886,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 256,
+      "total_queue_capacity": 256
+    },
+    "pipeline_baseline": {
+      "admission_cycles": 1480979,
+      "admitted_blocks": 5908774,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 256,
+      "total_queue_capacity": 256
+    },
+    "priority_only": {
+      "admission_cycles": 2153396,
+      "admitted_blocks": 4646886,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 253,
+      "total_queue_capacity": 256
+    },
+    "sparsity_baseline": {
+      "admission_cycles": 1270752,
+      "admitted_blocks": 5062334,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 256,
+      "total_queue_capacity": 256
+    },
+    "sparsity_optimized": {
+      "admission_cycles": 1126429,
+      "admitted_blocks": 4485150,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_queue_occupancy": 256,
+      "total_queue_capacity": 256
+    }
+  }
+}
