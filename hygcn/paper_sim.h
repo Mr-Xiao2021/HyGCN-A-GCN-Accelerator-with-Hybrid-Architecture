@@ -59,11 +59,17 @@ struct ArchitectureConfig {
     int hbm_channels = 0;
     int hbm_banks_per_channel = 0;
     uint64_t hbm_row_bytes = 0;
-    int hbm_transaction_queue_entries_per_channel = 0;
+    int hbm_read_queue_entries_per_channel = 0;
+    int hbm_write_buffer_entries_per_channel = 0;
     int hbm_command_queue_entries_per_bank = 0;
-    int hbm_row_hit_cycles = 0;
-    int hbm_row_miss_cycles = 0;
-    int hbm_row_conflict_cycles = 0;
+    int hbm_read_row_hit_cycles = 0;
+    int hbm_read_row_miss_cycles = 0;
+    int hbm_read_row_conflict_cycles = 0;
+    int hbm_write_row_hit_cycles = 0;
+    int hbm_write_row_miss_cycles = 0;
+    int hbm_write_row_conflict_cycles = 0;
+    int hbm_read_to_write_cycles = 0;
+    int hbm_write_to_read_cycles = 0;
     int edram_latency_cycles = 0;
     int edram_transactions_per_cycle = 0;
 
@@ -156,9 +162,14 @@ struct MemoryRequestTrace {
 struct TransactionAdmissionTrace {
     uint64_t cycle = 0;
     uint64_t admitted_blocks = 0;
-    uint64_t total_occupancy_before = 0;
-    uint64_t total_occupancy_after = 0;
-    uint64_t max_channel_occupancy_after = 0;
+    uint64_t admitted_read_blocks = 0;
+    uint64_t admitted_write_blocks = 0;
+    uint64_t total_read_occupancy_before = 0;
+    uint64_t total_read_occupancy_after = 0;
+    uint64_t total_write_occupancy_before = 0;
+    uint64_t total_write_occupancy_after = 0;
+    uint64_t max_channel_read_occupancy_after = 0;
+    uint64_t max_channel_write_occupancy_after = 0;
 };
 
 struct InputWindowTrace {
@@ -187,6 +198,9 @@ struct MemoryTimingResult {
     uint64_t row_buffer_hits = 0;
     uint64_t row_buffer_misses = 0;
     uint64_t priority_reorders = 0;
+    uint64_t read_to_write_switches = 0;
+    uint64_t write_to_read_switches = 0;
+    uint64_t direction_switch_stall_cycles = 0;
     std::array<uint64_t, kRequestClassCount> request_counts{};
     std::array<uint64_t, kRequestClassCount> request_bytes{};
     std::array<uint64_t, kRequestClassCount> request_wait_cycles{};
@@ -196,7 +210,8 @@ struct MemoryTimingResult {
     std::map<int, std::array<uint64_t, kRequestClassCount>> batch_completion_cycles;
     std::vector<MemoryRequestTrace> request_traces;
     std::vector<TransactionAdmissionTrace> admission_traces;
-    std::vector<uint64_t> max_channel_queue_occupancy;
+    std::vector<uint64_t> max_channel_read_queue_occupancy;
+    std::vector<uint64_t> max_channel_write_buffer_occupancy;
     std::vector<uint64_t> channel_blocks;
     std::vector<uint64_t> bank_blocks;
 };
@@ -308,6 +323,9 @@ struct LayerMetrics {
     uint64_t row_buffer_hits = 0;
     uint64_t row_buffer_misses = 0;
     uint64_t priority_reorders = 0;
+    uint64_t read_to_write_switches = 0;
+    uint64_t write_to_read_switches = 0;
+    uint64_t direction_switch_stall_cycles = 0;
     uint64_t ae_finish_cycle = 0;
     uint64_t ce_start_cycle = 0;
     uint64_t ce_finish_cycle = 0;
@@ -341,7 +359,8 @@ struct LayerMetrics {
     std::vector<MemoryRequestTrace> memory_request_traces;
     std::vector<MemoryRequestTrace> producer_request_traces;
     std::vector<TransactionAdmissionTrace> transaction_admission_traces;
-    std::vector<uint64_t> max_channel_queue_occupancy;
+    std::vector<uint64_t> max_channel_read_queue_occupancy;
+    std::vector<uint64_t> max_channel_write_buffer_occupancy;
     std::vector<uint64_t> channel_blocks;
     std::vector<uint64_t> bank_blocks;
     double simd_utilization = 0.0;

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 import argparse
+import base64
+import bisect
+import collections
 import concurrent.futures
 import configparser
 import hashlib
@@ -173,51 +176,112 @@ def derive_dramsim3_timing(root, profile_path, workloads):
     model_cycle_ns = 1.0 / frequency_ghz
     tck_ns = dram.getfloat("timing", "tCK")
     cl = dram.getint("timing", "CL")
+    cwl = dram.getint("timing", "CWL")
     trcdrd = dram.getint("timing", "tRCDRD")
+    trcdwr = dram.getint("timing", "tRCDWR")
     trp = dram.getint("timing", "tRP")
-    row_hit_cycles = math.ceil(cl * tck_ns / model_cycle_ns - 1e-12)
-    row_miss_cycles = math.ceil((trcdrd + cl) * tck_ns / model_cycle_ns - 1e-12)
-    row_conflict_cycles = math.ceil(
+    bl = dram.getint("dram_structure", "BL")
+    burst_cycle = bl // 2
+    al = dram.getint("timing", "AL", fallback=0)
+    trtrs = dram.getint("timing", "tRTRS", fallback=2)
+    twtr_l = dram.getint("timing", "tWTR_L")
+    read_hit_cycles = math.ceil(cl * tck_ns / model_cycle_ns - 1e-12)
+    read_miss_cycles = math.ceil((trcdrd + cl) * tck_ns / model_cycle_ns - 1e-12)
+    read_conflict_cycles = math.ceil(
         (trp + trcdrd + cl) * tck_ns / model_cycle_ns - 1e-12
     )
-    configured_hit = profile.getint("memory", "hbm_row_hit_cycles")
-    configured_miss = profile.getint("memory", "hbm_row_miss_cycles")
-    configured_conflict = profile.getint("memory", "hbm_row_conflict_cycles")
+    write_hit_cycles = math.ceil(cwl * tck_ns / model_cycle_ns - 1e-12)
+    write_miss_cycles = math.ceil((trcdwr + cwl) * tck_ns / model_cycle_ns - 1e-12)
+    write_conflict_cycles = math.ceil(
+        (trp + trcdwr + cwl) * tck_ns / model_cycle_ns - 1e-12
+    )
+    rl = al + cl
+    wl = al + cwl
+    write_delay = wl + burst_cycle
+    read_to_write_cycles = math.ceil(
+        (rl + burst_cycle - wl + trtrs) * tck_ns / model_cycle_ns - 1e-12
+    )
+    write_to_read_cycles = math.ceil(
+        (write_delay + twtr_l) * tck_ns / model_cycle_ns - 1e-12
+    )
+    configured_read = tuple(profile.getint("memory", name) for name in (
+        "hbm_read_row_hit_cycles",
+        "hbm_read_row_miss_cycles",
+        "hbm_read_row_conflict_cycles",
+    ))
+    configured_write = tuple(profile.getint("memory", name) for name in (
+        "hbm_write_row_hit_cycles",
+        "hbm_write_row_miss_cycles",
+        "hbm_write_row_conflict_cycles",
+    ))
+    configured_switch = tuple(profile.getint("memory", name) for name in (
+        "hbm_read_to_write_cycles", "hbm_write_to_read_cycles"
+    ))
     transaction_queue_entries = dram.getint("system", "trans_queue_size")
     command_queue_entries = dram.getint("system", "cmd_queue_size")
-    configured_transaction_queue = profile.getint(
-        "memory", "hbm_transaction_queue_entries_per_channel"
-    )
+    unified_queue = dram.getboolean("system", "unified_queue")
+    configured_read_queue = profile.getint(
+        "memory", "hbm_read_queue_entries_per_channel")
+    configured_write_buffer = profile.getint(
+        "memory", "hbm_write_buffer_entries_per_channel")
     configured_command_queue = profile.getint(
         "memory", "hbm_command_queue_entries_per_bank"
     )
-    if (configured_hit, configured_miss, configured_conflict) != (
-            row_hit_cycles, row_miss_cycles, row_conflict_cycles):
+    if configured_read != (
+            read_hit_cycles, read_miss_cycles, read_conflict_cycles):
         raise ValueError(
-            "paper HBM timing does not match the DRAMSim3-derived hit/miss/conflict "
-            f"cycles: configured={configured_hit}/{configured_miss}/{configured_conflict} "
-            f"derived={row_hit_cycles}/{row_miss_cycles}/{row_conflict_cycles}"
+            "paper HBM read timing does not match DRAMSim3: "
+            f"configured={configured_read} "
+            f"derived={(read_hit_cycles, read_miss_cycles, read_conflict_cycles)}"
         )
-    if (configured_transaction_queue, configured_command_queue) != (
-            transaction_queue_entries, command_queue_entries):
+    if configured_write != (
+            write_hit_cycles, write_miss_cycles, write_conflict_cycles):
+        raise ValueError(
+            "paper HBM write timing does not match DRAMSim3: "
+            f"configured={configured_write} "
+            f"derived={(write_hit_cycles, write_miss_cycles, write_conflict_cycles)}"
+        )
+    if configured_switch != (read_to_write_cycles, write_to_read_cycles):
+        raise ValueError(
+            "paper HBM direction switching does not match DRAMSim3: "
+            f"configured={configured_switch} "
+            f"derived={(read_to_write_cycles, write_to_read_cycles)}"
+        )
+    if unified_queue:
+        raise ValueError("paper HBM config must expose independent read/write queues")
+    if (configured_read_queue, configured_write_buffer, configured_command_queue) != (
+            transaction_queue_entries, transaction_queue_entries, command_queue_entries):
         raise ValueError(
             "paper HBM queue capacities do not match DRAMSim3: "
-            f"configured={configured_transaction_queue}/{configured_command_queue} "
-            f"source={transaction_queue_entries}/{command_queue_entries}"
+            f"configured={configured_read_queue}/{configured_write_buffer}/"
+            f"{configured_command_queue} source={transaction_queue_entries}/"
+            f"{transaction_queue_entries}/{command_queue_entries}"
         )
     return {
         "config": str(dram_path.relative_to(root)),
         "config_sha256": sha256_digest(dram_path),
         "tck_ns": tck_ns,
         "cl": cl,
+        "cwl": cwl,
         "trcdrd": trcdrd,
+        "trcdwr": trcdwr,
         "trp": trp,
+        "burst_cycle": burst_cycle,
+        "trtrs": trtrs,
+        "twtr_l": twtr_l,
         "model_frequency_ghz": frequency_ghz,
         "model_cycle_ns": model_cycle_ns,
-        "derived_row_hit_cycles": row_hit_cycles,
-        "derived_row_miss_cycles": row_miss_cycles,
-        "derived_row_conflict_cycles": row_conflict_cycles,
-        "transaction_queue_entries_per_channel": transaction_queue_entries,
+        "derived_read_row_hit_cycles": read_hit_cycles,
+        "derived_read_row_miss_cycles": read_miss_cycles,
+        "derived_read_row_conflict_cycles": read_conflict_cycles,
+        "derived_write_row_hit_cycles": write_hit_cycles,
+        "derived_write_row_miss_cycles": write_miss_cycles,
+        "derived_write_row_conflict_cycles": write_conflict_cycles,
+        "derived_read_to_write_cycles": read_to_write_cycles,
+        "derived_write_to_read_cycles": write_to_read_cycles,
+        "unified_queue": unified_queue,
+        "read_queue_entries_per_channel": transaction_queue_entries,
+        "write_buffer_entries_per_channel": transaction_queue_entries,
         "command_queue_entries_per_bank": command_queue_entries,
         "formula": definition,
     }
@@ -489,21 +553,102 @@ def validate_sequential_traffic(dataset, run):
     }
 
 
+ADMISSION_TRACE_FIELDS = (
+    "cycle_delta",
+    "admitted_blocks",
+    "admitted_read_blocks",
+    "admitted_write_blocks",
+    "total_read_occupancy_before",
+    "total_read_occupancy_after",
+    "total_write_occupancy_before",
+    "total_write_occupancy_after",
+    "max_channel_read_occupancy_after",
+    "max_channel_write_occupancy_after",
+)
+
+
+def decode_varint(payload, offset):
+    value = 0
+    shift = 0
+    while offset < len(payload):
+        byte = payload[offset]
+        offset += 1
+        value |= (byte & 0x7F) << shift
+        if byte & 0x80 == 0:
+            return value, offset
+        shift += 7
+        if shift >= 70:
+            raise ValueError("admission trace contains an oversized varint")
+    raise ValueError("admission trace ends inside a varint")
+
+
+def iter_admission_trace(summary):
+    if summary.get("representation") != "complete_delta_varint_base64_v1":
+        raise ValueError("admission evidence is not a complete reversible trace")
+    if tuple(summary.get("fields", ())) != ADMISSION_TRACE_FIELDS:
+        raise ValueError("admission trace field schema does not match the decoder")
+    for chunk in summary.get("trace_chunks", ()):
+        payload = base64.b64decode(chunk["payload_base64"], validate=True)
+        offset = 0
+        previous_cycle = 0
+        count = chunk["event_count"]
+        for index in range(count):
+            values = []
+            for _ in ADMISSION_TRACE_FIELDS:
+                value, offset = decode_varint(payload, offset)
+                values.append(value)
+            cycle = values[0] if index == 0 else previous_cycle + values[0]
+            previous_cycle = cycle
+            yield dict(zip(ADMISSION_TRACE_FIELDS[1:], values[1:]), cycle=cycle)
+        if offset != len(payload):
+            raise ValueError("admission trace chunk has trailing bytes")
+
+
+def normalized_histogram(counter):
+    return {str(value): counter[value] for value in sorted(counter)}
+
+
 def validate_transaction_admission(dataset, variant, run):
     architecture = run["architecture"]
     issue_limit = architecture["coordinator_issue_blocks_per_cycle"]
-    queue_capacity = architecture["hbm_transaction_queue_entries_per_channel"]
+    read_capacity = architecture["hbm_read_queue_entries_per_channel"]
+    write_capacity = architecture["hbm_write_buffer_entries_per_channel"]
     channels = architecture["hbm_channels"]
     block_size = architecture["block_size"]
     admitted_total = 0
+    admitted_read_total = 0
+    admitted_write_total = 0
     expected_total = 0
-    max_total_occupancy = 0
+    expected_read_total = 0
+    expected_write_total = 0
+    max_total_read_occupancy = 0
+    max_total_write_occupancy = 0
     admission_cycles = 0
+    checksum_values = []
     for layer in run["layers"]:
         summary = layer["transaction_admission_trace"]
-        traces = summary["trace_samples"]
         previous_cycle = None
-        for trace in traces:
+        cycle_count = 0
+        first_cycle = None
+        last_cycle = None
+        edge_first = []
+        edge_small = []
+        edge_last = collections.deque(maxlen=16)
+        weighted = collections.Counter()
+        histograms = {
+            name: collections.Counter() for name in (
+                "admitted_blocks",
+                "admitted_read_blocks",
+                "admitted_write_blocks",
+                "total_read_occupancy_after",
+                "total_write_occupancy_after",
+                "max_channel_read_occupancy_after",
+                "max_channel_write_occupancy_after",
+            )
+        }
+        actual_max = collections.Counter()
+        checksum = 1469598103934665603
+        for trace in iter_admission_trace(summary):
             admitted = trace["admitted_blocks"]
             if admitted <= 0 or admitted > issue_limit:
                 raise ValueError(
@@ -512,42 +657,185 @@ def validate_transaction_admission(dataset, variant, run):
                 )
             if previous_cycle is not None and trace["cycle"] <= previous_cycle:
                 raise ValueError(f"{dataset} {variant} admission cycles are not increasing")
-            if trace["max_channel_occupancy_after"] > queue_capacity:
-                raise ValueError(f"{dataset} {variant} sample exceeds a channel queue capacity")
+            if admitted != trace["admitted_read_blocks"] + trace["admitted_write_blocks"]:
+                raise ValueError(f"{dataset} {variant} direction counts do not sum")
+            if trace["total_read_occupancy_after"] != (
+                    trace["total_read_occupancy_before"] +
+                    trace["admitted_read_blocks"]):
+                raise ValueError(f"{dataset} {variant} read occupancy accounting differs")
+            if trace["total_write_occupancy_after"] != (
+                    trace["total_write_occupancy_before"] +
+                    trace["admitted_write_blocks"]):
+                raise ValueError(f"{dataset} {variant} write occupancy accounting differs")
+            if trace["max_channel_read_occupancy_after"] > read_capacity or \
+                    trace["max_channel_write_occupancy_after"] > write_capacity:
+                raise ValueError(f"{dataset} {variant} exceeds a directional queue capacity")
+            if trace["total_read_occupancy_after"] > channels * read_capacity or \
+                    trace["total_write_occupancy_after"] > channels * write_capacity:
+                raise ValueError(f"{dataset} {variant} exceeds aggregate directional capacity")
+            if cycle_count < 16:
+                edge_first.append(trace)
+            if cycle_count < 33:
+                edge_small.append(trace)
+            edge_last.append(trace)
+            for name in histograms:
+                histograms[name][trace[name]] += 1
+            for name in (
+                    "admitted_blocks", "admitted_read_blocks", "admitted_write_blocks",
+                    "total_read_occupancy_before", "total_read_occupancy_after",
+                    "total_write_occupancy_before", "total_write_occupancy_after"):
+                weighted[name] += trace[name]
+            actual_max["blocks_admitted_per_cycle"] = max(
+                actual_max["blocks_admitted_per_cycle"], admitted)
+            actual_max["total_read_occupancy"] = max(
+                actual_max["total_read_occupancy"], trace["total_read_occupancy_after"])
+            actual_max["total_write_occupancy"] = max(
+                actual_max["total_write_occupancy"], trace["total_write_occupancy_after"])
+            actual_max["channel_read_occupancy"] = max(
+                actual_max["channel_read_occupancy"],
+                trace["max_channel_read_occupancy_after"])
+            actual_max["channel_write_occupancy"] = max(
+                actual_max["channel_write_occupancy"],
+                trace["max_channel_write_occupancy_after"])
+            for value in (trace["cycle"],) + tuple(
+                    trace[name] for name in ADMISSION_TRACE_FIELDS[1:]):
+                checksum ^= value
+                checksum = (checksum * 1099511628211) & 0xFFFFFFFFFFFFFFFF
+            first_cycle = trace["cycle"] if first_cycle is None else first_cycle
+            last_cycle = trace["cycle"]
             previous_cycle = trace["cycle"]
-        peaks = summary["max_channel_queue_occupancy"]
-        if len(peaks) != channels or any(value > queue_capacity for value in peaks):
-            raise ValueError(f"{dataset} {variant} exceeds a channel queue capacity")
-        if summary["max_blocks_admitted_per_cycle"] > issue_limit:
+            cycle_count += 1
+        if cycle_count != summary["cycle_count"] or \
+                (first_cycle or 0) != summary["first_cycle"] or \
+                (last_cycle or 0) != summary["last_cycle"]:
+            raise ValueError(f"{dataset} {variant} compressed trace bounds differ")
+        expected_edges = edge_small if cycle_count <= 32 else edge_first + list(edge_last)
+        if expected_edges != summary["edge_samples"]:
+            raise ValueError(f"{dataset} {variant} edge samples differ from complete trace")
+        if dict(weighted) != summary["weighted_totals"]:
+            raise ValueError(f"{dataset} {variant} weighted admission totals differ")
+        for name, counter in histograms.items():
+            if normalized_histogram(counter) != summary["histograms"][name]:
+                raise ValueError(f"{dataset} {variant} {name} histogram differs")
+        if dict(actual_max) != summary["actual_max"]:
+            raise ValueError(f"{dataset} {variant} actual admission maxima differ")
+        if f"{checksum:016x}" != summary["trace_checksum_fnv1a64"]:
+            raise ValueError(f"{dataset} {variant} admission checksum differs")
+        read_peaks = summary["max_channel_read_queue_occupancy"]
+        write_peaks = summary["max_channel_write_buffer_occupancy"]
+        if len(read_peaks) != channels or any(value > read_capacity for value in read_peaks):
+            raise ValueError(f"{dataset} {variant} exceeds a channel read queue")
+        if len(write_peaks) != channels or any(value > write_capacity for value in write_peaks):
+            raise ValueError(f"{dataset} {variant} exceeds a channel write buffer")
+        if max(read_peaks, default=0) != actual_max["channel_read_occupancy"] or \
+                max(write_peaks, default=0) != actual_max["channel_write_occupancy"]:
+            raise ValueError(f"{dataset} {variant} directional peak vectors differ")
+        if actual_max["blocks_admitted_per_cycle"] > issue_limit:
             raise ValueError(f"{dataset} {variant} exceeds the shared admission bandwidth")
-        admitted_total += summary["admitted_blocks"]
+        admitted_total += weighted["admitted_blocks"]
+        admitted_read_total += weighted["admitted_read_blocks"]
+        admitted_write_total += weighted["admitted_write_blocks"]
         admission_cycles += summary["cycle_count"]
-        max_total_occupancy = max(
-            max_total_occupancy, summary["max_total_queue_occupancy"]
-        )
+        max_total_read_occupancy = max(
+            max_total_read_occupancy, actual_max["total_read_occupancy"])
+        max_total_write_occupancy = max(
+            max_total_write_occupancy, actual_max["total_write_occupancy"])
+        checksum_values.append(summary["trace_checksum_fnv1a64"])
         for request in layer["memory_requests"]:
-            expected_total += math.ceil(request["bytes"] / block_size)
+            blocks = math.ceil(request["bytes"] / block_size)
+            expected_total += blocks
+            if request["request_class"] in {"output", "intermediate_write"}:
+                expected_write_total += blocks
+            else:
+                expected_read_total += blocks
             if not (
                 request["first_admission_cycle"] >= request["enqueue_cycle"]
                 and request["last_admission_cycle"] >= request["first_admission_cycle"]
                 and request["first_issue_cycle"] >= request["first_admission_cycle"]
             ):
                 raise ValueError(f"{dataset} {variant} request admission violates causality")
-    if admitted_total != expected_total:
+    if (admitted_total, admitted_read_total, admitted_write_total) != (
+            expected_total, expected_read_total, expected_write_total):
         raise ValueError(
-            f"{dataset} {variant} admission trace covers {admitted_total} blocks, "
-            f"expected {expected_total}"
+            f"{dataset} {variant} admission trace covers "
+            f"{admitted_total}/{admitted_read_total}/{admitted_write_total} blocks, "
+            f"expected {expected_total}/{expected_read_total}/{expected_write_total}"
         )
     return {
         "admitted_blocks": admitted_total,
+        "admitted_read_blocks": admitted_read_total,
+        "admitted_write_blocks": admitted_write_total,
         "admission_cycles": admission_cycles,
         "max_blocks_admitted_per_cycle": max(
-            layer["transaction_admission_trace"]["max_blocks_admitted_per_cycle"]
+            layer["transaction_admission_trace"]["actual_max"][
+                "blocks_admitted_per_cycle"]
             for layer in run["layers"]
         ),
         "issue_limit_blocks_per_cycle": issue_limit,
-        "max_total_queue_occupancy": max_total_occupancy,
-        "total_queue_capacity": channels * queue_capacity,
+        "max_total_read_queue_occupancy": max_total_read_occupancy,
+        "max_total_write_buffer_occupancy": max_total_write_occupancy,
+        "total_read_queue_capacity": channels * read_capacity,
+        "total_write_buffer_capacity": channels * write_capacity,
+        "trace_checksums": checksum_values,
+    }
+
+
+def directional_memory_evidence(run):
+    evidence = []
+    for layer in run["layers"]:
+        reads = sorted(
+            (trace["first_issue_cycle"], trace["completion_cycle"])
+            for trace in layer["memory_requests"]
+            if trace["request_class"] not in {"output", "intermediate_write"}
+        )
+        read_starts = [start for start, _ in reads]
+        prefix_completion = []
+        for _, completion in reads:
+            prefix_completion.append(max(
+                completion,
+                prefix_completion[-1] if prefix_completion else 0,
+            ))
+        write_requests = collections.Counter()
+        overlapping_writes = collections.Counter()
+        for trace in layer["memory_requests"]:
+            request_class = trace["request_class"]
+            if request_class not in {"output", "intermediate_write"}:
+                continue
+            write_requests[request_class] += 1
+            index = bisect.bisect_left(read_starts, trace["completion_cycle"]) - 1
+            if index >= 0 and prefix_completion[index] > trace["first_issue_cycle"]:
+                overlapping_writes[request_class] += 1
+        admission = layer["transaction_admission_trace"]
+        evidence.append({
+            "layer": layer["layer"],
+            "read_requests": len(reads),
+            "write_requests": dict(write_requests),
+            "write_requests_overlapping_read_service": dict(overlapping_writes),
+            "read_to_write_switches": layer["read_to_write_switches"],
+            "write_to_read_switches": layer["write_to_read_switches"],
+            "direction_switch_stall_cycles": layer["direction_switch_stall_cycles"],
+            "max_channel_read_queue_occupancy":
+                admission["max_channel_read_queue_occupancy"],
+            "max_channel_write_buffer_occupancy":
+                admission["max_channel_write_buffer_occupancy"],
+            "trace_checksum_fnv1a64": admission["trace_checksum_fnv1a64"],
+        })
+    return {
+        "read_row_cycles": [
+            run["architecture"]["hbm_read_row_hit_cycles"],
+            run["architecture"]["hbm_read_row_miss_cycles"],
+            run["architecture"]["hbm_read_row_conflict_cycles"],
+        ],
+        "write_row_cycles": [
+            run["architecture"]["hbm_write_row_hit_cycles"],
+            run["architecture"]["hbm_write_row_miss_cycles"],
+            run["architecture"]["hbm_write_row_conflict_cycles"],
+        ],
+        "direction_switch_cycles": [
+            run["architecture"]["hbm_read_to_write_cycles"],
+            run["architecture"]["hbm_write_to_read_cycles"],
+        ],
+        "layers": evidence,
     }
 
 
@@ -617,13 +905,20 @@ def current_parameters(architecture, workloads):
         "benchmark_selected_layer": workloads["figures"]["figure_17"]["selected_layer"],
         "edge_input_dependency": "edge_completion_plus_neighbor_index_ready",
         "edge_ping_pong_regions": architecture["edge_ping_pong_regions"],
-        "hbm_transaction_queue_entries_per_channel":
-            architecture["hbm_transaction_queue_entries_per_channel"],
+        "hbm_read_queue_entries_per_channel":
+            architecture["hbm_read_queue_entries_per_channel"],
+        "hbm_write_buffer_entries_per_channel":
+            architecture["hbm_write_buffer_entries_per_channel"],
         "hbm_command_queue_entries_per_bank":
             architecture["hbm_command_queue_entries_per_bank"],
-        "hbm_row_hit_cycles": architecture["hbm_row_hit_cycles"],
-        "hbm_row_miss_cycles": architecture["hbm_row_miss_cycles"],
-        "hbm_row_conflict_cycles": architecture["hbm_row_conflict_cycles"],
+        "hbm_read_row_hit_cycles": architecture["hbm_read_row_hit_cycles"],
+        "hbm_read_row_miss_cycles": architecture["hbm_read_row_miss_cycles"],
+        "hbm_read_row_conflict_cycles": architecture["hbm_read_row_conflict_cycles"],
+        "hbm_write_row_hit_cycles": architecture["hbm_write_row_hit_cycles"],
+        "hbm_write_row_miss_cycles": architecture["hbm_write_row_miss_cycles"],
+        "hbm_write_row_conflict_cycles": architecture["hbm_write_row_conflict_cycles"],
+        "hbm_read_to_write_cycles": architecture["hbm_read_to_write_cycles"],
+        "hbm_write_to_read_cycles": architecture["hbm_write_to_read_cycles"],
         "coordinator_issue_blocks_per_cycle":
             architecture["coordinator_issue_blocks_per_cycle"],
         "input_ping_pong_regions": architecture["input_ping_pong_regions"],
@@ -742,6 +1037,10 @@ def main():
                 ],
             },
             "transaction_admission_oracles": admission_oracles,
+            "directional_memory_evidence": {
+                name: directional_memory_evidence(result)
+                for name, result in runs.items()
+            },
         }
         for name, value in metrics.items():
             metric_values[name].append(value)

@@ -55,7 +55,7 @@
 
 ### 5. Coordinator 使用 batch 仲裁、低位交织映射和请求级 HBM 时序
 
-每个 DRAM 请求携带 batch ID、请求类别、地址、字节数、producer sequence、producer-ready 与入队周期。Input 由对应 Edge completion 加邻居索引延迟动态释放。模型把请求推进为统一 64B block 流，保证同一地址/事务序列的完成时间不依赖上层请求切分。映射前，FIFO 逐 block 轮转 Edge、Input、Weight、Output 四个并发端口，复现论文所述未协调访问的频繁地址切换；batch-class 按 batch 和 `Edge > Input > Weight > Output` 组装连续流。两者共享全局四 block/cycle admission 带宽、每 channel 32-entry transaction queue 和每 bank 8-entry command queue，两个容量直接来自 bundled DRAMSim3 HBM 的 `trans_queue_size` 与 `cmd_queue_size`。bank 侧只在同 batch/class 内延续 open row，不跨 RAW 或优先级组绕行。priority 与 mapping 独立；low-bits 对应论文 §4.5.2；row-first 直接折叠 `rorabgbachco`，一个 row span 不再使用无来源的二路 bank striping。
+每个 DRAM 请求携带 batch ID、请求类别、地址、字节数、producer sequence、producer-ready 与入队周期。Input 由对应 Edge completion 加邻居索引延迟动态释放。模型把请求推进为统一 64B block 流，保证同一地址/事务序列的完成时间不依赖上层请求切分。映射前，FIFO 逐 block 轮转 Edge、Input、Weight、Output 四个并发端口，复现论文所述未协调访问的频繁地址切换；batch-class 按 batch 和 `Edge > Input > Weight > Output` 组装连续流。两者共享全局四 block/cycle admission 带宽。bundled DRAMSim3 HBM 配置为 `unified_queue=False`，因此每 channel 独立限制 32-entry read queue 和 32-entry write buffer，再共享每 bank 8-entry command queue。控制器采用读优先和有界 write draining；bank issue 分别使用 read `CL/tRCDRD`、write `CWL/tRCDWR`，并施加 read-to-write/write-to-read command spacing。bank 侧只在同 batch/class 内延续 open row，不跨 RAW 或优先级组绕行。priority 与 mapping 独立；low-bits 对应论文 §4.5.2；row-first 直接折叠 `rorabgbachco`，一个 row span 不再使用无来源的二路 bank striping。
 
 该规则对应论文“当前批次低优先级请求先于后续批次高优先级请求”的描述，避免现有全局严格优先级造成跨批次饥饿。
 
@@ -75,7 +75,7 @@ required `bandwidth_util` 使用从周期 0 到最后一个请求 completion 的
 
 ### 7. 区分结构参数与时序参数
 
-结构参数来自论文，不允许基准脚本修改。HBM row hit/miss/conflict 延迟由 bundled DRAMSim3 HBM 配置中的 `CL`、`tRCDRD`、`tRP` 与 `tCK` 推导；row 大小、channel/bank 数、请求释放延迟、ping-pong 区数和图分区调度占用上限集中在配置中，具有明确单位并写入运行清单。物理 16 MiB Aggregation Buffer 与低于单个 8 MiB 半区的 scheduler shard cap 分别记录，后者不得伪装成物理容量。基准报告从版本化 review v3 参数基线自动生成 config/source diff；`parameter_recalibration` 不得硬编码。priority/mapping 不得选择预设效率，流水开关不得选择固定重叠率，sequential 不得使用经验 spill 系数。
+结构参数来自论文，不允许基准脚本修改。HBM read row hit/miss/conflict 延迟由 bundled DRAMSim3 的 `CL/tRCDRD/tRP` 推导，write 延迟由 `CWL/tRCDWR/tRP` 推导，方向切换由 `RL/WL/burst/tRTRS/tWTR_L` 推导；全部通过 `tCK` 转换。row 大小、channel/bank 数、请求释放延迟、ping-pong 区数和图分区调度占用上限集中在配置中，具有明确单位并写入运行清单。物理 16 MiB Aggregation Buffer 与低于单个 8 MiB 半区的 scheduler shard cap 分别记录，后者不得伪装成物理容量。基准报告从版本化 review v3 参数基线自动生成 config/source diff；`parameter_recalibration` 不得硬编码。priority/mapping 不得选择预设效率，流水开关不得选择固定重叠率，sequential 不得使用经验 spill 系数。
 
 禁止在结果生成阶段乘全局“论文修正系数”或按数据集写特例。Cora、Citeseer、PubMed 必须使用同一结构和时序参数执行成对消融。
 如果调度占用上限相对验收基线变化，正式证据必须披露所有历史暴露。由于 Cora、Citeseer、PubMed 均已用于 4/5/6 MiB 比较，当前结果只能标记为 calibrated fit，不得回溯性声明 hold-out。未公开的 producer 延迟必须保留固定邻域敏感性；DRAMSim3 派生时序也保留相邻 profile 反事实。替代 row-first interleave 只能作为诊断，不得替换有外部配置依据的 required 基线。

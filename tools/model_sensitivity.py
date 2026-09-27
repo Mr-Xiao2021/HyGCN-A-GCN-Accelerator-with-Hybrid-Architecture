@@ -16,19 +16,38 @@ SCENARIOS = {
     "neighbor_delay_0": {("model", "neighbor_index_ready_cycles"): 0},
     "neighbor_delay_4": {("model", "neighbor_index_ready_cycles"): 4},
     "dram_timing_fast": {
-        ("memory", "hbm_row_hit_cycles"): 10,
-        ("memory", "hbm_row_miss_cycles"): 24,
-        ("memory", "hbm_row_conflict_cycles"): 38,
+        ("memory", "hbm_read_row_hit_cycles"): 10,
+        ("memory", "hbm_read_row_miss_cycles"): 24,
+        ("memory", "hbm_read_row_conflict_cycles"): 38,
+        ("memory", "hbm_write_row_hit_cycles"): 2,
+        ("memory", "hbm_write_row_miss_cycles"): 14,
+        ("memory", "hbm_write_row_conflict_cycles"): 28,
+        ("memory", "hbm_read_to_write_cycles"): 14,
+        ("memory", "hbm_write_to_read_cycles"): 12,
     },
     "dram_timing_slow": {
-        ("memory", "hbm_row_hit_cycles"): 18,
-        ("memory", "hbm_row_miss_cycles"): 36,
-        ("memory", "hbm_row_conflict_cycles"): 54,
+        ("memory", "hbm_read_row_hit_cycles"): 18,
+        ("memory", "hbm_read_row_miss_cycles"): 36,
+        ("memory", "hbm_read_row_conflict_cycles"): 54,
+        ("memory", "hbm_write_row_hit_cycles"): 6,
+        ("memory", "hbm_write_row_miss_cycles"): 22,
+        ("memory", "hbm_write_row_conflict_cycles"): 38,
+        ("memory", "hbm_read_to_write_cycles"): 22,
+        ("memory", "hbm_write_to_read_cycles"): 20,
     },
     "legacy_12_28_timing": {
-        ("memory", "hbm_row_hit_cycles"): 12,
-        ("memory", "hbm_row_miss_cycles"): 28,
-        ("memory", "hbm_row_conflict_cycles"): 42,
+        ("memory", "hbm_read_row_hit_cycles"): 12,
+        ("memory", "hbm_read_row_miss_cycles"): 28,
+        ("memory", "hbm_read_row_conflict_cycles"): 42,
+    },
+    "write_timing_slow": {
+        ("memory", "hbm_write_row_hit_cycles"): 6,
+        ("memory", "hbm_write_row_miss_cycles"): 22,
+        ("memory", "hbm_write_row_conflict_cycles"): 38,
+    },
+    "direction_switching_slow": {
+        ("memory", "hbm_read_to_write_cycles"): 22,
+        ("memory", "hbm_write_to_read_cycles"): 20,
     },
     "row_first_interleave_2": {("model", "row_first_bank_interleave"): 2},
 }
@@ -172,9 +191,9 @@ def main():
         "workload_manifest_sha256": paper_benchmark.sha256_digest(workload_path),
         "datasets": args.datasets,
         "selection_policy": (
-            "The required baseline is derived from the bundled DRAMSim3 HBM tCK, CL, and "
-            "tRCDRD values. Alternative values are diagnostic sensitivity points and are "
-            "not selected using paper targets."
+            "The required baseline is derived from bundled DRAMSim3 read, write, and "
+            "direction-switch timing. Alternative values are diagnostic sensitivity "
+            "points and are not selected using paper targets."
         ),
         "required_dram_timing_basis": dram_timing_basis,
         "scenarios": {},

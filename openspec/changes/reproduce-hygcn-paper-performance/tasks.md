@@ -103,3 +103,10 @@
 - [x] 12.4 取消 PubMed hold-out 声明，将三数据集 14 项论文数值标记为 calibrated fit，并继续输出 4/5/6 MiB partition sensitivity
 - [x] 12.5 从 bundled DRAMSim3 HBM 推导 14/28/42 row hit/miss/conflict 时序，保留相邻 timing profile 与 mapping 反事实敏感性
 - [x] 12.6 将验收报告固定拆分为 14 项论文数值与 12 项内部因果检查，不以 26/26 扩大外部证据
+
+## 13. Review v6 方向队列、写时序与完整 admission 证据整改
+
+- [x] 13.1 按 bundled DRAMSim3 `unified_queue=False` 将每 channel 拆为独立 32-entry read queue 和 32-entry write buffer，并保持全局 4 blocks/cycle admission
+- [x] 13.2 从 `CWL/tRCDWR/tRP` 推导 write hit/miss/conflict，从 `RL/WL/burst/tRTRS/tWTR_L` 推导 read/write switching，增加方向反例单测
+- [x] 13.3 将 transaction admission 事件保存为完整可逆 delta-varint/base64 分块，validator 独立重算 histogram、weighted totals、actual maxima、edge samples 和 checksum
+- [ ] 13.4 在不调整目标相关参数的前提下完成 clean Release、CTest、legacy、强制 benchmark、partition/model sensitivity，并固化修正前后证据

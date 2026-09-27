@@ -138,11 +138,17 @@ def main():
         "aggregation_shard_capacity_bytes": 5242880,
         "batch_launch_interval_cycles": 1,
         "edge_ping_pong_regions": 2,
-        "hbm_transaction_queue_entries_per_channel": 32,
+        "hbm_read_queue_entries_per_channel": 32,
+        "hbm_write_buffer_entries_per_channel": 32,
         "hbm_command_queue_entries_per_bank": 8,
-        "hbm_row_hit_cycles": 14,
-        "hbm_row_miss_cycles": 28,
-        "hbm_row_conflict_cycles": 42,
+        "hbm_read_row_hit_cycles": 14,
+        "hbm_read_row_miss_cycles": 28,
+        "hbm_read_row_conflict_cycles": 42,
+        "hbm_write_row_hit_cycles": 4,
+        "hbm_write_row_miss_cycles": 18,
+        "hbm_write_row_conflict_cycles": 32,
+        "hbm_read_to_write_cycles": 18,
+        "hbm_write_to_read_cycles": 16,
         "coordinator_issue_blocks_per_cycle": 4,
         "input_ping_pong_regions": 2,
         "neighbor_index_ready_cycles": 2,
@@ -160,13 +166,20 @@ def main():
     timing = benchmark.derive_dramsim3_timing(
         root, root / "configs/HYGCN_PAPER.ini", workloads
     )
-    if timing["derived_row_hit_cycles"] != 14 or \
-            timing["derived_row_miss_cycles"] != 28 or \
-            timing["derived_row_conflict_cycles"] != 42:
-        raise RuntimeError("required HBM timing must be derived from DRAMSim3")
-    if timing["transaction_queue_entries_per_channel"] != 32 or \
+    if timing["derived_read_row_hit_cycles"] != 14 or \
+            timing["derived_read_row_miss_cycles"] != 28 or \
+            timing["derived_read_row_conflict_cycles"] != 42 or \
+            timing["derived_write_row_hit_cycles"] != 4 or \
+            timing["derived_write_row_miss_cycles"] != 18 or \
+            timing["derived_write_row_conflict_cycles"] != 32 or \
+            timing["derived_read_to_write_cycles"] != 18 or \
+            timing["derived_write_to_read_cycles"] != 16:
+        raise RuntimeError("required directional HBM timing must be derived from DRAMSim3")
+    if timing["unified_queue"] or \
+            timing["read_queue_entries_per_channel"] != 32 or \
+            timing["write_buffer_entries_per_channel"] != 32 or \
             timing["command_queue_entries_per_bank"] != 8:
-        raise RuntimeError("required HBM queue capacities must be derived from DRAMSim3")
+        raise RuntimeError("required directional HBM queues must be derived from DRAMSim3")
     with (root / "configs/paper_metrics.json").open(encoding="utf-8") as stream:
         reference = json.load(stream)
     if benchmark.evidence_counts(reference) != {

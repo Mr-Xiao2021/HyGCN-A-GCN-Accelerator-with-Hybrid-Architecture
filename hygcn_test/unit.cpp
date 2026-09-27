@@ -91,8 +91,9 @@ void TestConfig() {
               paper.neighbor_index_ready_cycles == 2 &&
               paper.sequential_spill_alignment == "block",
           "paper profile audits request release and spill behavior");
-    Check(paper.hbm_transaction_queue_entries_per_channel == 32,
-          "paper profile uses the DRAMSim3 HBM transaction queue depth");
+    Check(paper.hbm_read_queue_entries_per_channel == 32 &&
+              paper.hbm_write_buffer_entries_per_channel == 32,
+          "paper profile models DRAMSim3 read and write queues independently");
     Check(static_cast<uint64_t>(paper.HbmBytesPerCycle()) / paper.block_size == 4,
           "paper profile derives four 64-byte coordinator issues per cycle");
     Check(std::abs(paper.HbmBytesPerCycle() - 256.0) < 1e-9,
@@ -102,12 +103,24 @@ void TestConfig() {
         return static_cast<int>(std::ceil(
             dram_cycles * dram_config.tCK * paper.frequency_ghz));
     };
-    Check(paper.hbm_row_hit_cycles == paper_cycles(dram_config.CL) &&
-              paper.hbm_row_miss_cycles ==
+    Check(paper.hbm_read_row_hit_cycles == paper_cycles(dram_config.CL) &&
+              paper.hbm_read_row_miss_cycles ==
                   paper_cycles(dram_config.tRCDRD + dram_config.CL) &&
-              paper.hbm_row_conflict_cycles == paper_cycles(
+              paper.hbm_read_row_conflict_cycles == paper_cycles(
                   dram_config.tRP + dram_config.tRCDRD + dram_config.CL),
-          "paper HBM hit/miss/conflict timing is derived from the DRAMSim3 HBM config");
+          "paper HBM read timing is derived from the DRAMSim3 HBM config");
+    Check(paper.hbm_write_row_hit_cycles == paper_cycles(dram_config.CWL) &&
+              paper.hbm_write_row_miss_cycles ==
+                  paper_cycles(dram_config.tRCDWR + dram_config.CWL) &&
+              paper.hbm_write_row_conflict_cycles == paper_cycles(
+                  dram_config.tRP + dram_config.tRCDWR + dram_config.CWL),
+          "paper HBM write timing is derived from CWL and tRCDWR");
+    Check(paper.hbm_read_to_write_cycles == paper_cycles(
+              dram_config.RL + dram_config.burst_cycle - dram_config.WL +
+              dram_config.tRTRS) &&
+              paper.hbm_write_to_read_cycles == paper_cycles(
+                  dram_config.write_delay + dram_config.tWTR_L),
+          "paper HBM direction switching follows DRAMSim3 command timing");
 
     auto invalid = paper;
     invalid.num_simd = 0;
@@ -436,7 +449,8 @@ void TestTransactionAdmissionBandwidth() {
     auto config = ArchitectureConfig::Load("configs/HYGCN_PAPER.ini");
     config.hbm_channels = 4;
     config.hbm_banks_per_channel = 1;
-    config.hbm_transaction_queue_entries_per_channel = 2;
+    config.hbm_read_queue_entries_per_channel = 2;
+    config.hbm_write_buffer_entries_per_channel = 2;
     config.hbm_row_bytes = 256;
     config.row_first_bank_interleave = 1;
     config.Validate();
@@ -458,19 +472,28 @@ void TestTransactionAdmissionBandwidth() {
                   "four coordinator ports admit at most four blocks per cycle");
             Check(first || trace.cycle > previous_cycle,
                   "transaction admission cycles are unique and increasing");
-            Check(trace.total_occupancy_after <= 8 &&
-                      trace.max_channel_occupancy_after <= 2,
-                  "shared admission preserves every channel queue capacity");
+            Check(trace.total_read_occupancy_after <= 8 &&
+                      trace.total_write_occupancy_after <= 8 &&
+                      trace.max_channel_read_occupancy_after <= 2 &&
+                      trace.max_channel_write_occupancy_after <= 2 &&
+                      trace.admitted_blocks == trace.admitted_read_blocks +
+                          trace.admitted_write_blocks,
+                  "shared admission preserves independent read and write capacities");
             admitted_blocks += trace.admitted_blocks;
             previous_cycle = trace.cycle;
             first = false;
         }
         Check(admitted_blocks == 16,
               "admission trace accounts for every 64-byte block");
-        Check(timing.max_channel_queue_occupancy.size() == 4 &&
-                  *std::max_element(timing.max_channel_queue_occupancy.begin(),
-                                    timing.max_channel_queue_occupancy.end()) <= 2,
-              "per-channel peak occupancy remains within the shared queue capacity");
+        Check(timing.max_channel_read_queue_occupancy.size() == 4 &&
+                  timing.max_channel_write_buffer_occupancy.size() == 4 &&
+                  *std::max_element(
+                      timing.max_channel_read_queue_occupancy.begin(),
+                      timing.max_channel_read_queue_occupancy.end()) <= 2 &&
+                  *std::max_element(
+                      timing.max_channel_write_buffer_occupancy.begin(),
+                      timing.max_channel_write_buffer_occupancy.end()) <= 2,
+              "per-channel read and write peaks remain independently bounded");
         for (const auto& trace : timing.request_traces) {
             Check(trace.first_admission_cycle >= trace.enqueue_cycle &&
                       trace.last_admission_cycle >= trace.first_admission_cycle &&
@@ -478,6 +501,63 @@ void TestTransactionAdmissionBandwidth() {
                   "request issue follows enqueue and bounded transaction admission");
         }
     }
+}
+
+void TestDirectionalHbmQueuesAndTiming() {
+    auto config = ArchitectureConfig::Load("configs/HYGCN_PAPER.ini");
+    config.hbm_channels = 1;
+    config.hbm_banks_per_channel = 4;
+    config.hbm_read_queue_entries_per_channel = 2;
+    config.hbm_write_buffer_entries_per_channel = 2;
+    config.hbm_row_bytes = 256;
+    config.row_first_bank_interleave = 1;
+    config.Validate();
+    const std::vector<MemoryRequest> requests = {
+        {0, RequestClass::EDGE, 128, 0, 0, 0},
+        {0, RequestClass::OUTPUT, 64, 128, 0, 1},
+    };
+    const auto timing = MemoryCoordinatorModel::Simulate(
+        requests, config, MemoryPriorityMode::FIFO,
+        AddressMappingMode::LOW_BITS);
+    Check(!timing.admission_traces.empty() &&
+              timing.admission_traces.front().admitted_read_blocks == 2 &&
+              timing.admission_traces.front().admitted_write_blocks == 1 &&
+              timing.admission_traces.front().max_channel_read_occupancy_after == 2 &&
+              timing.admission_traces.front().max_channel_write_occupancy_after == 1,
+          "a full read queue does not consume the independent write-buffer capacity");
+    const auto read = std::find_if(
+        timing.request_traces.begin(), timing.request_traces.end(),
+        [](const auto& trace) { return trace.request_class == RequestClass::EDGE; });
+    const auto write = std::find_if(
+        timing.request_traces.begin(), timing.request_traces.end(),
+        [](const auto& trace) { return trace.request_class == RequestClass::OUTPUT; });
+    Check(read != timing.request_traces.end() && write != timing.request_traces.end() &&
+              write->first_issue_cycle >=
+                  read->first_issue_cycle + config.hbm_read_to_write_cycles,
+          "read-to-write issue spacing follows the configured direction constraint");
+    Check(timing.read_to_write_switches > 0 &&
+              timing.direction_switch_stall_cycles > 0,
+          "direction switching records an observable stall counterexample");
+
+    const auto read_only = MemoryCoordinatorModel::Simulate(
+        {{0, RequestClass::EDGE, 64, 0, 0, 0}}, config,
+        MemoryPriorityMode::FIFO, AddressMappingMode::LOW_BITS);
+    const auto write_only = MemoryCoordinatorModel::Simulate(
+        {{0, RequestClass::OUTPUT, 64, 0, 0, 0}}, config,
+        MemoryPriorityMode::FIFO, AddressMappingMode::LOW_BITS);
+    Check(write_only.cycles < read_only.cycles &&
+              read_only.cycles - write_only.cycles ==
+                  static_cast<uint64_t>(config.hbm_read_row_miss_cycles -
+                                        config.hbm_write_row_miss_cycles),
+          "write requests use CWL/tRCDWR timing instead of read latency");
+    std::cout << "directional_hbm_evidence={\"read_peak\":"
+              << timing.max_channel_read_queue_occupancy.front()
+              << ",\"write_peak\":"
+              << timing.max_channel_write_buffer_occupancy.front()
+              << ",\"read_issue\":" << read->first_issue_cycle
+              << ",\"write_issue\":" << write->first_issue_cycle
+              << ",\"switch_stall\":" << timing.direction_switch_stall_cycles
+              << "}\n";
 }
 
 void TestMemoryServiceBandwidthScope() {
@@ -885,6 +965,8 @@ int main() {
         RunNamedTest("coordinator_ordering", TestCoordinator);
         RunNamedTest("V5_01_transaction_admission_bandwidth",
                      TestTransactionAdmissionBandwidth);
+        RunNamedTest("V6_01_directional_hbm_queues_and_timing",
+                     TestDirectionalHbmQueuesAndTiming);
         RunNamedTest("V4_01_memory_service_bandwidth_scope", TestMemoryServiceBandwidthScope);
         RunNamedTest("F02_fragmentation_invariance", TestFragmentationInvariant);
         RunNamedTest("aggregation_buffer", TestAggregationBuffer);

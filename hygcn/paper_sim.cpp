@@ -48,6 +48,44 @@ std::string Hex64(uint64_t value) {
     return output.str();
 }
 
+void AppendVarint(std::string& output, uint64_t value) {
+    do {
+        uint8_t byte = static_cast<uint8_t>(value & 0x7fU);
+        value >>= 7U;
+        if (value != 0) {
+            byte |= 0x80U;
+        }
+        output.push_back(static_cast<char>(byte));
+    } while (value != 0);
+}
+
+std::string Base64Encode(const std::string& input) {
+    constexpr char kAlphabet[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string output;
+    output.reserve(((input.size() + 2) / 3) * 4);
+    for (std::size_t offset = 0; offset < input.size(); offset += 3) {
+        const uint32_t first = static_cast<unsigned char>(input[offset]);
+        const uint32_t second = offset + 1 < input.size()
+            ? static_cast<unsigned char>(input[offset + 1]) : 0;
+        const uint32_t third = offset + 2 < input.size()
+            ? static_cast<unsigned char>(input[offset + 2]) : 0;
+        const uint32_t value = (first << 16U) | (second << 8U) | third;
+        output.push_back(kAlphabet[(value >> 18U) & 0x3fU]);
+        output.push_back(kAlphabet[(value >> 12U) & 0x3fU]);
+        output.push_back(offset + 1 < input.size()
+            ? kAlphabet[(value >> 6U) & 0x3fU] : '=');
+        output.push_back(offset + 2 < input.size()
+            ? kAlphabet[value & 0x3fU] : '=');
+    }
+    return output;
+}
+
+void IncrementHistogram(json& histogram, uint64_t value) {
+    const std::string key = std::to_string(value);
+    histogram[key] = histogram.value(key, uint64_t{0}) + 1;
+}
+
 uint64_t Fnv1aUpdate(uint64_t hash, const char* data, std::size_t size) {
     constexpr uint64_t kPrime = 1099511628211ULL;
     for (std::size_t i = 0; i < size; ++i) {
@@ -106,6 +144,11 @@ std::size_t CoordinatorPort(RequestClass request_class) {
     throw std::runtime_error("unknown request class");
 }
 
+bool IsWriteRequest(RequestClass request_class) {
+    return request_class == RequestClass::OUTPUT ||
+           request_class == RequestClass::INTERMEDIATE_WRITE;
+}
+
 uint64_t CoordinatorIssueBlocksPerCycle(const ArchitectureConfig& architecture) {
     return std::max<uint64_t>(
         1, static_cast<uint64_t>(std::floor(
@@ -138,15 +181,22 @@ json ArchitectureJson(const ArchitectureConfig& architecture) {
         {"hbm_channels", architecture.hbm_channels},
         {"hbm_banks_per_channel", architecture.hbm_banks_per_channel},
         {"hbm_row_bytes", architecture.hbm_row_bytes},
-        {"hbm_transaction_queue_entries_per_channel",
-         architecture.hbm_transaction_queue_entries_per_channel},
+        {"hbm_read_queue_entries_per_channel",
+         architecture.hbm_read_queue_entries_per_channel},
+        {"hbm_write_buffer_entries_per_channel",
+         architecture.hbm_write_buffer_entries_per_channel},
         {"hbm_command_queue_entries_per_bank",
          architecture.hbm_command_queue_entries_per_bank},
         {"coordinator_issue_blocks_per_cycle",
          CoordinatorIssueBlocksPerCycle(architecture)},
-        {"hbm_row_hit_cycles", architecture.hbm_row_hit_cycles},
-        {"hbm_row_miss_cycles", architecture.hbm_row_miss_cycles},
-        {"hbm_row_conflict_cycles", architecture.hbm_row_conflict_cycles},
+        {"hbm_read_row_hit_cycles", architecture.hbm_read_row_hit_cycles},
+        {"hbm_read_row_miss_cycles", architecture.hbm_read_row_miss_cycles},
+        {"hbm_read_row_conflict_cycles", architecture.hbm_read_row_conflict_cycles},
+        {"hbm_write_row_hit_cycles", architecture.hbm_write_row_hit_cycles},
+        {"hbm_write_row_miss_cycles", architecture.hbm_write_row_miss_cycles},
+        {"hbm_write_row_conflict_cycles", architecture.hbm_write_row_conflict_cycles},
+        {"hbm_read_to_write_cycles", architecture.hbm_read_to_write_cycles},
+        {"hbm_write_to_read_cycles", architecture.hbm_write_to_read_cycles},
         {"edram_latency_cycles", architecture.edram_latency_cycles},
         {"edram_transactions_per_cycle", architecture.edram_transactions_per_cycle},
         {"simd_efficiency", architecture.simd_efficiency},
@@ -208,49 +258,165 @@ json LayerJson(const LayerMetrics& layer) {
                 ? json(*trace.producer_sequence) : json(nullptr)},
         });
     }
-    json admission_samples = json::array();
-    std::array<uint64_t, 5> admission_histogram{};
+    json admission_edge_samples = json::array();
+    json admission_histograms = {
+        {"admitted_blocks", json::object()},
+        {"admitted_read_blocks", json::object()},
+        {"admitted_write_blocks", json::object()},
+        {"total_read_occupancy_after", json::object()},
+        {"total_write_occupancy_after", json::object()},
+        {"max_channel_read_occupancy_after", json::object()},
+        {"max_channel_write_occupancy_after", json::object()},
+    };
     uint64_t admitted_blocks = 0;
-    uint64_t max_total_occupancy = 0;
+    uint64_t admitted_read_blocks = 0;
+    uint64_t admitted_write_blocks = 0;
+    uint64_t total_read_occupancy_before = 0;
+    uint64_t total_read_occupancy_after = 0;
+    uint64_t total_write_occupancy_before = 0;
+    uint64_t total_write_occupancy_after = 0;
+    uint64_t max_blocks_admitted_per_cycle = 0;
+    uint64_t max_total_read_occupancy = 0;
+    uint64_t max_total_write_occupancy = 0;
+    uint64_t max_channel_read_occupancy = 0;
+    uint64_t max_channel_write_occupancy = 0;
     uint64_t admission_checksum = 1469598103934665603ULL;
     for (std::size_t index = 0; index < layer.transaction_admission_traces.size(); ++index) {
         const auto& trace = layer.transaction_admission_traces[index];
-        if (trace.admitted_blocks < admission_histogram.size()) {
-            ++admission_histogram[trace.admitted_blocks];
-        }
+        IncrementHistogram(admission_histograms["admitted_blocks"],
+                           trace.admitted_blocks);
+        IncrementHistogram(admission_histograms["admitted_read_blocks"],
+                           trace.admitted_read_blocks);
+        IncrementHistogram(admission_histograms["admitted_write_blocks"],
+                           trace.admitted_write_blocks);
+        IncrementHistogram(admission_histograms["total_read_occupancy_after"],
+                           trace.total_read_occupancy_after);
+        IncrementHistogram(admission_histograms["total_write_occupancy_after"],
+                           trace.total_write_occupancy_after);
+        IncrementHistogram(admission_histograms["max_channel_read_occupancy_after"],
+                           trace.max_channel_read_occupancy_after);
+        IncrementHistogram(admission_histograms["max_channel_write_occupancy_after"],
+                           trace.max_channel_write_occupancy_after);
         admitted_blocks += trace.admitted_blocks;
-        max_total_occupancy = std::max(max_total_occupancy, trace.total_occupancy_after);
-        for (const uint64_t value : {trace.cycle, trace.admitted_blocks,
-                                     trace.total_occupancy_before,
-                                     trace.total_occupancy_after,
-                                     trace.max_channel_occupancy_after}) {
+        admitted_read_blocks += trace.admitted_read_blocks;
+        admitted_write_blocks += trace.admitted_write_blocks;
+        total_read_occupancy_before += trace.total_read_occupancy_before;
+        total_read_occupancy_after += trace.total_read_occupancy_after;
+        total_write_occupancy_before += trace.total_write_occupancy_before;
+        total_write_occupancy_after += trace.total_write_occupancy_after;
+        max_blocks_admitted_per_cycle = std::max(
+            max_blocks_admitted_per_cycle, trace.admitted_blocks);
+        max_total_read_occupancy = std::max(
+            max_total_read_occupancy, trace.total_read_occupancy_after);
+        max_total_write_occupancy = std::max(
+            max_total_write_occupancy, trace.total_write_occupancy_after);
+        max_channel_read_occupancy = std::max(
+            max_channel_read_occupancy, trace.max_channel_read_occupancy_after);
+        max_channel_write_occupancy = std::max(
+            max_channel_write_occupancy, trace.max_channel_write_occupancy_after);
+        for (const uint64_t value : {
+                 trace.cycle,
+                 trace.admitted_blocks,
+                 trace.admitted_read_blocks,
+                 trace.admitted_write_blocks,
+                 trace.total_read_occupancy_before,
+                 trace.total_read_occupancy_after,
+                 trace.total_write_occupancy_before,
+                 trace.total_write_occupancy_after,
+                 trace.max_channel_read_occupancy_after,
+                 trace.max_channel_write_occupancy_after}) {
             admission_checksum ^= value;
             admission_checksum *= 1099511628211ULL;
         }
         if (index < 16 || index + 16 >= layer.transaction_admission_traces.size()) {
-            admission_samples.push_back({
+            admission_edge_samples.push_back({
                 {"cycle", trace.cycle},
                 {"admitted_blocks", trace.admitted_blocks},
-                {"total_occupancy_before", trace.total_occupancy_before},
-                {"total_occupancy_after", trace.total_occupancy_after},
-                {"max_channel_occupancy_after", trace.max_channel_occupancy_after},
+                {"admitted_read_blocks", trace.admitted_read_blocks},
+                {"admitted_write_blocks", trace.admitted_write_blocks},
+                {"total_read_occupancy_before", trace.total_read_occupancy_before},
+                {"total_read_occupancy_after", trace.total_read_occupancy_after},
+                {"total_write_occupancy_before", trace.total_write_occupancy_before},
+                {"total_write_occupancy_after", trace.total_write_occupancy_after},
+                {"max_channel_read_occupancy_after",
+                 trace.max_channel_read_occupancy_after},
+                {"max_channel_write_occupancy_after",
+                 trace.max_channel_write_occupancy_after},
             });
         }
     }
+    constexpr std::size_t kAdmissionChunkEvents = 4096;
+    json admission_chunks = json::array();
+    for (std::size_t offset = 0;
+         offset < layer.transaction_admission_traces.size();
+         offset += kAdmissionChunkEvents) {
+        const std::size_t end = std::min(
+            offset + kAdmissionChunkEvents,
+            layer.transaction_admission_traces.size());
+        std::string payload;
+        payload.reserve((end - offset) * 20);
+        uint64_t previous_cycle = 0;
+        for (std::size_t index = offset; index < end; ++index) {
+            const auto& trace = layer.transaction_admission_traces[index];
+            AppendVarint(payload, index == offset
+                ? trace.cycle : trace.cycle - previous_cycle);
+            previous_cycle = trace.cycle;
+            for (const uint64_t value : {
+                     trace.admitted_blocks,
+                     trace.admitted_read_blocks,
+                     trace.admitted_write_blocks,
+                     trace.total_read_occupancy_before,
+                     trace.total_read_occupancy_after,
+                     trace.total_write_occupancy_before,
+                     trace.total_write_occupancy_after,
+                     trace.max_channel_read_occupancy_after,
+                     trace.max_channel_write_occupancy_after}) {
+                AppendVarint(payload, value);
+            }
+        }
+        admission_chunks.push_back({
+            {"event_count", end - offset},
+            {"payload_base64", Base64Encode(payload)},
+        });
+    }
     json admission_summary = {
+        {"representation", "complete_delta_varint_base64_v1"},
+        {"fields", {"cycle_delta", "admitted_blocks", "admitted_read_blocks",
+                    "admitted_write_blocks", "total_read_occupancy_before",
+                    "total_read_occupancy_after", "total_write_occupancy_before",
+                    "total_write_occupancy_after",
+                    "max_channel_read_occupancy_after",
+                    "max_channel_write_occupancy_after"}},
+        {"chunk_event_limit", kAdmissionChunkEvents},
+        {"trace_chunks", admission_chunks},
         {"cycle_count", layer.transaction_admission_traces.size()},
         {"first_cycle", layer.transaction_admission_traces.empty()
             ? 0 : layer.transaction_admission_traces.front().cycle},
         {"last_cycle", layer.transaction_admission_traces.empty()
             ? 0 : layer.transaction_admission_traces.back().cycle},
-        {"admitted_blocks", admitted_blocks},
-        {"max_blocks_admitted_per_cycle", admission_histogram[4] > 0 ? 4 :
-            admission_histogram[3] > 0 ? 3 : admission_histogram[2] > 0 ? 2 : 1},
-        {"admitted_blocks_histogram", admission_histogram},
-        {"max_total_queue_occupancy", max_total_occupancy},
-        {"max_channel_queue_occupancy", layer.max_channel_queue_occupancy},
+        {"weighted_totals", {
+            {"admitted_blocks", admitted_blocks},
+            {"admitted_read_blocks", admitted_read_blocks},
+            {"admitted_write_blocks", admitted_write_blocks},
+            {"total_read_occupancy_before", total_read_occupancy_before},
+            {"total_read_occupancy_after", total_read_occupancy_after},
+            {"total_write_occupancy_before", total_write_occupancy_before},
+            {"total_write_occupancy_after", total_write_occupancy_after},
+        }},
+        {"histograms", admission_histograms},
+        {"actual_max", {
+            {"blocks_admitted_per_cycle", max_blocks_admitted_per_cycle},
+            {"total_read_occupancy", max_total_read_occupancy},
+            {"total_write_occupancy", max_total_write_occupancy},
+            {"channel_read_occupancy", max_channel_read_occupancy},
+            {"channel_write_occupancy", max_channel_write_occupancy},
+        }},
+        {"max_channel_read_queue_occupancy",
+         layer.max_channel_read_queue_occupancy},
+        {"max_channel_write_buffer_occupancy",
+         layer.max_channel_write_buffer_occupancy},
         {"trace_checksum_fnv1a64", Hex64(admission_checksum)},
-        {"trace_samples", admission_samples},
+        {"edge_samples", admission_edge_samples},
     };
     json input_windows = json::array();
     for (const auto& trace : layer.input_window_traces) {
@@ -296,6 +462,9 @@ json LayerJson(const LayerMetrics& layer) {
         {"row_buffer_hits", layer.row_buffer_hits},
         {"row_buffer_misses", layer.row_buffer_misses},
         {"priority_reorders", layer.priority_reorders},
+        {"read_to_write_switches", layer.read_to_write_switches},
+        {"write_to_read_switches", layer.write_to_read_switches},
+        {"direction_switch_stall_cycles", layer.direction_switch_stall_cycles},
         {"ae_finish_cycle", layer.ae_finish_cycle},
         {"ce_start_cycle", layer.ce_start_cycle},
         {"ce_finish_cycle", layer.ce_finish_cycle},
@@ -368,14 +537,28 @@ ArchitectureConfig ArchitectureConfig::Load(const std::string& path) {
     config.hbm_channels = reader.GetInteger("memory", "hbm_channels", -1);
     config.hbm_banks_per_channel = reader.GetInteger("memory", "hbm_banks_per_channel", -1);
     config.hbm_row_bytes = reader.GetInteger("memory", "hbm_row_bytes", -1);
-    config.hbm_transaction_queue_entries_per_channel = reader.GetInteger(
-        "memory", "hbm_transaction_queue_entries_per_channel", -1);
+    config.hbm_read_queue_entries_per_channel = reader.GetInteger(
+        "memory", "hbm_read_queue_entries_per_channel", -1);
+    config.hbm_write_buffer_entries_per_channel = reader.GetInteger(
+        "memory", "hbm_write_buffer_entries_per_channel", -1);
     config.hbm_command_queue_entries_per_bank = reader.GetInteger(
         "memory", "hbm_command_queue_entries_per_bank", -1);
-    config.hbm_row_hit_cycles = reader.GetInteger("memory", "hbm_row_hit_cycles", -1);
-    config.hbm_row_miss_cycles = reader.GetInteger("memory", "hbm_row_miss_cycles", -1);
-    config.hbm_row_conflict_cycles = reader.GetInteger(
-        "memory", "hbm_row_conflict_cycles", -1);
+    config.hbm_read_row_hit_cycles = reader.GetInteger(
+        "memory", "hbm_read_row_hit_cycles", -1);
+    config.hbm_read_row_miss_cycles = reader.GetInteger(
+        "memory", "hbm_read_row_miss_cycles", -1);
+    config.hbm_read_row_conflict_cycles = reader.GetInteger(
+        "memory", "hbm_read_row_conflict_cycles", -1);
+    config.hbm_write_row_hit_cycles = reader.GetInteger(
+        "memory", "hbm_write_row_hit_cycles", -1);
+    config.hbm_write_row_miss_cycles = reader.GetInteger(
+        "memory", "hbm_write_row_miss_cycles", -1);
+    config.hbm_write_row_conflict_cycles = reader.GetInteger(
+        "memory", "hbm_write_row_conflict_cycles", -1);
+    config.hbm_read_to_write_cycles = reader.GetInteger(
+        "memory", "hbm_read_to_write_cycles", -1);
+    config.hbm_write_to_read_cycles = reader.GetInteger(
+        "memory", "hbm_write_to_read_cycles", -1);
     config.edram_latency_cycles = reader.GetInteger("memory", "edram_latency_cycles", -1);
     config.edram_transactions_per_cycle = reader.GetInteger("memory", "edram_transactions_per_cycle", -1);
 
@@ -447,15 +630,24 @@ void ArchitectureConfig::Validate() const {
     require_positive(hbm_row_bytes >= static_cast<uint64_t>(block_size) &&
                          hbm_row_bytes % block_size == 0,
                      "hbm_row_bytes");
-    require_positive(hbm_transaction_queue_entries_per_channel > 0,
-                     "hbm_transaction_queue_entries_per_channel");
+    require_positive(hbm_read_queue_entries_per_channel > 0,
+                     "hbm_read_queue_entries_per_channel");
+    require_positive(hbm_write_buffer_entries_per_channel > 0,
+                     "hbm_write_buffer_entries_per_channel");
     require_positive(hbm_command_queue_entries_per_bank > 0,
                      "hbm_command_queue_entries_per_bank");
-    require_positive(hbm_row_hit_cycles > 0, "hbm_row_hit_cycles");
-    require_positive(hbm_row_miss_cycles > hbm_row_hit_cycles,
-                     "hbm_row_miss_cycles");
-    require_positive(hbm_row_conflict_cycles > hbm_row_miss_cycles,
-                     "hbm_row_conflict_cycles");
+    require_positive(hbm_read_row_hit_cycles > 0, "hbm_read_row_hit_cycles");
+    require_positive(hbm_read_row_miss_cycles > hbm_read_row_hit_cycles,
+                     "hbm_read_row_miss_cycles");
+    require_positive(hbm_read_row_conflict_cycles > hbm_read_row_miss_cycles,
+                     "hbm_read_row_conflict_cycles");
+    require_positive(hbm_write_row_hit_cycles > 0, "hbm_write_row_hit_cycles");
+    require_positive(hbm_write_row_miss_cycles > hbm_write_row_hit_cycles,
+                     "hbm_write_row_miss_cycles");
+    require_positive(hbm_write_row_conflict_cycles > hbm_write_row_miss_cycles,
+                     "hbm_write_row_conflict_cycles");
+    require_positive(hbm_read_to_write_cycles > 0, "hbm_read_to_write_cycles");
+    require_positive(hbm_write_to_read_cycles > 0, "hbm_write_to_read_cycles");
     require_positive(edram_latency_cycles >= 0, "edram_latency_cycles");
     require_positive(edram_transactions_per_cycle > 0, "edram_transactions_per_cycle");
     require_positive(simd_efficiency > 0.0 && simd_efficiency <= 1.0, "simd_efficiency");
@@ -641,7 +833,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     MemoryTimingResult result;
     result.channel_blocks.assign(architecture.hbm_channels, 0);
     result.bank_blocks.assign(architecture.hbm_banks_per_channel, 0);
-    result.max_channel_queue_occupancy.assign(architecture.hbm_channels, 0);
+    result.max_channel_read_queue_occupancy.assign(architecture.hbm_channels, 0);
+    result.max_channel_write_buffer_occupancy.assign(architecture.hbm_channels, 0);
     if (requests.empty()) {
         return result;
     }
@@ -650,6 +843,13 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         uint64_t ready_cycle = 0;
         uint64_t open_row = 0;
         bool row_open = false;
+    };
+
+    struct ChannelState {
+        uint64_t next_read_cycle = 0;
+        uint64_t next_write_cycle = 0;
+        uint64_t last_issue_cycle = 0;
+        int last_direction = -1;
     };
 
     struct RequestState {
@@ -679,6 +879,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         std::size_t channel = 0;
         std::size_t bank = 0;
         uint64_t row = 0;
+        bool is_write = false;
     };
 
     const uint64_t blocks_per_row = architecture.hbm_row_bytes / architecture.block_size;
@@ -688,7 +889,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         1, static_cast<uint64_t>(std::ceil(architecture.block_size / bytes_per_channel_cycle)));
     const std::size_t coordinator_issue_blocks = static_cast<std::size_t>(
         CoordinatorIssueBlocksPerCycle(architecture));
-    std::vector<uint64_t> channel_issue_cycle(architecture.hbm_channels, 0);
+    std::vector<ChannelState> channels(architecture.hbm_channels);
     std::vector<BankState> banks(
         static_cast<std::size_t>(architecture.hbm_channels) *
         architecture.hbm_banks_per_channel);
@@ -812,12 +1013,16 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         auto candidate = map_block(state.first_block + block_offset);
         candidate.request_index = index;
         candidate.block_offset = block_offset;
+        candidate.is_write = IsWriteRequest(state.request.request_class);
         candidate.producer_ready_cycle = producer_ready;
         candidate.enqueue_cycle = enqueue;
         const auto& bank_state = banks[
             candidate.channel * architecture.hbm_banks_per_channel + candidate.bank];
+        const auto& channel_state = channels[candidate.channel];
+        const uint64_t direction_ready = candidate.is_write
+            ? channel_state.next_write_cycle : channel_state.next_read_cycle;
         candidate.start_cycle = std::max(
-            {enqueue, channel_issue_cycle[candidate.channel], bank_state.ready_cycle});
+            {enqueue, direction_ready, bank_state.ready_cycle});
         return candidate;
     };
     struct BankQueue {
@@ -826,10 +1031,16 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         using Set = std::set<Candidate, Comparator>;
 
         BankQueue(const Comparator& future_after, const Comparator& available_less)
-            : future(future_after), available(available_less),
+            : future_reads(future_after), future_writes(future_after),
+              available(available_less),
               available_less(available_less) {}
 
-        Queue future;
+        Queue& Future(bool is_write) {
+            return is_write ? future_writes : future_reads;
+        }
+
+        Queue future_reads;
+        Queue future_writes;
         Set available;
         std::map<uint64_t, Set> available_rows;
         Comparator available_less;
@@ -915,17 +1126,22 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         pending_fifo_ports.emplace_back(pending_fifo_less);
     }
     std::set<std::pair<std::size_t, uint64_t>> issued_candidates;
-    std::vector<std::size_t> outstanding_blocks(architecture.hbm_channels, 0);
-    std::vector<std::deque<Candidate>> controller_queues(architecture.hbm_channels);
+    std::vector<std::size_t> outstanding_read_blocks(architecture.hbm_channels, 0);
+    std::vector<std::size_t> outstanding_write_blocks(architecture.hbm_channels, 0);
+    std::vector<std::deque<Candidate>> controller_read_queues(architecture.hbm_channels);
+    std::vector<std::deque<Candidate>> controller_write_queues(architecture.hbm_channels);
+    std::vector<std::size_t> write_drain_remaining(architecture.hbm_channels, 0);
     std::vector<uint64_t> next_controller_dispatch_cycle(architecture.hbm_channels, 0);
     std::vector<std::size_t> command_queue_occupancy(total_banks, 0);
     std::size_t fifo_next_port = 0;
     uint64_t next_admission_order = 0;
 
-    auto resource_ready = [&](std::size_t flat_bank) {
+    auto resource_ready = [&](std::size_t flat_bank, bool is_write) {
         const std::size_t channel =
             flat_bank / architecture.hbm_banks_per_channel;
-        return std::max(channel_issue_cycle[channel], banks[flat_bank].ready_cycle);
+        const uint64_t direction_ready = is_write
+            ? channels[channel].next_write_cycle : channels[channel].next_read_cycle;
+        return std::max(direction_ready, banks[flat_bank].ready_cycle);
     };
     auto push_available = [&](BankQueue& queue, const Candidate& candidate) {
         queue.available.insert(candidate);
@@ -941,26 +1157,31 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     auto enqueue_bank_candidate = [&](Candidate candidate) {
         const std::size_t flat_bank =
             candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
-        if (candidate.controller_dispatch_cycle <= resource_ready(flat_bank)) {
+        if (candidate.controller_dispatch_cycle <=
+            resource_ready(flat_bank, candidate.is_write)) {
             push_available(bank_queues[flat_bank], candidate);
         } else {
-            bank_queues[flat_bank].future.push(candidate);
+            bank_queues[flat_bank].Future(candidate.is_write).push(candidate);
         }
         active_fifo.push(candidate);
     };
     auto peek_bank = [&](std::size_t flat_bank) {
         auto& queue = bank_queues[flat_bank];
-        const uint64_t ready_cycle = resource_ready(flat_bank);
-        while (!queue.future.empty() &&
-               queue.future.top().controller_dispatch_cycle <= ready_cycle) {
-            push_available(queue, queue.future.top());
-            queue.future.pop();
+        for (const bool is_write : {false, true}) {
+            auto& future = queue.Future(is_write);
+            while (!future.empty() &&
+                   future.top().controller_dispatch_cycle <=
+                       resource_ready(flat_bank, is_write)) {
+                push_available(queue, future.top());
+                future.pop();
+            }
         }
         BankChoice choice;
         choice.flat_bank = flat_bank;
         if (!queue.available.empty()) {
             choice.candidate = *queue.available.begin();
-            choice.candidate.start_cycle = ready_cycle;
+            choice.candidate.start_cycle = resource_ready(
+                flat_bank, choice.candidate.is_write);
             choice.source = 1;
             choice.valid = true;
             if (priority == MemoryPriorityMode::BATCH_CLASS &&
@@ -976,16 +1197,30 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                         if (primary_request.batch_id == row_request.batch_id &&
                             primary_request.request_class == row_request.request_class) {
                             choice.candidate = *row_queue.begin();
-                            choice.candidate.start_cycle = ready_cycle;
+                            choice.candidate.start_cycle = resource_ready(
+                                flat_bank, choice.candidate.is_write);
                             choice.source = 2;
                         }
                     }
                 }
             }
-        } else if (!queue.future.empty()) {
-            choice.candidate = queue.future.top();
-            choice.candidate.start_cycle = queue.future.top().controller_dispatch_cycle;
-            choice.valid = true;
+        }
+        for (const bool is_write : {false, true}) {
+            auto& future = queue.Future(is_write);
+            if (future.empty()) {
+                continue;
+            }
+            Candidate candidate = future.top();
+            candidate.start_cycle = std::max(
+                candidate.controller_dispatch_cycle,
+                resource_ready(flat_bank, is_write));
+            if (!choice.valid || candidate.start_cycle < choice.candidate.start_cycle ||
+                (candidate.start_cycle == choice.candidate.start_cycle &&
+                 priority_less(candidate, choice.candidate))) {
+                choice.candidate = candidate;
+                choice.source = is_write ? 4 : 3;
+                choice.valid = true;
+            }
         }
         return choice;
     };
@@ -1055,8 +1290,10 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             push_pending(make_candidate(index, 0), 0);
         }
     }
-    const std::size_t queue_capacity = static_cast<std::size_t>(
-        architecture.hbm_transaction_queue_entries_per_channel);
+    const std::size_t read_queue_capacity = static_cast<std::size_t>(
+        architecture.hbm_read_queue_entries_per_channel);
+    const std::size_t write_buffer_capacity = static_cast<std::size_t>(
+        architecture.hbm_write_buffer_entries_per_channel);
     const std::size_t command_queue_capacity = static_cast<std::size_t>(
         architecture.hbm_command_queue_entries_per_bank);
     struct PendingChoice {
@@ -1064,6 +1301,11 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         std::size_t port = 0;
         PendingSet::iterator iterator;
         bool valid = false;
+    };
+    auto transaction_queue_has_capacity = [&](const Candidate& candidate) {
+        return candidate.is_write
+            ? outstanding_write_blocks[candidate.channel] < write_buffer_capacity
+            : outstanding_read_blocks[candidate.channel] < read_queue_capacity;
     };
     auto select_pending = [&]() {
         PendingChoice choice;
@@ -1081,7 +1323,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                     iterator->row != head.row) {
                     break;
                 }
-                if (outstanding_blocks[iterator->channel] < queue_capacity) {
+                if (transaction_queue_has_capacity(*iterator)) {
                     choice.candidate = *iterator;
                     choice.iterator = iterator;
                     choice.valid = true;
@@ -1096,7 +1338,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                 continue;
             }
             const auto iterator = pending_fifo_ports[port].begin();
-            if (outstanding_blocks[iterator->channel] >= queue_capacity) {
+            if (!transaction_queue_has_capacity(*iterator)) {
                 continue;
             }
             choice.candidate = *iterator;
@@ -1121,9 +1363,15 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     auto admit_transaction_blocks = [&](uint64_t cycle,
                                         std::vector<bool>& affected_channels) {
         promote_pending(cycle);
-        const std::size_t occupancy_before = std::accumulate(
-            outstanding_blocks.begin(), outstanding_blocks.end(), std::size_t{0});
+        const std::size_t read_occupancy_before = std::accumulate(
+            outstanding_read_blocks.begin(), outstanding_read_blocks.end(),
+            std::size_t{0});
+        const std::size_t write_occupancy_before = std::accumulate(
+            outstanding_write_blocks.begin(), outstanding_write_blocks.end(),
+            std::size_t{0});
         std::size_t admitted = 0;
+        std::size_t admitted_reads = 0;
+        std::size_t admitted_writes = 0;
         while (admitted < coordinator_issue_blocks) {
             PendingChoice choice = select_pending();
             if (!choice.valid) {
@@ -1140,8 +1388,15 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             }
             candidate.admission_cycle = cycle;
             candidate.admission_order = next_admission_order++;
-            controller_queues[candidate.channel].push_back(candidate);
-            ++outstanding_blocks[candidate.channel];
+            if (candidate.is_write) {
+                controller_write_queues[candidate.channel].push_back(candidate);
+                ++outstanding_write_blocks[candidate.channel];
+                ++admitted_writes;
+            } else {
+                controller_read_queues[candidate.channel].push_back(candidate);
+                ++outstanding_read_blocks[candidate.channel];
+                ++admitted_reads;
+            }
             auto& state = states[candidate.request_index];
             state.first_admission = std::min(state.first_admission, cycle);
             state.last_admission = std::max(state.last_admission, cycle);
@@ -1157,26 +1412,73 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             TransactionAdmissionTrace trace;
             trace.cycle = cycle;
             trace.admitted_blocks = admitted;
-            trace.total_occupancy_before = occupancy_before;
-            trace.total_occupancy_after = std::accumulate(
-                outstanding_blocks.begin(), outstanding_blocks.end(), uint64_t{0});
-            trace.max_channel_occupancy_after = *std::max_element(
-                outstanding_blocks.begin(), outstanding_blocks.end());
-            for (std::size_t channel = 0; channel < outstanding_blocks.size(); ++channel) {
-                if (outstanding_blocks[channel] > queue_capacity) {
-                    throw std::runtime_error("transaction queue capacity exceeded");
+            trace.admitted_read_blocks = admitted_reads;
+            trace.admitted_write_blocks = admitted_writes;
+            trace.total_read_occupancy_before = read_occupancy_before;
+            trace.total_read_occupancy_after = std::accumulate(
+                outstanding_read_blocks.begin(), outstanding_read_blocks.end(),
+                uint64_t{0});
+            trace.total_write_occupancy_before = write_occupancy_before;
+            trace.total_write_occupancy_after = std::accumulate(
+                outstanding_write_blocks.begin(), outstanding_write_blocks.end(),
+                uint64_t{0});
+            trace.max_channel_read_occupancy_after = *std::max_element(
+                outstanding_read_blocks.begin(), outstanding_read_blocks.end());
+            trace.max_channel_write_occupancy_after = *std::max_element(
+                outstanding_write_blocks.begin(), outstanding_write_blocks.end());
+            for (std::size_t channel = 0;
+                 channel < outstanding_read_blocks.size(); ++channel) {
+                if (outstanding_read_blocks[channel] > read_queue_capacity) {
+                    throw std::runtime_error("read transaction queue capacity exceeded");
                 }
-                result.max_channel_queue_occupancy[channel] = std::max<uint64_t>(
-                    result.max_channel_queue_occupancy[channel], outstanding_blocks[channel]);
+                if (outstanding_write_blocks[channel] > write_buffer_capacity) {
+                    throw std::runtime_error("write buffer capacity exceeded");
+                }
+                result.max_channel_read_queue_occupancy[channel] = std::max<uint64_t>(
+                    result.max_channel_read_queue_occupancy[channel],
+                    outstanding_read_blocks[channel]);
+                result.max_channel_write_buffer_occupancy[channel] = std::max<uint64_t>(
+                    result.max_channel_write_buffer_occupancy[channel],
+                    outstanding_write_blocks[channel]);
             }
             result.admission_traces.push_back(std::move(trace));
             next_admission_cycle = cycle + 1;
         }
         return admitted;
     };
+    auto channel_command_queue_empty = [&](std::size_t channel) {
+        const std::size_t first_bank =
+            channel * architecture.hbm_banks_per_channel;
+        return std::all_of(
+            command_queue_occupancy.begin() + static_cast<std::ptrdiff_t>(first_bank),
+            command_queue_occupancy.begin() + static_cast<std::ptrdiff_t>(
+                first_bank + architecture.hbm_banks_per_channel),
+            [](std::size_t occupancy) { return occupancy == 0; });
+    };
+    auto refresh_write_drain = [&](std::size_t channel) {
+        auto& remaining = write_drain_remaining[channel];
+        const auto& writes = controller_write_queues[channel];
+        const auto& reads = controller_read_queues[channel];
+        if (remaining != 0 && writes.empty()) {
+            remaining = 0;
+        }
+        if (remaining == 0 && !writes.empty() &&
+            (writes.size() >= write_buffer_capacity || reads.empty() ||
+             (writes.size() > 8 && channel_command_queue_empty(channel)))) {
+            remaining = writes.size();
+        }
+    };
+    struct ControllerChoice {
+        std::size_t index = 0;
+        bool is_write = false;
+        bool valid = false;
+    };
     auto controller_choice = [&](std::size_t channel, uint64_t cycle) {
-        std::optional<std::size_t> selected;
-        const auto& queue = controller_queues[channel];
+        refresh_write_drain(channel);
+        ControllerChoice selected;
+        selected.is_write = write_drain_remaining[channel] != 0;
+        const auto& queue = selected.is_write
+            ? controller_write_queues[channel] : controller_read_queues[channel];
         for (std::size_t index = 0; index < queue.size(); ++index) {
             const auto& candidate = queue[index];
             if (candidate.admission_cycle > cycle) {
@@ -1185,7 +1487,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             const std::size_t flat_bank =
                 candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
             if (command_queue_occupancy[flat_bank] < command_queue_capacity) {
-                selected = index;
+                selected.index = index;
+                selected.valid = true;
                 break;
             }
         }
@@ -1193,8 +1496,12 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     };
     auto next_controller_event = [&]() -> std::optional<uint64_t> {
         std::optional<uint64_t> earliest;
-        for (std::size_t channel = 0; channel < controller_queues.size(); ++channel) {
-            const auto& queue = controller_queues[channel];
+        for (std::size_t channel = 0;
+             channel < controller_read_queues.size(); ++channel) {
+            refresh_write_drain(channel);
+            const bool is_write = write_drain_remaining[channel] != 0;
+            const auto& queue = is_write
+                ? controller_write_queues[channel] : controller_read_queues[channel];
             if (queue.empty()) {
                 continue;
             }
@@ -1218,21 +1525,28 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     auto dispatch_controllers = [&](uint64_t cycle,
                                     std::vector<bool>& affected_channels) {
         std::size_t dispatched = 0;
-        for (std::size_t channel = 0; channel < controller_queues.size(); ++channel) {
+        for (std::size_t channel = 0;
+             channel < controller_read_queues.size(); ++channel) {
             if (next_controller_dispatch_cycle[channel] > cycle) {
                 continue;
             }
             const auto selected = controller_choice(channel, cycle);
-            if (!selected.has_value()) {
+            if (!selected.valid) {
                 continue;
             }
-            auto& queue = controller_queues[channel];
-            Candidate candidate = queue[*selected];
-            queue.erase(queue.begin() + static_cast<std::ptrdiff_t>(*selected));
-            if (outstanding_blocks[channel] == 0) {
-                throw std::runtime_error("transaction queue occupancy underflow");
+            auto& queue = selected.is_write
+                ? controller_write_queues[channel] : controller_read_queues[channel];
+            Candidate candidate = queue[selected.index];
+            queue.erase(queue.begin() + static_cast<std::ptrdiff_t>(selected.index));
+            auto& outstanding = selected.is_write
+                ? outstanding_write_blocks[channel] : outstanding_read_blocks[channel];
+            if (outstanding == 0) {
+                throw std::runtime_error("directional transaction queue occupancy underflow");
             }
-            --outstanding_blocks[channel];
+            --outstanding;
+            if (selected.is_write && write_drain_remaining[channel] != 0) {
+                --write_drain_remaining[channel];
+            }
             candidate.controller_dispatch_cycle = cycle;
             const std::size_t flat_bank =
                 candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
@@ -1297,15 +1611,23 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             std::size_t valid_channels = 0;
             for (const auto& queue : bank_queues) {
                 bank_available += queue.available.size();
-                bank_future += queue.future.size();
+                bank_future += queue.future_reads.size() + queue.future_writes.size();
             }
             for (const auto& choice : channel_choices) {
                 valid_channels += choice.valid ? 1 : 0;
             }
             const std::size_t total_outstanding = std::accumulate(
-                outstanding_blocks.begin(), outstanding_blocks.end(), std::size_t{0});
+                outstanding_read_blocks.begin(), outstanding_read_blocks.end(),
+                std::size_t{0}) + std::accumulate(
+                outstanding_write_blocks.begin(), outstanding_write_blocks.end(),
+                std::size_t{0});
             const std::size_t controller_pending = std::accumulate(
-                controller_queues.begin(), controller_queues.end(), std::size_t{0},
+                controller_read_queues.begin(), controller_read_queues.end(),
+                std::size_t{0},
+                [](std::size_t count, const auto& queue) { return count + queue.size(); }) +
+                std::accumulate(
+                controller_write_queues.begin(), controller_write_queues.end(),
+                std::size_t{0},
                 [](std::size_t count, const auto& queue) { return count + queue.size(); });
             const std::size_t command_pending = std::accumulate(
                 command_queue_occupancy.begin(), command_queue_occupancy.end(),
@@ -1334,8 +1656,12 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             if (row->second.empty()) {
                 selected_queue.available_rows.erase(row);
             }
+        } else if (selected_choice.source == 3) {
+            selected_queue.future_reads.pop();
+        } else if (selected_choice.source == 4) {
+            selected_queue.future_writes.pop();
         } else {
-            selected_queue.future.pop();
+            throw std::runtime_error("unknown bank choice source");
         }
         if (command_queue_occupancy[selected_choice.flat_bank] == 0) {
             throw std::runtime_error("command queue occupancy underflow");
@@ -1364,10 +1690,13 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         state.first_issue = std::min(state.first_issue, selected.start_cycle);
         const bool row_hit = bank_state.row_open && bank_state.open_row == selected.row;
         const bool row_conflict = bank_state.row_open && !row_hit;
-        const uint64_t access_cycles = row_hit
-            ? architecture.hbm_row_hit_cycles
-            : row_conflict ? architecture.hbm_row_conflict_cycles
-                           : architecture.hbm_row_miss_cycles;
+        const uint64_t access_cycles = selected.is_write
+            ? (row_hit ? architecture.hbm_write_row_hit_cycles
+                       : row_conflict ? architecture.hbm_write_row_conflict_cycles
+                                      : architecture.hbm_write_row_miss_cycles)
+            : (row_hit ? architecture.hbm_read_row_hit_cycles
+                       : row_conflict ? architecture.hbm_read_row_conflict_cycles
+                                      : architecture.hbm_read_row_miss_cycles);
         if (row_hit) {
             ++result.row_buffer_hits;
             ++result.row_buffer_hits_by_class[static_cast<std::size_t>(
@@ -1378,7 +1707,35 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                 state.request.request_class)];
         }
         const uint64_t completion = selected.start_cycle + access_cycles + transfer_cycles;
-        channel_issue_cycle[selected.channel] = selected.start_cycle + transfer_cycles;
+        auto& channel_state = channels[selected.channel];
+        if (channel_state.last_direction != -1 &&
+            channel_state.last_direction != static_cast<int>(selected.is_write)) {
+            const uint64_t base_ready = std::max(
+                selected.controller_dispatch_cycle, bank_state.ready_cycle);
+            if (selected.start_cycle > base_ready) {
+                result.direction_switch_stall_cycles += selected.start_cycle - base_ready;
+            }
+            if (selected.is_write) {
+                ++result.read_to_write_switches;
+            } else {
+                ++result.write_to_read_switches;
+            }
+        }
+        if (selected.is_write) {
+            channel_state.next_write_cycle = std::max(
+                channel_state.next_write_cycle, selected.start_cycle + transfer_cycles);
+            channel_state.next_read_cycle = std::max(
+                channel_state.next_read_cycle,
+                selected.start_cycle + architecture.hbm_write_to_read_cycles);
+        } else {
+            channel_state.next_read_cycle = std::max(
+                channel_state.next_read_cycle, selected.start_cycle + transfer_cycles);
+            channel_state.next_write_cycle = std::max(
+                channel_state.next_write_cycle,
+                selected.start_cycle + architecture.hbm_read_to_write_cycles);
+        }
+        channel_state.last_issue_cycle = selected.start_cycle;
+        channel_state.last_direction = static_cast<int>(selected.is_write);
         bank_state.ready_cycle = completion;
         bank_state.open_row = selected.row;
         bank_state.row_open = true;
@@ -2078,6 +2435,9 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
         metrics.row_buffer_hits = memory_timing.row_buffer_hits;
         metrics.row_buffer_misses = memory_timing.row_buffer_misses;
         metrics.priority_reorders = memory_timing.priority_reorders;
+        metrics.read_to_write_switches = memory_timing.read_to_write_switches;
+        metrics.write_to_read_switches = memory_timing.write_to_read_switches;
+        metrics.direction_switch_stall_cycles = memory_timing.direction_switch_stall_cycles;
         metrics.request_counts = memory_timing.request_counts;
         metrics.request_bytes = memory_timing.request_bytes;
         metrics.request_wait_cycles = memory_timing.request_wait_cycles;
@@ -2087,7 +2447,10 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
         metrics.bank_blocks = memory_timing.bank_blocks;
         metrics.memory_request_traces = memory_timing.request_traces;
         metrics.transaction_admission_traces = memory_timing.admission_traces;
-        metrics.max_channel_queue_occupancy = memory_timing.max_channel_queue_occupancy;
+        metrics.max_channel_read_queue_occupancy =
+            memory_timing.max_channel_read_queue_occupancy;
+        metrics.max_channel_write_buffer_occupancy =
+            memory_timing.max_channel_write_buffer_occupancy;
         metrics.aggregation_memory_cycles = std::max(
             memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::EDGE)],
             memory_timing.class_completion_cycles[static_cast<std::size_t>(RequestClass::INPUT)]);

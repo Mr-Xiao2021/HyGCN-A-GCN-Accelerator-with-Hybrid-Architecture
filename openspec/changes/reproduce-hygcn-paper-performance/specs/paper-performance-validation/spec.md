@@ -82,7 +82,9 @@
 ### Requirement: 因果与请求切分不变量
 同一有序 block 流的内存完成时间、row hit/miss 和 channel/bank 事务计数 MUST 不受上层请求切分影响。Output 请求 MUST 在对应 CE producer-ready 后入队；Intermediate Read MUST 访问对应 Write 的同一地址和字节范围，并等待该 Write 完成。已经进入请求级时间线的 intermediate 流量 MUST NOT 再以解析延迟重复计时。
 
-FIFO 与 batch-class MUST 共享全局 transaction admission 带宽和 queue capacity。四个 buffer port 每个模型周期合计进入所有 channel transaction queue 的 block 数 MUST 不超过由论文 HBM 接口宽度派生的 4；每 channel transaction queue 和每 bank command queue MUST 分别受 bundled DRAMSim3 `trans_queue_size=32` 与 `cmd_queue_size=8` 约束，并保存 admission cycle 与 occupancy trace。
+FIFO 与 batch-class MUST 共享全局 transaction admission 带宽。四个 buffer port 每个模型周期合计进入所有 channel controller 的 block 数 MUST 不超过由论文 HBM 接口宽度派生的 4。bundled DRAMSim3 为 `unified_queue=False`，因此每 channel read queue 与 write buffer MUST 分别受 `trans_queue_size=32` 约束，每 bank command queue MUST 受 `cmd_queue_size=8` 约束。read 与 write MUST 分别使用 `CL/tRCDRD` 和 `CWL/tRCDWR` 派生的 row timing，并施加 DRAMSim3 read/write command switching 约束。
+
+admission 证据 MUST 保存可逆的完整压缩 trace，或明确降级为 summary/sample。正式 benchmark 使用完整 trace 时，validator MUST 独立解码并重算方向 histogram、weighted total、actual maximum 与 checksum；edge sample 不得被声明为 raw trace。
 
 #### Scenario: 请求切分反例
 - **WHEN** 同一 128 个连续 block 分别封装为一个请求和 128 个请求
@@ -91,6 +93,14 @@ FIFO 与 batch-class MUST 共享全局 transaction admission 带宽和 queue cap
 #### Scenario: producer 和 RAW 依赖
 - **WHEN** 执行流水 Output 与 sequential intermediate 流量
 - **THEN** 每个 Output 的入队周期不早于 producer-ready，且每个 Intermediate Read 的地址、字节数和入队周期满足对应 Write 的 RAW 依赖
+
+#### Scenario: 独立读写队列与方向时序
+- **WHEN** 同一 channel 的 read queue 达到容量并同时存在 write 请求，且后续从 read 切换到 write
+- **THEN** write 可进入独立 write buffer；read/write 峰值分别不超过 32，写请求使用 CWL/tRCDWR 时序，首次 write issue 满足 read-to-write spacing
+
+#### Scenario: Admission 完整证据
+- **WHEN** benchmark 读取一层 transaction admission 证据
+- **THEN** validator 从压缩分块恢复全部事件，并独立重算 histogram、weighted totals、actual maxima、edge samples 与 FNV-1a checksum
 
 ### Requirement: 自检与回归
 构建系统 SHALL 注册单元测试、集成 smoke 测试和论文指标验收测试。默认快速测试 MUST 在合理时间内运行且不依赖缺失的大型数据集；完整论文验收 MUST 可单独触发并输出汇总报告。

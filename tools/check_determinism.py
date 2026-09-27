@@ -6,6 +6,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import paper_benchmark
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Check deterministic HyGCN paper output")
@@ -75,6 +77,11 @@ def main():
                     raise RuntimeError("producer-dependent request enqueued too early")
                 if request["first_issue_cycle"] < request["enqueue_cycle"]:
                     raise RuntimeError("producer-dependent request issued too early")
+        admission = paper_benchmark.validate_transaction_admission(
+            "test", "determinism", result
+        )
+        if admission["admitted_blocks"] <= 0 or not admission["trace_checksums"]:
+            raise RuntimeError("complete admission trace evidence is empty")
     print("paper_output_determinism=PASS")
     return 0
 
