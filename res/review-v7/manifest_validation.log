@@ -1,0 +1,5 @@
+raw_runs=21
+git_commits=['0ab8c611d729']
+binary_digests=['b715def6a3274930']
+config_digests=['0cf2686310c6cc33']
+manifest_validation=PASS

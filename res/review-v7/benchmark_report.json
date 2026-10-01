@@ -1,0 +1,2506 @@
+{
+  "aggregate": {
+    "coordination_active_bandwidth_gain": 3.601022260522487,
+    "coordination_bandwidth_gain": 3.2396634796826285,
+    "coordination_speedup": 3.2396634796826294,
+    "mapping_bandwidth_gain": 3.2205747547148182,
+    "mapping_speedup": 3.2205747547148182,
+    "pipeline_dram_ratio": 0.6712370660995312,
+    "pipeline_speedup": 1.9130172884383274,
+    "priority_bandwidth_gain": 1.2594987960090152,
+    "priority_incremental_bandwidth_gain": 1.0061704944612606,
+    "priority_incremental_bandwidth_gain_aggregate": 1.0061704944612606,
+    "priority_incremental_row_hit_ratio": 1.0305153857558027,
+    "priority_incremental_row_hit_ratio_aggregate": 1.0305153857558027,
+    "priority_incremental_speedup": 1.0061704944612606,
+    "priority_incremental_speedup_aggregate": 1.0061704944612606,
+    "priority_speedup": 1.2594987960090152,
+    "sparsity_ae_dram_ratio": 0.717850907227855,
+    "sparsity_input_dram_ratio": 0.7176311957169967,
+    "sparsity_speedup": 1.6961036837638706
+  },
+  "cache_validation": "input and configuration digests plus complete run manifest",
+  "datasets": [
+    "cora",
+    "citeseer",
+    "pubmed"
+  ],
+  "dram_timing_basis": {
+    "burst_cycle": 2,
+    "cl": 7,
+    "command_queue_entries_per_bank": 8,
+    "config": "configs/HBM1_4Gb_x128.ini",
+    "config_sha256": "e3558f02ec836645bd53788f52ce4b4a207b0a1e1f7b29ba6da35cffb2b9b832",
+    "cwl": 2,
+    "derived_read_row_conflict_cycles": 42,
+    "derived_read_row_hit_cycles": 14,
+    "derived_read_row_miss_cycles": 28,
+    "derived_read_to_write_cycles": 18,
+    "derived_write_row_conflict_cycles": 32,
+    "derived_write_row_hit_cycles": 4,
+    "derived_write_row_miss_cycles": 18,
+    "derived_write_to_read_cycles": 16,
+    "formula": {
+      "config": "configs/HBM1_4Gb_x128.ini",
+      "model_cycle_ns": "1 / architecture.frequency_ghz",
+      "read_row_conflict_formula": "ceil((tRP + tRCDRD + CL) * tCK / model_cycle_ns)",
+      "read_row_hit_formula": "ceil(CL * tCK / model_cycle_ns)",
+      "read_row_miss_formula": "ceil((tRCDRD + CL) * tCK / model_cycle_ns)",
+      "read_to_write_formula": "ceil((RL + burst_cycle - WL + tRTRS) * tCK / model_cycle_ns)",
+      "source": "bundled DRAMSim3 HBM timing configuration",
+      "transfer_note": "burst/block transfer is modeled separately by transfer_cycles, so BL is not duplicated in row access latency",
+      "write_row_conflict_formula": "ceil((tRP + tRCDWR + CWL) * tCK / model_cycle_ns)",
+      "write_row_hit_formula": "ceil(CWL * tCK / model_cycle_ns)",
+      "write_row_miss_formula": "ceil((tRCDWR + CWL) * tCK / model_cycle_ns)",
+      "write_to_read_formula": "ceil((write_delay + tWTR_L) * tCK / model_cycle_ns)"
+    },
+    "model_cycle_ns": 1.0,
+    "model_frequency_ghz": 1.0,
+    "read_queue_entries_per_channel": 32,
+    "tck_ns": 2.0,
+    "trcdrd": 7,
+    "trcdwr": 7,
+    "trp": 7,
+    "trtrs": 2,
+    "twtr_l": 4,
+    "unified_queue": false,
+    "write_buffer_entries_per_channel": 32
+  },
+  "evidence_counts": {
+    "internal_check_rows": 12,
+    "paper_metric_rows": 14
+  },
+  "memory_ablation": {
+    "admission_policy": "FIFO and batch-class share one global admission clock; at most four 64-byte blocks enter all channel controllers per paper cycle, while each channel independently enforces the 32-entry read queue and 32-entry write buffer",
+    "command_queue_entries_per_bank": 8,
+    "command_queue_source": "configs/HBM1_4Gb_x128.ini cmd_queue_size=8; the request-level controller bounds each bank command queue to the same depth",
+    "coordinator_input_policy": "four-buffer block-level round-robin FIFO for the paper's concurrent uncoordinated baseline; batch-by-batch Edge > Input > Weight > Output assembly with same batch/class open-row continuation when priority is enabled",
+    "coordinator_input_source": "HyGCN HPCA 2020 Figure 9 and Section 4.5.2 show concurrent Edge, Input, Weight, and Output buffer requests interleaved before the coordinator and assembled into continuous batch-local streams after priority sorting",
+    "coordinator_issue_blocks_per_cycle": 4,
+    "coordinator_issue_width_source": "derived from the paper profile peak interface width: floor(256 bytes/cycle divided by 64 bytes/block)",
+    "dram_timing": {
+      "config": "configs/HBM1_4Gb_x128.ini",
+      "model_cycle_ns": "1 / architecture.frequency_ghz",
+      "read_row_conflict_formula": "ceil((tRP + tRCDRD + CL) * tCK / model_cycle_ns)",
+      "read_row_hit_formula": "ceil(CL * tCK / model_cycle_ns)",
+      "read_row_miss_formula": "ceil((tRCDRD + CL) * tCK / model_cycle_ns)",
+      "read_to_write_formula": "ceil((RL + burst_cycle - WL + tRTRS) * tCK / model_cycle_ns)",
+      "source": "bundled DRAMSim3 HBM timing configuration",
+      "transfer_note": "burst/block transfer is modeled separately by transfer_cycles, so BL is not duplicated in row access latency",
+      "write_row_conflict_formula": "ceil((tRP + tRCDWR + CWL) * tCK / model_cycle_ns)",
+      "write_row_hit_formula": "ceil(CWL * tCK / model_cycle_ns)",
+      "write_row_miss_formula": "ceil((tRCDWR + CWL) * tCK / model_cycle_ns)",
+      "write_to_read_formula": "ceil((write_delay + tWTR_L) * tCK / model_cycle_ns)"
+    },
+    "low_bits_source": "HyGCN HPCA 2020 Section 4.5.2: channel and bank identifiers use lower address bits",
+    "mapping_baseline": "row-first",
+    "mapping_optimized": "low-bits",
+    "priority_baseline": "fifo",
+    "priority_optimized": "batch-class",
+    "priority_order_source": "HyGCN HPCA 2020 Section 4.5.2 executes requests batch-by-batch: all requests from the current batch, including its lower-priority classes, precede high-priority requests from the next batch",
+    "read_queue_entries_per_channel": 32,
+    "row_first_bank_interleave": 1,
+    "row_first_layout_basis": "one row-sized block span stays in one bank, then the collapsed mapping advances channel and bank fields in the order represented by rorabgbachco",
+    "row_first_source": "configs/HBM1_4Gb_x128.ini selects address_mapping=rorabgbachco. The collapsed request-level baseline therefore keeps every contiguous row span in one bank; it does not add an unsupported adjacent-bank striping factor.",
+    "transaction_queue_source": "configs/HBM1_4Gb_x128.ini sets unified_queue=False and trans_queue_size=32; DRAMSim3 therefore allocates an independent 32-entry read_queue and 32-entry write_buffer in every channel controller",
+    "write_buffer_entries_per_channel": 32
+  },
+  "parameter_audit": {
+    "baseline_commit": "9aa127d248849e68160c7aafd70b79cbe468094a",
+    "baseline_version": "review-v3-9aa127d",
+    "current": {
+      "aggregation_ping_pong_regions": 2,
+      "aggregation_shard_capacity_bytes": 5242880,
+      "batch_launch_interval_cycles": 1,
+      "benchmark_selected_layer": "0",
+      "coordinator_issue_blocks_per_cycle": 4,
+      "edge_input_dependency": "edge_completion_plus_neighbor_index_ready",
+      "edge_ping_pong_regions": 2,
+      "hbm_command_queue_entries_per_bank": 8,
+      "hbm_read_queue_entries_per_channel": 32,
+      "hbm_read_row_conflict_cycles": 42,
+      "hbm_read_row_hit_cycles": 14,
+      "hbm_read_row_miss_cycles": 28,
+      "hbm_read_to_write_cycles": 18,
+      "hbm_write_buffer_entries_per_channel": 32,
+      "hbm_write_row_conflict_cycles": 32,
+      "hbm_write_row_hit_cycles": 4,
+      "hbm_write_row_miss_cycles": 18,
+      "hbm_write_to_read_cycles": 16,
+      "input_ping_pong_regions": 2,
+      "neighbor_index_ready_cycles": 2,
+      "row_first_bank_interleave": 1,
+      "sequential_spill_alignment": "block"
+    },
+    "differences": [
+      {
+        "baseline": 2,
+        "current": null,
+        "parameter": "aggregation_residency_banks_per_region"
+      },
+      {
+        "baseline": 4194304,
+        "current": 5242880,
+        "parameter": "aggregation_shard_capacity_bytes"
+      },
+      {
+        "baseline": "all",
+        "current": "0",
+        "parameter": "benchmark_selected_layer"
+      },
+      {
+        "baseline": null,
+        "current": 4,
+        "parameter": "coordinator_issue_blocks_per_cycle"
+      },
+      {
+        "baseline": "static_enqueue_cycle",
+        "current": "edge_completion_plus_neighbor_index_ready",
+        "parameter": "edge_input_dependency"
+      },
+      {
+        "baseline": null,
+        "current": 8,
+        "parameter": "hbm_command_queue_entries_per_bank"
+      },
+      {
+        "baseline": null,
+        "current": 32,
+        "parameter": "hbm_read_queue_entries_per_channel"
+      },
+      {
+        "baseline": null,
+        "current": 42,
+        "parameter": "hbm_read_row_conflict_cycles"
+      },
+      {
+        "baseline": null,
+        "current": 14,
+        "parameter": "hbm_read_row_hit_cycles"
+      },
+      {
+        "baseline": null,
+        "current": 28,
+        "parameter": "hbm_read_row_miss_cycles"
+      },
+      {
+        "baseline": null,
+        "current": 18,
+        "parameter": "hbm_read_to_write_cycles"
+      },
+      {
+        "baseline": null,
+        "current": 32,
+        "parameter": "hbm_write_buffer_entries_per_channel"
+      },
+      {
+        "baseline": null,
+        "current": 32,
+        "parameter": "hbm_write_row_conflict_cycles"
+      },
+      {
+        "baseline": null,
+        "current": 4,
+        "parameter": "hbm_write_row_hit_cycles"
+      },
+      {
+        "baseline": null,
+        "current": 18,
+        "parameter": "hbm_write_row_miss_cycles"
+      },
+      {
+        "baseline": null,
+        "current": 16,
+        "parameter": "hbm_write_to_read_cycles"
+      },
+      {
+        "baseline": 0,
+        "current": 2,
+        "parameter": "neighbor_index_ready_cycles"
+      },
+      {
+        "baseline": 2,
+        "current": 1,
+        "parameter": "row_first_bank_interleave"
+      },
+      {
+        "baseline": "aggregation_shard_capacity",
+        "current": "block",
+        "parameter": "sequential_spill_alignment"
+      }
+    ],
+    "parameter_recalibration": true
+  },
+  "parameter_baseline_file": "configs/paper_parameter_baseline.json",
+  "parameter_recalibration": true,
+  "per_dataset": {
+    "citeseer": {
+      "directional_memory_evidence": {
+        "coordination_baseline": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 132695,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "read_requests": 4586,
+              "read_to_write_switches": 322,
+              "trace_checksum_fnv1a64": "bc1626432bfbd45d",
+              "write_requests": {
+                "output": 10
+              },
+              "write_requests_overlapping_read_service": {
+                "output": 9
+              },
+              "write_to_read_switches": 314
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "mapping_only": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 76932,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "read_requests": 4586,
+              "read_to_write_switches": 672,
+              "trace_checksum_fnv1a64": "b1b064e10db7f1c7",
+              "write_requests": {
+                "output": 10
+              },
+              "write_requests_overlapping_read_service": {
+                "output": 8
+              },
+              "write_to_read_switches": 664
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "optimized": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 11359,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "read_requests": 4586,
+              "read_to_write_switches": 132,
+              "trace_checksum_fnv1a64": "69c08f6d355be241",
+              "write_requests": {
+                "output": 10
+              },
+              "write_requests_overlapping_read_service": {
+                "output": 8
+              },
+              "write_to_read_switches": 124
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "pipeline_baseline": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 0,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "read_requests": 4596,
+              "read_to_write_switches": 16,
+              "trace_checksum_fnv1a64": "072598e5d787b429",
+              "write_requests": {
+                "intermediate_write": 10,
+                "output": 10
+              },
+              "write_requests_overlapping_read_service": {},
+              "write_to_read_switches": 8
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "priority_only": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 123833,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "read_requests": 4586,
+              "read_to_write_switches": 275,
+              "trace_checksum_fnv1a64": "d304829f316bf242",
+              "write_requests": {
+                "output": 10
+              },
+              "write_requests_overlapping_read_service": {
+                "output": 10
+              },
+              "write_to_read_switches": 273
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "sparsity_baseline": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 0,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "read_requests": 8330,
+              "read_to_write_switches": 0,
+              "trace_checksum_fnv1a64": "c2059b617910a8cd",
+              "write_requests": {},
+              "write_requests_overlapping_read_service": {},
+              "write_to_read_switches": 0
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "sparsity_optimized": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 0,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "read_requests": 4585,
+              "read_to_write_switches": 0,
+              "trace_checksum_fnv1a64": "3a58b70d68415459",
+              "write_requests": {},
+              "write_requests_overlapping_read_service": {},
+              "write_to_read_switches": 0
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        }
+      },
+      "mapping_evidence": {
+        "baseline_bank_blocks": [
+          165848,
+          172144,
+          172112,
+          165792,
+          159392,
+          162072,
+          170040,
+          165408,
+          167856,
+          173223,
+          166528,
+          164448,
+          169736,
+          163664,
+          160856,
+          158448
+        ],
+        "baseline_channel_blocks": [
+          331384,
+          331104,
+          332752,
+          332392,
+          332752,
+          332807,
+          332088,
+          332288
+        ],
+        "optimized_bank_blocks": [
+          165880,
+          166040,
+          166040,
+          166176,
+          165760,
+          165823,
+          165976,
+          166352,
+          166280,
+          166096,
+          166320,
+          166144,
+          166288,
+          166144,
+          166064,
+          166184
+        ],
+        "optimized_channel_blocks": [
+          332196,
+          332196,
+          332196,
+          332196,
+          332196,
+          332196,
+          332196,
+          332195
+        ]
+      },
+      "metrics": {
+        "coordination_active_bandwidth_gain": 3.6456031642548634,
+        "coordination_bandwidth_gain": 3.355070317295119,
+        "coordination_speedup": 3.355070317295119,
+        "mapping_bandwidth_gain": 3.3309148954490357,
+        "mapping_speedup": 3.3309148954490357,
+        "pipeline_dram_ratio": 0.6325590085913986,
+        "pipeline_speedup": 2.160007205187735,
+        "priority_bandwidth_gain": 1.1993836352830403,
+        "priority_incremental_bandwidth_gain": 1.0072518880260455,
+        "priority_incremental_bandwidth_gain_aggregate": 1.0072518880260455,
+        "priority_incremental_row_hit_ratio": 1.029866444151557,
+        "priority_incremental_row_hit_ratio_aggregate": 1.029866444151557,
+        "priority_incremental_speedup": 1.0072518880260455,
+        "priority_incremental_speedup_aggregate": 1.0072518880260455,
+        "priority_speedup": 1.1993836352830403,
+        "sparsity_ae_dram_ratio": 0.3369416923226975,
+        "sparsity_input_dram_ratio": 0.3367899008115419,
+        "sparsity_speedup": 2.8949367799611543
+      },
+      "priority_trace_evidence": {
+        "address_mapping": "low-bits",
+        "changed_requests": [
+          {
+            "batch_id": 0,
+            "fifo_completion": 148,
+            "fifo_issue": 0,
+            "optimized_completion": 63,
+            "optimized_issue": 0,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 0
+          },
+          {
+            "batch_id": 1,
+            "fifo_completion": 338,
+            "fifo_issue": 105,
+            "optimized_completion": 82400,
+            "optimized_issue": 82336,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 1
+          },
+          {
+            "batch_id": 2,
+            "fifo_completion": 544,
+            "fifo_issue": 294,
+            "optimized_completion": 82447,
+            "optimized_issue": 82384,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 2
+          },
+          {
+            "batch_id": 3,
+            "fifo_completion": 715,
+            "fifo_issue": 500,
+            "optimized_completion": 82492,
+            "optimized_issue": 82431,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 3
+          },
+          {
+            "batch_id": 4,
+            "fifo_completion": 891,
+            "fifo_issue": 672,
+            "optimized_completion": 303866,
+            "optimized_issue": 82476,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 4
+          },
+          {
+            "batch_id": 5,
+            "fifo_completion": 1106,
+            "fifo_issue": 848,
+            "optimized_completion": 380868,
+            "optimized_issue": 237203,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 5
+          },
+          {
+            "batch_id": 6,
+            "fifo_completion": 1286,
+            "fifo_issue": 1063,
+            "optimized_completion": 380892,
+            "optimized_issue": 303622,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 6
+          },
+          {
+            "batch_id": 7,
+            "fifo_completion": 1513,
+            "fifo_issue": 1242,
+            "optimized_completion": 526720,
+            "optimized_issue": 303668,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 7
+          }
+        ],
+        "fifo_row_buffer_hits": 2351301,
+        "fifo_row_buffer_misses": 306266,
+        "optimized_row_buffer_hits": 2421526,
+        "optimized_row_buffer_misses": 236041,
+        "priority_reorders": 4584
+      },
+      "raw": {
+        "coordination_baseline": {
+          "active_bandwidth_utilization": 0.26520814347603416,
+          "bandwidth_utilization": 0.26422514536739244,
+          "row_buffer_hits": 2571694,
+          "row_buffer_misses": 85873,
+          "row_hit_rate": 0.9676873621624591,
+          "total_aggregation_cycles": 2488540,
+          "total_aggregation_dram_bytes": 166484928,
+          "total_cycles": 2514491,
+          "total_dram_bytes": 170084288,
+          "total_input_dram_bytes": 166371840
+        },
+        "mapping_only": {
+          "active_bandwidth_utilization": 0.9552281562889989,
+          "bandwidth_utilization": 0.8801114724564343,
+          "row_buffer_hits": 2351301,
+          "row_buffer_misses": 306266,
+          "row_hit_rate": 0.8847569976598897,
+          "total_aggregation_cycles": 689436,
+          "total_aggregation_dram_bytes": 166484928,
+          "total_cycles": 754895,
+          "total_dram_bytes": 170084288,
+          "total_input_dram_bytes": 166371840
+        },
+        "optimized": {
+          "active_bandwidth_utilization": 0.966843647042388,
+          "bandwidth_utilization": 0.8864939423051263,
+          "row_buffer_hits": 2421526,
+          "row_buffer_misses": 236041,
+          "row_hit_rate": 0.911181543118198,
+          "total_aggregation_cycles": 684060,
+          "total_aggregation_dram_bytes": 166484928,
+          "total_cycles": 749460,
+          "total_dram_bytes": 170084288,
+          "total_input_dram_bytes": 166371840
+        },
+        "pipeline_baseline": {
+          "active_bandwidth_utilization": 0.9771662447540022,
+          "bandwidth_utilization": 0.6488129764602903,
+          "row_buffer_hits": 3918762,
+          "row_buffer_misses": 282533,
+          "row_hit_rate": 0.9327509732118311,
+          "total_aggregation_cycles": 684060,
+          "total_aggregation_dram_bytes": 166484928,
+          "total_cycles": 1618839,
+          "total_dram_bytes": 268882880,
+          "total_input_dram_bytes": 166371840
+        },
+        "priority_only": {
+          "active_bandwidth_utilization": 0.3169076177065983,
+          "bandwidth_utilization": 0.3169073153839329,
+          "row_buffer_hits": 2571664,
+          "row_buffer_misses": 85903,
+          "row_hit_rate": 0.9676760736417934,
+          "total_aggregation_cycles": 2067188,
+          "total_aggregation_dram_bytes": 166484928,
+          "total_cycles": 2096486,
+          "total_dram_bytes": 170084288,
+          "total_input_dram_bytes": 166371840
+        },
+        "sparsity_baseline": {
+          "active_bandwidth_utilization": 0.988380104803735,
+          "bandwidth_utilization": 0.988380104803735,
+          "row_buffer_hits": 7478359,
+          "row_buffer_misses": 242048,
+          "row_hit_rate": 0.9686482849932653,
+          "total_aggregation_cycles": 1958500,
+          "total_aggregation_dram_bytes": 494106048,
+          "total_cycles": 1958500,
+          "total_dram_bytes": 494106048,
+          "total_input_dram_bytes": 493992960
+        },
+        "sparsity_optimized": {
+          "active_bandwidth_utilization": 0.9676994192301339,
+          "bandwidth_utilization": 0.9676965393480458,
+          "row_buffer_hits": 2369688,
+          "row_buffer_misses": 231639,
+          "row_hit_rate": 0.9109535248740355,
+          "total_aggregation_cycles": 676526,
+          "total_aggregation_dram_bytes": 166484928,
+          "total_cycles": 676526,
+          "total_dram_bytes": 166484928,
+          "total_input_dram_bytes": 166371840
+        }
+      },
+      "runs": {
+        "coordination_baseline": "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-fifo_mapping-row-first_seed-1_layer-0.json",
+        "mapping_only": "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-fifo_mapping-low-bits_seed-1_layer-0.json",
+        "optimized": "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json",
+        "pipeline_baseline": "paper_paper_gcn_citeseer_sequential_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json",
+        "priority_only": "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-batch-class_mapping-row-first_seed-1_layer-0.json",
+        "sparsity_baseline": "paper_paper_gcn_citeseer_latency-aware_independent_sparse-off_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json",
+        "sparsity_optimized": "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json"
+      },
+      "sequential_traffic_oracle": {
+        "alignment": "block",
+        "intermediate_read_bytes": 49399296,
+        "intermediate_write_bytes": 49399296,
+        "producer_bytes": 49399296
+      },
+      "transaction_admission_oracles": {
+        "coordination_baseline": {
+          "admission_cycles": 1132289,
+          "admitted_blocks": 2657567,
+          "admitted_read_blocks": 2630951,
+          "admitted_write_blocks": 26616,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 239,
+          "max_total_write_buffer_occupancy": 242,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "bc1626432bfbd45d"
+          ]
+        },
+        "mapping_only": {
+          "admission_cycles": 669831,
+          "admitted_blocks": 2657567,
+          "admitted_read_blocks": 2630951,
+          "admitted_write_blocks": 26616,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 256,
+          "max_total_write_buffer_occupancy": 256,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "b1b064e10db7f1c7"
+          ]
+        },
+        "optimized": {
+          "admission_cycles": 667822,
+          "admitted_blocks": 2657567,
+          "admitted_read_blocks": 2630951,
+          "admitted_write_blocks": 26616,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 256,
+          "max_total_write_buffer_occupancy": 256,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "69c08f6d355be241"
+          ]
+        },
+        "pipeline_baseline": {
+          "admission_cycles": 1058262,
+          "admitted_blocks": 4201295,
+          "admitted_read_blocks": 3402815,
+          "admitted_write_blocks": 798480,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 256,
+          "max_total_write_buffer_occupancy": 256,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "072598e5d787b429"
+          ]
+        },
+        "priority_only": {
+          "admission_cycles": 1190267,
+          "admitted_blocks": 2657567,
+          "admitted_read_blocks": 2630951,
+          "admitted_write_blocks": 26616,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 256,
+          "max_total_write_buffer_occupancy": 245,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "d304829f316bf242"
+          ]
+        },
+        "sparsity_baseline": {
+          "admission_cycles": 1937940,
+          "admitted_blocks": 7720407,
+          "admitted_read_blocks": 7720407,
+          "admitted_write_blocks": 0,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 256,
+          "max_total_write_buffer_occupancy": 0,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "c2059b617910a8cd"
+          ]
+        },
+        "sparsity_optimized": {
+          "admission_cycles": 656517,
+          "admitted_blocks": 2601327,
+          "admitted_read_blocks": 2601327,
+          "admitted_write_blocks": 0,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 256,
+          "max_total_write_buffer_occupancy": 0,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "3a58b70d68415459"
+          ]
+        }
+      }
+    },
+    "cora": {
+      "directional_memory_evidence": {
+        "coordination_baseline": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 70274,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "read_requests": 717,
+              "read_to_write_switches": 190,
+              "trace_checksum_fnv1a64": "dc4dcb21bd5c0882",
+              "write_requests": {
+                "output": 3
+              },
+              "write_requests_overlapping_read_service": {
+                "output": 2
+              },
+              "write_to_read_switches": 182
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "mapping_only": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 18298,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "read_requests": 717,
+              "read_to_write_switches": 172,
+              "trace_checksum_fnv1a64": "9bafccfa3a07a7ad",
+              "write_requests": {
+                "output": 3
+              },
+              "write_requests_overlapping_read_service": {
+                "output": 1
+              },
+              "write_to_read_switches": 164
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "optimized": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 1490,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                4,
+                4,
+                4,
+                4,
+                1,
+                1,
+                2,
+                2
+              ],
+              "read_requests": 717,
+              "read_to_write_switches": 20,
+              "trace_checksum_fnv1a64": "ade998e2282dc6e0",
+              "write_requests": {
+                "output": 3
+              },
+              "write_requests_overlapping_read_service": {
+                "output": 1
+              },
+              "write_to_read_switches": 12
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "pipeline_baseline": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 72,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "read_requests": 720,
+              "read_to_write_switches": 16,
+              "trace_checksum_fnv1a64": "8208fb4cdfe40e0a",
+              "write_requests": {
+                "intermediate_write": 3,
+                "output": 3
+              },
+              "write_requests_overlapping_read_service": {},
+              "write_to_read_switches": 8
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "priority_only": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 35721,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "read_requests": 717,
+              "read_to_write_switches": 88,
+              "trace_checksum_fnv1a64": "632bb477d3a32f91",
+              "write_requests": {
+                "output": 3
+              },
+              "write_requests_overlapping_read_service": {
+                "output": 2
+              },
+              "write_to_read_switches": 80
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "sparsity_baseline": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 0,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "read_requests": 744,
+              "read_to_write_switches": 0,
+              "trace_checksum_fnv1a64": "5e897eb48a6de398",
+              "write_requests": {},
+              "write_requests_overlapping_read_service": {},
+              "write_to_read_switches": 0
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "sparsity_optimized": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 0,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "read_requests": 716,
+              "read_to_write_switches": 0,
+              "trace_checksum_fnv1a64": "b3095118bd3fb1c3",
+              "write_requests": {},
+              "write_requests_overlapping_read_service": {},
+              "write_to_read_switches": 0
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        }
+      },
+      "mapping_evidence": {
+        "baseline_bank_blocks": [
+          44950,
+          44390,
+          45080,
+          44854,
+          44796,
+          44774,
+          45612,
+          45978,
+          44446,
+          43996,
+          44940,
+          44450,
+          43948,
+          43686,
+          44806,
+          44560
+        ],
+        "baseline_channel_blocks": [
+          89708,
+          89466,
+          89416,
+          89488,
+          89332,
+          89124,
+          89272,
+          89460
+        ],
+        "optimized_bank_blocks": [
+          44790,
+          44796,
+          44758,
+          44696,
+          44624,
+          44626,
+          44668,
+          44672,
+          44688,
+          44640,
+          44660,
+          44700,
+          44684,
+          44736,
+          44744,
+          44784
+        ],
+        "optimized_channel_blocks": [
+          89401,
+          89401,
+          89409,
+          89409,
+          89417,
+          89417,
+          89406,
+          89406
+        ]
+      },
+      "metrics": {
+        "coordination_active_bandwidth_gain": 3.5571846860508076,
+        "coordination_bandwidth_gain": 2.81310554720127,
+        "coordination_speedup": 2.81310554720127,
+        "mapping_bandwidth_gain": 2.788061117590085,
+        "mapping_speedup": 2.788061117590085,
+        "pipeline_dram_ratio": 0.5947139201101516,
+        "pipeline_speedup": 1.9514963921452875,
+        "priority_bandwidth_gain": 1.3008130381213066,
+        "priority_incremental_bandwidth_gain": 1.0089827405336194,
+        "priority_incremental_bandwidth_gain_aggregate": 1.0089827405336194,
+        "priority_incremental_row_hit_ratio": 1.040272431598207,
+        "priority_incremental_row_hit_ratio_aggregate": 1.040272431598207,
+        "priority_incremental_speedup": 1.0089827405336194,
+        "priority_incremental_speedup_aggregate": 1.0089827405336194,
+        "priority_speedup": 1.3008130381213066,
+        "sparsity_ae_dram_ratio": 0.9306264222606646,
+        "sparsity_input_dram_ratio": 0.9304529788281635,
+        "sparsity_speedup": 1.067694848436418
+      },
+      "priority_trace_evidence": {
+        "address_mapping": "low-bits",
+        "changed_requests": [
+          {
+            "batch_id": 0,
+            "fifo_completion": 454,
+            "fifo_issue": 0,
+            "optimized_completion": 171,
+            "optimized_issue": 0,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 0
+          },
+          {
+            "batch_id": 1,
+            "fifo_completion": 985,
+            "fifo_issue": 410,
+            "optimized_completion": 60731,
+            "optimized_issue": 60540,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 1
+          },
+          {
+            "batch_id": 2,
+            "fifo_completion": 1595,
+            "fifo_issue": 942,
+            "optimized_completion": 118047,
+            "optimized_issue": 60702,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 2
+          },
+          {
+            "batch_id": 0,
+            "fifo_completion": 1642,
+            "fifo_issue": 662,
+            "optimized_completion": 461,
+            "optimized_issue": 174,
+            "producer_sequence": 0,
+            "request_class": "input",
+            "sequence": 3
+          },
+          {
+            "batch_id": 0,
+            "fifo_completion": 2343,
+            "fifo_issue": 1599,
+            "optimized_completion": 708,
+            "optimized_issue": 442,
+            "producer_sequence": 0,
+            "request_class": "input",
+            "sequence": 4
+          },
+          {
+            "batch_id": 0,
+            "fifo_completion": 3047,
+            "fifo_issue": 2286,
+            "optimized_completion": 956,
+            "optimized_issue": 690,
+            "producer_sequence": 0,
+            "request_class": "input",
+            "sequence": 5
+          },
+          {
+            "batch_id": 0,
+            "fifo_completion": 3693,
+            "fifo_issue": 2963,
+            "optimized_completion": 1203,
+            "optimized_issue": 938,
+            "producer_sequence": 0,
+            "request_class": "input",
+            "sequence": 6
+          },
+          {
+            "batch_id": 0,
+            "fifo_completion": 4367,
+            "fifo_issue": 3650,
+            "optimized_completion": 1463,
+            "optimized_issue": 1186,
+            "producer_sequence": 0,
+            "request_class": "input",
+            "sequence": 7
+          }
+        ],
+        "fifo_row_buffer_hits": 663506,
+        "fifo_row_buffer_misses": 51760,
+        "optimized_row_buffer_hits": 690227,
+        "optimized_row_buffer_misses": 25039,
+        "priority_reorders": 599
+      },
+      "raw": {
+        "coordination_baseline": {
+          "active_bandwidth_utilization": 0.2771923379202262,
+          "bandwidth_utilization": 0.25354907593576215,
+          "row_buffer_hits": 692596,
+          "row_buffer_misses": 22670,
+          "row_hit_rate": 0.9683054975351827,
+          "total_aggregation_cycles": 645559,
+          "total_aggregation_dram_bytes": 43656832,
+          "total_cycles": 705254,
+          "total_dram_bytes": 45777024,
+          "total_input_dram_bytes": 43539840
+        },
+        "mapping_only": {
+          "active_bandwidth_utilization": 0.9707525352326768,
+          "bandwidth_utilization": 0.7069103200173944,
+          "row_buffer_hits": 663506,
+          "row_buffer_misses": 51760,
+          "row_hit_rate": 0.9276353132960325,
+          "total_aggregation_cycles": 192741,
+          "total_aggregation_dram_bytes": 43656832,
+          "total_cycles": 252955,
+          "total_dram_bytes": 45777024,
+          "total_input_dram_bytes": 43539840
+        },
+        "optimized": {
+          "active_bandwidth_utilization": 0.9860243395404492,
+          "bandwidth_utilization": 0.7132603120026485,
+          "row_buffer_hits": 690227,
+          "row_buffer_misses": 25039,
+          "row_hit_rate": 0.9649934429988284,
+          "total_aggregation_cycles": 190670,
+          "total_aggregation_dram_bytes": 43656832,
+          "total_cycles": 250703,
+          "total_dram_bytes": 45777024,
+          "total_input_dram_bytes": 43539840
+        },
+        "pipeline_baseline": {
+          "active_bandwidth_utilization": 0.9895166226773996,
+          "bandwidth_utilization": 0.6145711973117818,
+          "row_buffer_hits": 1162571,
+          "row_buffer_misses": 40135,
+          "row_hit_rate": 0.9666294173305862,
+          "total_aggregation_cycles": 190670,
+          "total_aggregation_dram_bytes": 43656832,
+          "total_cycles": 489246,
+          "total_dram_bytes": 76973184,
+          "total_input_dram_bytes": 43539840
+        },
+        "priority_only": {
+          "active_bandwidth_utilization": 0.3686938144329897,
+          "bandwidth_utilization": 0.3298199437808486,
+          "row_buffer_hits": 692599,
+          "row_buffer_misses": 22667,
+          "row_hit_rate": 0.9683096917790025,
+          "total_aggregation_cycles": 482469,
+          "total_aggregation_dram_bytes": 43656832,
+          "total_cycles": 542164,
+          "total_dram_bytes": 45777024,
+          "total_input_dram_bytes": 43539840
+        },
+        "sparsity_baseline": {
+          "active_bandwidth_utilization": 0.9881847302063224,
+          "bandwidth_utilization": 0.9881740724762726,
+          "row_buffer_hits": 709820,
+          "row_buffer_misses": 23168,
+          "row_hit_rate": 0.9683923884156357,
+          "total_aggregation_cycles": 200417,
+          "total_aggregation_dram_bytes": 46911232,
+          "total_cycles": 200417,
+          "total_dram_bytes": 46911232,
+          "total_input_dram_bytes": 46794240
+        },
+        "sparsity_optimized": {
+          "active_bandwidth_utilization": 0.9871808230438381,
+          "bandwidth_utilization": 0.9871693940990212,
+          "row_buffer_hits": 658970,
+          "row_buffer_misses": 23168,
+          "row_hit_rate": 0.9660361979540797,
+          "total_aggregation_cycles": 187710,
+          "total_aggregation_dram_bytes": 43656832,
+          "total_cycles": 187710,
+          "total_dram_bytes": 43656832,
+          "total_input_dram_bytes": 43539840
+        }
+      },
+      "runs": {
+        "coordination_baseline": "paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-fifo_mapping-row-first_seed-1_layer-0.json",
+        "mapping_only": "paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-fifo_mapping-low-bits_seed-1_layer-0.json",
+        "optimized": "paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json",
+        "pipeline_baseline": "paper_paper_gcn_cora_sequential_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json",
+        "priority_only": "paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-batch-class_mapping-row-first_seed-1_layer-0.json",
+        "sparsity_baseline": "paper_paper_gcn_cora_latency-aware_independent_sparse-off_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json",
+        "sparsity_optimized": "paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json"
+      },
+      "sequential_traffic_oracle": {
+        "alignment": "block",
+        "intermediate_read_bytes": 15598080,
+        "intermediate_write_bytes": 15598080,
+        "producer_bytes": 15598080
+      },
+      "transaction_admission_oracles": {
+        "coordination_baseline": {
+          "admission_cycles": 307302,
+          "admitted_blocks": 715266,
+          "admitted_read_blocks": 693602,
+          "admitted_write_blocks": 21664,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 235,
+          "max_total_write_buffer_occupancy": 217,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "dc4dcb21bd5c0882"
+          ]
+        },
+        "mapping_only": {
+          "admission_cycles": 179657,
+          "admitted_blocks": 715266,
+          "admitted_read_blocks": 693602,
+          "admitted_write_blocks": 21664,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 256,
+          "max_total_write_buffer_occupancy": 256,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "9bafccfa3a07a7ad"
+          ]
+        },
+        "optimized": {
+          "admission_cycles": 179130,
+          "admitted_blocks": 715266,
+          "admitted_read_blocks": 693602,
+          "admitted_write_blocks": 21664,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 256,
+          "max_total_write_buffer_occupancy": 20,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "ade998e2282dc6e0"
+          ]
+        },
+        "pipeline_baseline": {
+          "admission_cycles": 301141,
+          "admitted_blocks": 1202706,
+          "admitted_read_blocks": 937322,
+          "admitted_write_blocks": 265384,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 256,
+          "max_total_write_buffer_occupancy": 4,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "8208fb4cdfe40e0a"
+          ]
+        },
+        "priority_only": {
+          "admission_cycles": 326275,
+          "admitted_blocks": 715266,
+          "admitted_read_blocks": 693602,
+          "admitted_write_blocks": 21664,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 254,
+          "max_total_write_buffer_occupancy": 220,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "632bb477d3a32f91"
+          ]
+        },
+        "sparsity_baseline": {
+          "admission_cycles": 183800,
+          "admitted_blocks": 732988,
+          "admitted_read_blocks": 732988,
+          "admitted_write_blocks": 0,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 256,
+          "max_total_write_buffer_occupancy": 0,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "5e897eb48a6de398"
+          ]
+        },
+        "sparsity_optimized": {
+          "admission_cycles": 170830,
+          "admitted_blocks": 682138,
+          "admitted_read_blocks": 682138,
+          "admitted_write_blocks": 0,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 256,
+          "max_total_write_buffer_occupancy": 0,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "b3095118bd3fb1c3"
+          ]
+        }
+      }
+    },
+    "pubmed": {
+      "directional_memory_evidence": {
+        "coordination_baseline": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 374154,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "read_requests": 4658,
+              "read_to_write_switches": 1141,
+              "trace_checksum_fnv1a64": "4dc9aa6fab5bcdf5",
+              "write_requests": {
+                "output": 8
+              },
+              "write_requests_overlapping_read_service": {
+                "output": 8
+              },
+              "write_to_read_switches": 1141
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "mapping_only": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 257298,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "read_requests": 4658,
+              "read_to_write_switches": 2478,
+              "trace_checksum_fnv1a64": "84605a5ff9edc59f",
+              "write_requests": {
+                "output": 8
+              },
+              "write_requests_overlapping_read_service": {
+                "output": 7
+              },
+              "write_to_read_switches": 2470
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "optimized": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 6380,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "read_requests": 4658,
+              "read_to_write_switches": 86,
+              "trace_checksum_fnv1a64": "4b1c1709a705f0d4",
+              "write_requests": {
+                "output": 8
+              },
+              "write_requests_overlapping_read_service": {
+                "output": 7
+              },
+              "write_to_read_switches": 78
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "pipeline_baseline": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 72,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                27,
+                27,
+                27,
+                27,
+                27,
+                27,
+                27,
+                27
+              ],
+              "read_requests": 4666,
+              "read_to_write_switches": 16,
+              "trace_checksum_fnv1a64": "796b702307f3e816",
+              "write_requests": {
+                "intermediate_write": 8,
+                "output": 8
+              },
+              "write_requests_overlapping_read_service": {},
+              "write_to_read_switches": 8
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "priority_only": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 115102,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "read_requests": 4658,
+              "read_to_write_switches": 233,
+              "trace_checksum_fnv1a64": "ddbaed1eaf496a18",
+              "write_requests": {
+                "output": 8
+              },
+              "write_requests_overlapping_read_service": {
+                "output": 8
+              },
+              "write_to_read_switches": 225
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "sparsity_baseline": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 0,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "read_requests": 4944,
+              "read_to_write_switches": 0,
+              "trace_checksum_fnv1a64": "c567af43546cc8a5",
+              "write_requests": {},
+              "write_requests_overlapping_read_service": {},
+              "write_to_read_switches": 0
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        },
+        "sparsity_optimized": {
+          "direction_switch_cycles": [
+            18,
+            16
+          ],
+          "layers": [
+            {
+              "direction_switch_stall_cycles": 0,
+              "layer": 0,
+              "max_channel_read_queue_occupancy": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+              ],
+              "max_channel_write_buffer_occupancy": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "read_requests": 4657,
+              "read_to_write_switches": 0,
+              "trace_checksum_fnv1a64": "422ee4bf078bb697",
+              "write_requests": {},
+              "write_requests_overlapping_read_service": {},
+              "write_to_read_switches": 0
+            }
+          ],
+          "read_row_cycles": [
+            14,
+            28,
+            42
+          ],
+          "write_row_cycles": [
+            4,
+            18,
+            32
+          ]
+        }
+      },
+      "mapping_evidence": {
+        "baseline_bank_blocks": [
+          290080,
+          290784,
+          289478,
+          291168,
+          288224,
+          290464,
+          293152,
+          292128,
+          291136,
+          290208,
+          288352,
+          291616,
+          289056,
+          291808,
+          291264,
+          287968
+        ],
+        "baseline_channel_blocks": [
+          581184,
+          580838,
+          580672,
+          581696,
+          581440,
+          581408,
+          580288,
+          579360
+        ],
+        "optimized_bank_blocks": [
+          290656,
+          290656,
+          290656,
+          290656,
+          290566,
+          290560,
+          290560,
+          290560,
+          290240,
+          290240,
+          290240,
+          290240,
+          290264,
+          290264,
+          290264,
+          290264
+        ],
+        "optimized_channel_blocks": [
+          580861,
+          580861,
+          580861,
+          580861,
+          580861,
+          580861,
+          580860,
+          580860
+        ]
+      },
+      "metrics": {
+        "coordination_active_bandwidth_gain": 3.60027893126179,
+        "coordination_bandwidth_gain": 3.550814574551498,
+        "coordination_speedup": 3.5508145745514983,
+        "mapping_bandwidth_gain": 3.5427482511053348,
+        "mapping_speedup": 3.5427482511053348,
+        "pipeline_dram_ratio": 0.7864382695970433,
+        "pipeline_speedup": 1.6275482679819595,
+        "priority_bandwidth_gain": 1.278299714622699,
+        "priority_incremental_bandwidth_gain": 1.0022768548241174,
+        "priority_incremental_bandwidth_gain_aggregate": 1.0022768548241174,
+        "priority_incremental_row_hit_ratio": 1.0214072815176438,
+        "priority_incremental_row_hit_ratio_aggregate": 1.0214072815176438,
+        "priority_incremental_speedup": 1.0022768548241177,
+        "priority_incremental_speedup_aggregate": 1.0022768548241177,
+        "priority_speedup": 1.278299714622699,
+        "sparsity_ae_dram_ratio": 0.8859846071002032,
+        "sparsity_input_dram_ratio": 0.8856507075112847,
+        "sparsity_speedup": 1.1256794228940392
+      },
+      "priority_trace_evidence": {
+        "address_mapping": "low-bits",
+        "changed_requests": [
+          {
+            "batch_id": 0,
+            "fifo_completion": 1365,
+            "fifo_issue": 0,
+            "optimized_completion": 542,
+            "optimized_issue": 0,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 0
+          },
+          {
+            "batch_id": 1,
+            "fifo_completion": 3127,
+            "fifo_issue": 1321,
+            "optimized_completion": 145915,
+            "optimized_issue": 145405,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 1
+          },
+          {
+            "batch_id": 2,
+            "fifo_completion": 4467,
+            "fifo_issue": 3082,
+            "optimized_completion": 293538,
+            "optimized_issue": 145898,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 2
+          },
+          {
+            "batch_id": 3,
+            "fifo_completion": 5788,
+            "fifo_issue": 4424,
+            "optimized_completion": 439362,
+            "optimized_issue": 293486,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 3
+          },
+          {
+            "batch_id": 4,
+            "fifo_completion": 7157,
+            "fifo_issue": 5744,
+            "optimized_completion": 587829,
+            "optimized_issue": 439305,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 4
+          },
+          {
+            "batch_id": 5,
+            "fifo_completion": 8428,
+            "fifo_issue": 7092,
+            "optimized_completion": 737367,
+            "optimized_issue": 587707,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 5
+          },
+          {
+            "batch_id": 6,
+            "fifo_completion": 9748,
+            "fifo_issue": 8384,
+            "optimized_completion": 885723,
+            "optimized_issue": 737241,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 6
+          },
+          {
+            "batch_id": 7,
+            "fifo_completion": 10646,
+            "fifo_issue": 9704,
+            "optimized_completion": 1033871,
+            "optimized_issue": 885583,
+            "producer_sequence": null,
+            "request_class": "edge",
+            "sequence": 7
+          }
+        ],
+        "fifo_row_buffer_hits": 4385377,
+        "fifo_row_buffer_misses": 261509,
+        "optimized_row_buffer_hits": 4479256,
+        "optimized_row_buffer_misses": 167630,
+        "priority_reorders": 3509
+      },
+      "raw": {
+        "coordination_baseline": {
+          "active_bandwidth_utilization": 0.2740690036217866,
+          "bandwidth_utilization": 0.2740690036217866,
+          "row_buffer_hits": 4500864,
+          "row_buffer_misses": 146022,
+          "row_hit_rate": 0.9685763756631861,
+          "total_aggregation_cycles": 4155465,
+          "total_aggregation_dram_bytes": 287049600,
+          "total_cycles": 4238792,
+          "total_dram_bytes": 297400704,
+          "total_input_dram_bytes": 286103552
+        },
+        "mapping_only": {
+          "active_bandwidth_utilization": 0.9725897517041144,
+          "bandwidth_utilization": 0.9709574832632661,
+          "row_buffer_hits": 4385377,
+          "row_buffer_misses": 261509,
+          "row_hit_rate": 0.9437238184883382,
+          "total_aggregation_cycles": 1153069,
+          "total_aggregation_dram_bytes": 287049600,
+          "total_cycles": 1196470,
+          "total_dram_bytes": 297400704,
+          "total_input_dram_bytes": 286103552
+        },
+        "optimized": {
+          "active_bandwidth_utilization": 0.9867248594514295,
+          "bandwidth_utilization": 0.9731682124930471,
+          "row_buffer_hits": 4479256,
+          "row_buffer_misses": 167630,
+          "row_hit_rate": 0.9639263799456238,
+          "total_aggregation_cycles": 1150351,
+          "total_aggregation_dram_bytes": 287049600,
+          "total_cycles": 1193752,
+          "total_dram_bytes": 297400704,
+          "total_input_dram_bytes": 286103552
+        },
+        "pipeline_baseline": {
+          "active_bandwidth_utilization": 0.9884760926516396,
+          "bandwidth_utilization": 0.7603077170131696,
+          "row_buffer_hits": 5704250,
+          "row_buffer_misses": 204524,
+          "row_hit_rate": 0.9653863897993052,
+          "total_aggregation_cycles": 1150351,
+          "total_aggregation_dram_bytes": 287049600,
+          "total_cycles": 1942889,
+          "total_dram_bytes": 378161536,
+          "total_input_dram_bytes": 286103552
+        },
+        "priority_only": {
+          "active_bandwidth_utilization": 0.35034254042344914,
+          "bandwidth_utilization": 0.3503423291166573,
+          "row_buffer_hits": 4501534,
+          "row_buffer_misses": 145352,
+          "row_hit_rate": 0.9687205582405077,
+          "total_aggregation_cycles": 3238363,
+          "total_aggregation_dram_bytes": 287049600,
+          "total_cycles": 3315961,
+          "total_dram_bytes": 297400704,
+          "total_input_dram_bytes": 286103552
+        },
+        "sparsity_baseline": {
+          "active_bandwidth_utilization": 0.9883093567315396,
+          "bandwidth_utilization": 0.9883078131686549,
+          "row_buffer_hits": 4902338,
+          "row_buffer_misses": 159996,
+          "row_hit_rate": 0.9683948155139507,
+          "total_aggregation_cycles": 1293767,
+          "total_aggregation_dram_bytes": 323989376,
+          "total_cycles": 1293767,
+          "total_dram_bytes": 323989376,
+          "total_input_dram_bytes": 323043328
+        },
+        "sparsity_optimized": {
+          "active_bandwidth_utilization": 0.9868698985923328,
+          "bandwidth_utilization": 0.9868681614633941,
+          "row_buffer_hits": 4325666,
+          "row_buffer_misses": 159484,
+          "row_hit_rate": 0.9644417689486416,
+          "total_aggregation_cycles": 1149321,
+          "total_aggregation_dram_bytes": 287049600,
+          "total_cycles": 1149321,
+          "total_dram_bytes": 287049600,
+          "total_input_dram_bytes": 286103552
+        }
+      },
+      "runs": {
+        "coordination_baseline": "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-fifo_mapping-row-first_seed-1_layer-0.json",
+        "mapping_only": "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-fifo_mapping-low-bits_seed-1_layer-0.json",
+        "optimized": "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json",
+        "pipeline_baseline": "paper_paper_gcn_pubmed_sequential_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json",
+        "priority_only": "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-batch-class_mapping-row-first_seed-1_layer-0.json",
+        "sparsity_baseline": "paper_paper_gcn_pubmed_latency-aware_independent_sparse-off_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json",
+        "sparsity_optimized": "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json"
+      },
+      "sequential_traffic_oracle": {
+        "alignment": "block",
+        "intermediate_read_bytes": 40380416,
+        "intermediate_write_bytes": 40380416,
+        "producer_bytes": 40380416
+      },
+      "transaction_admission_oracles": {
+        "coordination_baseline": {
+          "admission_cycles": 1981222,
+          "admitted_blocks": 4646886,
+          "admitted_read_blocks": 4489150,
+          "admitted_write_blocks": 157736,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 250,
+          "max_total_write_buffer_occupancy": 246,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "4dc9aa6fab5bcdf5"
+          ]
+        },
+        "mapping_only": {
+          "admission_cycles": 1164750,
+          "admitted_blocks": 4646886,
+          "admitted_read_blocks": 4489150,
+          "admitted_write_blocks": 157736,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 256,
+          "max_total_write_buffer_occupancy": 256,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "84605a5ff9edc59f"
+          ]
+        },
+        "optimized": {
+          "admission_cycles": 1163242,
+          "admitted_blocks": 4646886,
+          "admitted_read_blocks": 4489150,
+          "admitted_write_blocks": 157736,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 256,
+          "max_total_write_buffer_occupancy": 256,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "4b1c1709a705f0d4"
+          ]
+        },
+        "pipeline_baseline": {
+          "admission_cycles": 1480284,
+          "admitted_blocks": 5908774,
+          "admitted_read_blocks": 5120094,
+          "admitted_write_blocks": 788680,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 256,
+          "max_total_write_buffer_occupancy": 212,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "796b702307f3e816"
+          ]
+        },
+        "priority_only": {
+          "admission_cycles": 2139729,
+          "admitted_blocks": 4646886,
+          "admitted_read_blocks": 4489150,
+          "admitted_write_blocks": 157736,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 253,
+          "max_total_write_buffer_occupancy": 236,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "ddbaed1eaf496a18"
+          ]
+        },
+        "sparsity_baseline": {
+          "admission_cycles": 1270752,
+          "admitted_blocks": 5062334,
+          "admitted_read_blocks": 5062334,
+          "admitted_write_blocks": 0,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 256,
+          "max_total_write_buffer_occupancy": 0,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "c567af43546cc8a5"
+          ]
+        },
+        "sparsity_optimized": {
+          "admission_cycles": 1126429,
+          "admitted_blocks": 4485150,
+          "admitted_read_blocks": 4485150,
+          "admitted_write_blocks": 0,
+          "issue_limit_blocks_per_cycle": 4,
+          "max_blocks_admitted_per_cycle": 4,
+          "max_total_read_queue_occupancy": 256,
+          "max_total_write_buffer_occupancy": 0,
+          "total_read_queue_capacity": 256,
+          "total_write_buffer_capacity": 256,
+          "trace_checksums": [
+            "422ee4bf078bb697"
+          ]
+        }
+      }
+    }
+  },
+  "reference_file": "configs/paper_metrics.json",
+  "schema_version": 2,
+  "scope": {
+    "not_validated": [
+      "absolute CPU speedup",
+      "absolute GPU speedup",
+      "DiffPool",
+      "complete chip energy and area",
+      "exact ping-pong half ownership",
+      "automatic SVG redownload and redigitization"
+    ],
+    "validated": "Fig. 15 layer-0 AE-only sparsity and Fig. 16-17 layer-0 request-level microarchitectural effects for GCN"
+  },
+  "workload_manifest": {
+    "figures": {
+      "figure_15": {
+        "aggregation": "per_dataset",
+        "input_features": "dataset_metadata.feature",
+        "model": "gcn",
+        "output_features": 128,
+        "scope": "aggregation",
+        "selected_layer": "0"
+      },
+      "figure_16": {
+        "aggregation": "per_dataset",
+        "input_features": "dataset_metadata.feature",
+        "model": "gcn",
+        "output_features": 128,
+        "scope": "full",
+        "selected_layer": "0"
+      },
+      "figure_17": {
+        "aggregation": "arithmetic_mean_over_datasets",
+        "input_features": "dataset_metadata.feature",
+        "model": "gcn",
+        "output_features": 128,
+        "scope": "full",
+        "selected_layer": "0"
+      }
+    },
+    "graph_partition": {
+      "aggregation_ping_pong_half_capacity_bytes": 8388608,
+      "aggregation_shard_capacity_bytes": 5242880,
+      "calibrated_fit_datasets": [
+        "cora",
+        "citeseer",
+        "pubmed"
+      ],
+      "candidate_capacities_mib": [
+        4,
+        5,
+        6
+      ],
+      "fit_disclosure": "Cora, Citeseer, and PubMed were all exposed before this version; the 5 MiB scheduler cap and the 14 paper rows are reported as a calibrated fit, not independent hold-out validation",
+      "historical_exposure": "Review v4 evaluated all three datasets at 4, 5, and 6 MiB before Review v5; no dataset in this repository remains unexposed for scheduler-cap selection",
+      "independent_holdout_datasets": [],
+      "policy": "fixed dataset-independent scheduler occupancy cap below one physical ping-pong half",
+      "source": "HyGCN Section 4.3.2 requires the destination interval and its aggregation results to fit the on-chip Aggregation Buffer; the paper does not publish the simulator's interval occupancy, so this request-level model reports the fixed scheduler cap separately from the 16 MiB physical capacity"
+    },
+    "path": "configs/paper_workloads.json",
+    "sha256": "20a6ef60fec4b21ca9f4bc47332c5c5a1fb033febf9c9d90a70354300ad04753",
+    "version": "hygcn-hpca2020-table5-gcn-v3"
+  }
+}

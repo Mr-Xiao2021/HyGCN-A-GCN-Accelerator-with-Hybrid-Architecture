@@ -1,0 +1,8 @@
+paper_metrics=14/14 PASS
+internal_checks=7/12 (five threshold regressions retained)
+partition_sensitivity=4MiB:FAIL,5MiB:PASS,6MiB:FAIL
+model_sensitivity=9 scenarios PASS
+complete_trace=21/21 PASS
+raw_lossless_gzip=21/21 PASS
+no_target_parameter_retuning=PASS
+formal_validation=PASS

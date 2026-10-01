@@ -1,0 +1,25 @@
+commit 0ab8c611d7294683aec2dc20f1f296d3c68acb29
+Author:     Mr-Xiao2021 <349602396@qq.com>
+AuthorDate: Sun Sep 27 18:29:26 2026 +0800
+Commit:     Mr-Xiao2021 <349602396@qq.com>
+CommitDate: Sun Sep 27 18:29:26 2026 +0800
+
+    model directional HBM queues
+
+ configs/HYGCN_LEGACY.ini                           |  14 +-
+ configs/HYGCN_PAPER.ini                            |  14 +-
+ configs/HYGCN_SMOKE.ini                            |  14 +-
+ configs/paper_workloads.json                       |  18 +-
+ docs/paper-reproduction.md                         |   6 +-
+ hygcn/paper_sim.cpp                                | 569 +++++++++++++++++----
+ hygcn/paper_sim.h                                  |  37 +-
+ hygcn_test/unit.cpp                                | 110 +++-
+ .../reproduce-hygcn-paper-performance/design.md    |   4 +-
+ .../specs/hybrid-architecture-simulation/spec.md   |   2 +-
+ .../specs/paper-performance-validation/spec.md     |  12 +-
+ .../reproduce-hygcn-paper-performance/tasks.md     |   7 +
+ tools/check_determinism.py                         |   7 +
+ tools/model_sensitivity.py                         |  43 +-
+ tools/paper_benchmark.py                           | 395 ++++++++++++--
+ tools/test_paper_benchmark.py                      |  33 +-
+ 16 files changed, 1065 insertions(+), 220 deletions(-)

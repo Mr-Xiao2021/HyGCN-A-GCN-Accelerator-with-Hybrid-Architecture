@@ -1,0 +1,1073 @@
+{
+  "citeseer": {
+    "coordination_baseline": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 132695,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "read_requests": 4586,
+          "read_to_write_switches": 322,
+          "trace_checksum_fnv1a64": "bc1626432bfbd45d",
+          "write_requests": {
+            "output": 10
+          },
+          "write_requests_overlapping_read_service": {
+            "output": 9
+          },
+          "write_to_read_switches": 314
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "mapping_only": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 76932,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "read_requests": 4586,
+          "read_to_write_switches": 672,
+          "trace_checksum_fnv1a64": "b1b064e10db7f1c7",
+          "write_requests": {
+            "output": 10
+          },
+          "write_requests_overlapping_read_service": {
+            "output": 8
+          },
+          "write_to_read_switches": 664
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "optimized": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 11359,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "read_requests": 4586,
+          "read_to_write_switches": 132,
+          "trace_checksum_fnv1a64": "69c08f6d355be241",
+          "write_requests": {
+            "output": 10
+          },
+          "write_requests_overlapping_read_service": {
+            "output": 8
+          },
+          "write_to_read_switches": 124
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "pipeline_baseline": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 0,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "read_requests": 4596,
+          "read_to_write_switches": 16,
+          "trace_checksum_fnv1a64": "072598e5d787b429",
+          "write_requests": {
+            "intermediate_write": 10,
+            "output": 10
+          },
+          "write_requests_overlapping_read_service": {},
+          "write_to_read_switches": 8
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "priority_only": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 123833,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "read_requests": 4586,
+          "read_to_write_switches": 275,
+          "trace_checksum_fnv1a64": "d304829f316bf242",
+          "write_requests": {
+            "output": 10
+          },
+          "write_requests_overlapping_read_service": {
+            "output": 10
+          },
+          "write_to_read_switches": 273
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "sparsity_baseline": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 0,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "read_requests": 8330,
+          "read_to_write_switches": 0,
+          "trace_checksum_fnv1a64": "c2059b617910a8cd",
+          "write_requests": {},
+          "write_requests_overlapping_read_service": {},
+          "write_to_read_switches": 0
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "sparsity_optimized": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 0,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "read_requests": 4585,
+          "read_to_write_switches": 0,
+          "trace_checksum_fnv1a64": "3a58b70d68415459",
+          "write_requests": {},
+          "write_requests_overlapping_read_service": {},
+          "write_to_read_switches": 0
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    }
+  },
+  "cora": {
+    "coordination_baseline": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 70274,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "read_requests": 717,
+          "read_to_write_switches": 190,
+          "trace_checksum_fnv1a64": "dc4dcb21bd5c0882",
+          "write_requests": {
+            "output": 3
+          },
+          "write_requests_overlapping_read_service": {
+            "output": 2
+          },
+          "write_to_read_switches": 182
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "mapping_only": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 18298,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "read_requests": 717,
+          "read_to_write_switches": 172,
+          "trace_checksum_fnv1a64": "9bafccfa3a07a7ad",
+          "write_requests": {
+            "output": 3
+          },
+          "write_requests_overlapping_read_service": {
+            "output": 1
+          },
+          "write_to_read_switches": 164
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "optimized": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 1490,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            4,
+            4,
+            4,
+            4,
+            1,
+            1,
+            2,
+            2
+          ],
+          "read_requests": 717,
+          "read_to_write_switches": 20,
+          "trace_checksum_fnv1a64": "ade998e2282dc6e0",
+          "write_requests": {
+            "output": 3
+          },
+          "write_requests_overlapping_read_service": {
+            "output": 1
+          },
+          "write_to_read_switches": 12
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "pipeline_baseline": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 72,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "read_requests": 720,
+          "read_to_write_switches": 16,
+          "trace_checksum_fnv1a64": "8208fb4cdfe40e0a",
+          "write_requests": {
+            "intermediate_write": 3,
+            "output": 3
+          },
+          "write_requests_overlapping_read_service": {},
+          "write_to_read_switches": 8
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "priority_only": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 35721,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "read_requests": 717,
+          "read_to_write_switches": 88,
+          "trace_checksum_fnv1a64": "632bb477d3a32f91",
+          "write_requests": {
+            "output": 3
+          },
+          "write_requests_overlapping_read_service": {
+            "output": 2
+          },
+          "write_to_read_switches": 80
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "sparsity_baseline": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 0,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "read_requests": 744,
+          "read_to_write_switches": 0,
+          "trace_checksum_fnv1a64": "5e897eb48a6de398",
+          "write_requests": {},
+          "write_requests_overlapping_read_service": {},
+          "write_to_read_switches": 0
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "sparsity_optimized": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 0,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "read_requests": 716,
+          "read_to_write_switches": 0,
+          "trace_checksum_fnv1a64": "b3095118bd3fb1c3",
+          "write_requests": {},
+          "write_requests_overlapping_read_service": {},
+          "write_to_read_switches": 0
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    }
+  },
+  "pubmed": {
+    "coordination_baseline": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 374154,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "read_requests": 4658,
+          "read_to_write_switches": 1141,
+          "trace_checksum_fnv1a64": "4dc9aa6fab5bcdf5",
+          "write_requests": {
+            "output": 8
+          },
+          "write_requests_overlapping_read_service": {
+            "output": 8
+          },
+          "write_to_read_switches": 1141
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "mapping_only": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 257298,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "read_requests": 4658,
+          "read_to_write_switches": 2478,
+          "trace_checksum_fnv1a64": "84605a5ff9edc59f",
+          "write_requests": {
+            "output": 8
+          },
+          "write_requests_overlapping_read_service": {
+            "output": 7
+          },
+          "write_to_read_switches": 2470
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "optimized": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 6380,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "read_requests": 4658,
+          "read_to_write_switches": 86,
+          "trace_checksum_fnv1a64": "4b1c1709a705f0d4",
+          "write_requests": {
+            "output": 8
+          },
+          "write_requests_overlapping_read_service": {
+            "output": 7
+          },
+          "write_to_read_switches": 78
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "pipeline_baseline": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 72,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            27,
+            27,
+            27,
+            27,
+            27,
+            27,
+            27,
+            27
+          ],
+          "read_requests": 4666,
+          "read_to_write_switches": 16,
+          "trace_checksum_fnv1a64": "796b702307f3e816",
+          "write_requests": {
+            "intermediate_write": 8,
+            "output": 8
+          },
+          "write_requests_overlapping_read_service": {},
+          "write_to_read_switches": 8
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "priority_only": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 115102,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "read_requests": 4658,
+          "read_to_write_switches": 233,
+          "trace_checksum_fnv1a64": "ddbaed1eaf496a18",
+          "write_requests": {
+            "output": 8
+          },
+          "write_requests_overlapping_read_service": {
+            "output": 8
+          },
+          "write_to_read_switches": 225
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "sparsity_baseline": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 0,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "read_requests": 4944,
+          "read_to_write_switches": 0,
+          "trace_checksum_fnv1a64": "c567af43546cc8a5",
+          "write_requests": {},
+          "write_requests_overlapping_read_service": {},
+          "write_to_read_switches": 0
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    },
+    "sparsity_optimized": {
+      "direction_switch_cycles": [
+        18,
+        16
+      ],
+      "layers": [
+        {
+          "direction_switch_stall_cycles": 0,
+          "layer": 0,
+          "max_channel_read_queue_occupancy": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+          ],
+          "max_channel_write_buffer_occupancy": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "read_requests": 4657,
+          "read_to_write_switches": 0,
+          "trace_checksum_fnv1a64": "422ee4bf078bb697",
+          "write_requests": {},
+          "write_requests_overlapping_read_service": {},
+          "write_to_read_switches": 0
+        }
+      ],
+      "read_row_cycles": [
+        14,
+        28,
+        42
+      ],
+      "write_row_cycles": [
+        4,
+        18,
+        32
+      ]
+    }
+  }
+}

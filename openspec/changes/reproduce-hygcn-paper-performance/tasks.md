@@ -109,4 +109,4 @@
 - [x] 13.1 按 bundled DRAMSim3 `unified_queue=False` 将每 channel 拆为独立 32-entry read queue 和 32-entry write buffer，并保持全局 4 blocks/cycle admission
 - [x] 13.2 从 `CWL/tRCDWR/tRP` 推导 write hit/miss/conflict，从 `RL/WL/burst/tRTRS/tWTR_L` 推导 read/write switching，增加方向反例单测
 - [x] 13.3 将 transaction admission 事件保存为完整可逆 delta-varint/base64 分块，validator 独立重算 histogram、weighted totals、actual maxima、edge samples 和 checksum
-- [ ] 13.4 在不调整目标相关参数的前提下完成 clean Release、CTest、legacy、强制 benchmark、partition/model sensitivity，并固化修正前后证据
+- [x] 13.4 在不调整目标相关参数的前提下完成 clean Release、CTest、legacy、强制 benchmark、partition/model sensitivity，并固化修正前后证据

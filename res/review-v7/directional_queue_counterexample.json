@@ -1,0 +1,12 @@
+{
+  "direction_switch_stall_cycles": 17,
+  "observed_read_peak": 2,
+  "observed_write_peak": 1,
+  "read_first_issue_cycle": 0,
+  "read_queue_capacity": 2,
+  "result": "PASS",
+  "source": "res/review-v7/unit.log",
+  "test": "V6_01_directional_hbm_queues_and_timing",
+  "write_buffer_capacity": 2,
+  "write_first_issue_cycle": 19
+}

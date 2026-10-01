@@ -1,0 +1,22 @@
+paper_paper_gcn_citeseer_latency-aware_independent_sparse-off_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json: PASS blocks=7720407 read=7720407 write=0 max=4 checksums=c2059b617910a8cd
+paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json: PASS blocks=2657567 read=2630951 write=26616 max=4 checksums=69c08f6d355be241
+paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json: PASS blocks=2601327 read=2601327 write=0 max=4 checksums=3a58b70d68415459
+paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-batch-class_mapping-row-first_seed-1_layer-0.json: PASS blocks=2657567 read=2630951 write=26616 max=4 checksums=d304829f316bf242
+paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-fifo_mapping-low-bits_seed-1_layer-0.json: PASS blocks=2657567 read=2630951 write=26616 max=4 checksums=b1b064e10db7f1c7
+paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-fifo_mapping-row-first_seed-1_layer-0.json: PASS blocks=2657567 read=2630951 write=26616 max=4 checksums=bc1626432bfbd45d
+paper_paper_gcn_citeseer_sequential_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json: PASS blocks=4201295 read=3402815 write=798480 max=4 checksums=072598e5d787b429
+paper_paper_gcn_cora_latency-aware_independent_sparse-off_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json: PASS blocks=732988 read=732988 write=0 max=4 checksums=5e897eb48a6de398
+paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json: PASS blocks=715266 read=693602 write=21664 max=4 checksums=ade998e2282dc6e0
+paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json: PASS blocks=682138 read=682138 write=0 max=4 checksums=b3095118bd3fb1c3
+paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-batch-class_mapping-row-first_seed-1_layer-0.json: PASS blocks=715266 read=693602 write=21664 max=4 checksums=632bb477d3a32f91
+paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-fifo_mapping-low-bits_seed-1_layer-0.json: PASS blocks=715266 read=693602 write=21664 max=4 checksums=9bafccfa3a07a7ad
+paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-fifo_mapping-row-first_seed-1_layer-0.json: PASS blocks=715266 read=693602 write=21664 max=4 checksums=dc4dcb21bd5c0882
+paper_paper_gcn_cora_sequential_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json: PASS blocks=1202706 read=937322 write=265384 max=4 checksums=8208fb4cdfe40e0a
+paper_paper_gcn_pubmed_latency-aware_independent_sparse-off_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json: PASS blocks=5062334 read=5062334 write=0 max=4 checksums=c567af43546cc8a5
+paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json: PASS blocks=4646886 read=4489150 write=157736 max=4 checksums=4b1c1709a705f0d4
+paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json: PASS blocks=4485150 read=4485150 write=0 max=4 checksums=422ee4bf078bb697
+paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-batch-class_mapping-row-first_seed-1_layer-0.json: PASS blocks=4646886 read=4489150 write=157736 max=4 checksums=ddbaed1eaf496a18
+paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-fifo_mapping-low-bits_seed-1_layer-0.json: PASS blocks=4646886 read=4489150 write=157736 max=4 checksums=84605a5ff9edc59f
+paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-fifo_mapping-row-first_seed-1_layer-0.json: PASS blocks=4646886 read=4489150 write=157736 max=4 checksums=4dc9aa6fab5bcdf5
+paper_paper_gcn_pubmed_sequential_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json: PASS blocks=5908774 read=5120094 write=788680 max=4 checksums=796b702307f3e816
+complete_trace_files=21 admitted_blocks=64675995 read_blocks=61999387 write_blocks=2676608 unique_checksums=21 status=PASS

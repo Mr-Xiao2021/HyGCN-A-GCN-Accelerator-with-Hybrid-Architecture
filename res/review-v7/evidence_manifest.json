@@ -1,0 +1,50 @@
+{
+  "artifact_directory": "res/review-v7",
+  "branch": "run/npu",
+  "complete_admission_trace": {
+    "admitted_blocks": 64675995,
+    "max_blocks_per_cycle": 4,
+    "raw_files": 21,
+    "read_blocks": 61999387,
+    "status": "PASS",
+    "unique_checksums": 21,
+    "write_blocks": 2676608
+  },
+  "date": "2026-10-01",
+  "fixed_binary": "/tmp/hygcn-build-review-v7-0ab8c61/hygcntest",
+  "fixed_binary_sha256": "07ba9f15230f3b4360e195de15a7a97b9d2b88fdcfb38da5eca967ea5e660176",
+  "formal_output_directory": "/tmp/hygcn-review-v7-formal-0ab8c61",
+  "historical_parameter_recalibration_disclosed": true,
+  "implementation_commit": "0ab8c611d7294683aec2dc20f1f296d3c68acb29",
+  "implementation_parent_remote": "3414f1e4ba530c4923b32a5dbedc272240418083",
+  "internal_checks": {
+    "passed": 7,
+    "total": 12
+  },
+  "model_output_directory": "/tmp/hygcn-review-v7-model-0ab8c61",
+  "no_target_parameter_retuning_in_revision": true,
+  "paper_metrics": {
+    "passed": 14,
+    "total": 14
+  },
+  "partition_output_directory": "/tmp/hygcn-review-v7-partition-0ab8c61",
+  "partition_sensitivity": {
+    "4_mib": "FAIL",
+    "5_mib": "PASS",
+    "6_mib": "FAIL",
+    "independent_holdout": false
+  },
+  "raw_storage": {
+    "csv": "plain text",
+    "json": "lossless .json.gz"
+  },
+  "schema_version": 1,
+  "tests": {
+    "V6_01_directional_hbm_queues_and_timing": "PASS",
+    "clean_release_build": "PASS",
+    "ctest": "9/9 PASS",
+    "legacy": "Cora/Citeseer PASS",
+    "paper_output_determinism_complete_trace_decoder": "PASS",
+    "strict_openspec": "PASS"
+  }
+}

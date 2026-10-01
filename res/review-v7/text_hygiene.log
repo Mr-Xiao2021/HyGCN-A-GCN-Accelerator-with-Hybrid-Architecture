@@ -1,0 +1,3 @@
+crlf=PASS
+git_diff_check=PASS
+trailing_whitespace=PASS

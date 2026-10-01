@@ -1,0 +1,323 @@
+{
+  "citeseer": {
+    "coordination_baseline": {
+      "admission_cycles": 1132289,
+      "admitted_blocks": 2657567,
+      "admitted_read_blocks": 2630951,
+      "admitted_write_blocks": 26616,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 239,
+      "max_total_write_buffer_occupancy": 242,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "bc1626432bfbd45d"
+      ]
+    },
+    "mapping_only": {
+      "admission_cycles": 669831,
+      "admitted_blocks": 2657567,
+      "admitted_read_blocks": 2630951,
+      "admitted_write_blocks": 26616,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 256,
+      "max_total_write_buffer_occupancy": 256,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "b1b064e10db7f1c7"
+      ]
+    },
+    "optimized": {
+      "admission_cycles": 667822,
+      "admitted_blocks": 2657567,
+      "admitted_read_blocks": 2630951,
+      "admitted_write_blocks": 26616,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 256,
+      "max_total_write_buffer_occupancy": 256,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "69c08f6d355be241"
+      ]
+    },
+    "pipeline_baseline": {
+      "admission_cycles": 1058262,
+      "admitted_blocks": 4201295,
+      "admitted_read_blocks": 3402815,
+      "admitted_write_blocks": 798480,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 256,
+      "max_total_write_buffer_occupancy": 256,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "072598e5d787b429"
+      ]
+    },
+    "priority_only": {
+      "admission_cycles": 1190267,
+      "admitted_blocks": 2657567,
+      "admitted_read_blocks": 2630951,
+      "admitted_write_blocks": 26616,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 256,
+      "max_total_write_buffer_occupancy": 245,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "d304829f316bf242"
+      ]
+    },
+    "sparsity_baseline": {
+      "admission_cycles": 1937940,
+      "admitted_blocks": 7720407,
+      "admitted_read_blocks": 7720407,
+      "admitted_write_blocks": 0,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 256,
+      "max_total_write_buffer_occupancy": 0,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "c2059b617910a8cd"
+      ]
+    },
+    "sparsity_optimized": {
+      "admission_cycles": 656517,
+      "admitted_blocks": 2601327,
+      "admitted_read_blocks": 2601327,
+      "admitted_write_blocks": 0,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 256,
+      "max_total_write_buffer_occupancy": 0,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "3a58b70d68415459"
+      ]
+    }
+  },
+  "cora": {
+    "coordination_baseline": {
+      "admission_cycles": 307302,
+      "admitted_blocks": 715266,
+      "admitted_read_blocks": 693602,
+      "admitted_write_blocks": 21664,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 235,
+      "max_total_write_buffer_occupancy": 217,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "dc4dcb21bd5c0882"
+      ]
+    },
+    "mapping_only": {
+      "admission_cycles": 179657,
+      "admitted_blocks": 715266,
+      "admitted_read_blocks": 693602,
+      "admitted_write_blocks": 21664,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 256,
+      "max_total_write_buffer_occupancy": 256,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "9bafccfa3a07a7ad"
+      ]
+    },
+    "optimized": {
+      "admission_cycles": 179130,
+      "admitted_blocks": 715266,
+      "admitted_read_blocks": 693602,
+      "admitted_write_blocks": 21664,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 256,
+      "max_total_write_buffer_occupancy": 20,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "ade998e2282dc6e0"
+      ]
+    },
+    "pipeline_baseline": {
+      "admission_cycles": 301141,
+      "admitted_blocks": 1202706,
+      "admitted_read_blocks": 937322,
+      "admitted_write_blocks": 265384,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 256,
+      "max_total_write_buffer_occupancy": 4,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "8208fb4cdfe40e0a"
+      ]
+    },
+    "priority_only": {
+      "admission_cycles": 326275,
+      "admitted_blocks": 715266,
+      "admitted_read_blocks": 693602,
+      "admitted_write_blocks": 21664,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 254,
+      "max_total_write_buffer_occupancy": 220,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "632bb477d3a32f91"
+      ]
+    },
+    "sparsity_baseline": {
+      "admission_cycles": 183800,
+      "admitted_blocks": 732988,
+      "admitted_read_blocks": 732988,
+      "admitted_write_blocks": 0,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 256,
+      "max_total_write_buffer_occupancy": 0,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "5e897eb48a6de398"
+      ]
+    },
+    "sparsity_optimized": {
+      "admission_cycles": 170830,
+      "admitted_blocks": 682138,
+      "admitted_read_blocks": 682138,
+      "admitted_write_blocks": 0,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 256,
+      "max_total_write_buffer_occupancy": 0,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "b3095118bd3fb1c3"
+      ]
+    }
+  },
+  "pubmed": {
+    "coordination_baseline": {
+      "admission_cycles": 1981222,
+      "admitted_blocks": 4646886,
+      "admitted_read_blocks": 4489150,
+      "admitted_write_blocks": 157736,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 250,
+      "max_total_write_buffer_occupancy": 246,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "4dc9aa6fab5bcdf5"
+      ]
+    },
+    "mapping_only": {
+      "admission_cycles": 1164750,
+      "admitted_blocks": 4646886,
+      "admitted_read_blocks": 4489150,
+      "admitted_write_blocks": 157736,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 256,
+      "max_total_write_buffer_occupancy": 256,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "84605a5ff9edc59f"
+      ]
+    },
+    "optimized": {
+      "admission_cycles": 1163242,
+      "admitted_blocks": 4646886,
+      "admitted_read_blocks": 4489150,
+      "admitted_write_blocks": 157736,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 256,
+      "max_total_write_buffer_occupancy": 256,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "4b1c1709a705f0d4"
+      ]
+    },
+    "pipeline_baseline": {
+      "admission_cycles": 1480284,
+      "admitted_blocks": 5908774,
+      "admitted_read_blocks": 5120094,
+      "admitted_write_blocks": 788680,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 256,
+      "max_total_write_buffer_occupancy": 212,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "796b702307f3e816"
+      ]
+    },
+    "priority_only": {
+      "admission_cycles": 2139729,
+      "admitted_blocks": 4646886,
+      "admitted_read_blocks": 4489150,
+      "admitted_write_blocks": 157736,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 253,
+      "max_total_write_buffer_occupancy": 236,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "ddbaed1eaf496a18"
+      ]
+    },
+    "sparsity_baseline": {
+      "admission_cycles": 1270752,
+      "admitted_blocks": 5062334,
+      "admitted_read_blocks": 5062334,
+      "admitted_write_blocks": 0,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 256,
+      "max_total_write_buffer_occupancy": 0,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "c567af43546cc8a5"
+      ]
+    },
+    "sparsity_optimized": {
+      "admission_cycles": 1126429,
+      "admitted_blocks": 4485150,
+      "admitted_read_blocks": 4485150,
+      "admitted_write_blocks": 0,
+      "issue_limit_blocks_per_cycle": 4,
+      "max_blocks_admitted_per_cycle": 4,
+      "max_total_read_queue_occupancy": 256,
+      "max_total_write_buffer_occupancy": 0,
+      "total_read_queue_capacity": 256,
+      "total_write_buffer_capacity": 256,
+      "trace_checksums": [
+        "422ee4bf078bb697"
+      ]
+    }
+  }
+}

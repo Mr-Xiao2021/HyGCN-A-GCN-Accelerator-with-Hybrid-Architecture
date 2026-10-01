@@ -1,0 +1,28 @@
+{
+  "calibrated_fit_datasets": [
+    "cora",
+    "citeseer",
+    "pubmed"
+  ],
+  "evidence_counts": {
+    "internal_check_rows": 12,
+    "paper_metric_rows": 14
+  },
+  "independent_holdout_datasets": [],
+  "internal_checks_passed": 7,
+  "internal_checks_total": 12,
+  "paper_metrics_passed": 14,
+  "paper_metrics_total": 14,
+  "parameter_recalibration": true,
+  "scope": {
+    "not_validated": [
+      "absolute CPU speedup",
+      "absolute GPU speedup",
+      "DiffPool",
+      "complete chip energy and area",
+      "exact ping-pong half ownership",
+      "automatic SVG redownload and redigitization"
+    ],
+    "validated": "Fig. 15 layer-0 AE-only sparsity and Fig. 16-17 layer-0 request-level microarchitectural effects for GCN"
+  }
+}

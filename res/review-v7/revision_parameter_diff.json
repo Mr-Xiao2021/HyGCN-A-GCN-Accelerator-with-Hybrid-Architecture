@@ -1,0 +1,60 @@
+{
+  "base_commit": "3414f1e4ba530c4923b32a5dbedc272240418083",
+  "derived_issue_width_unchanged": {
+    "block_bytes": 64,
+    "blocks_per_cycle": 4,
+    "bytes_per_cycle": 256
+  },
+  "direction_model_changes": {
+    "direction_switch_timing": {
+      "after": [
+        18,
+        16
+      ],
+      "source": "RL/WL/burst/tRTRS/tWTR_L from bundled DRAMSim3 HBM config"
+    },
+    "queue_organization": {
+      "after": {
+        "hbm_read_queue_entries_per_channel": 32,
+        "hbm_write_buffer_entries_per_channel": 32
+      },
+      "before": {
+        "hbm_transaction_queue_entries_per_channel": 32
+      },
+      "source": "bundled DRAMSim3 unified_queue=False and trans_queue_size=32"
+    },
+    "read_timing": {
+      "after": [
+        14,
+        28,
+        42
+      ],
+      "before": [
+        14,
+        28,
+        42
+      ]
+    },
+    "write_timing": {
+      "after": [
+        4,
+        18,
+        32
+      ],
+      "source": "CWL/tRCDWR/tRP from bundled DRAMSim3 HBM config"
+    }
+  },
+  "implementation_commit": "0ab8c611d7294683aec2dc20f1f296d3c68acb29",
+  "no_target_parameter_retuning": true,
+  "target_related_parameters_unchanged": {
+    "architecture.frequency_ghz": 1.0,
+    "memory.hbm_bandwidth_gbps": 256,
+    "memory.hbm_banks_per_channel": 16,
+    "memory.hbm_channels": 8,
+    "memory.hbm_row_bytes": 2048,
+    "model.aggregation_shard_capacity_bytes": 5242880,
+    "model.batch_launch_interval_cycles": 1,
+    "model.neighbor_index_ready_cycles": 2,
+    "model.row_first_bank_interleave": 1
+  }
+}
