@@ -36,6 +36,12 @@ def run_case(root, reference, aggregate, per_dataset, expected_returncode, name,
             f"{name}: expected return code {expected_returncode}, got "
             f"{completed.returncode}: {completed.stdout}{completed.stderr}"
         )
+    if name == "valid":
+        output = output_path.read_text(encoding="utf-8")
+        if "Historical Schema v5 Comparison" not in output or \
+                "internal_checks_schema_v6=12/12" not in completed.stdout or \
+                "internal_checks_schema_v5=11/12" not in completed.stdout:
+            raise RuntimeError("valid: schema v5/v6 audit comparison is missing")
 
 
 def main():

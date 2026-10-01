@@ -541,7 +541,58 @@ void TestTransactionAdmissionBandwidth() {
                       trace.first_issue_cycle >= trace.first_admission_cycle,
                   "request issue follows enqueue and bounded transaction admission");
         }
+        if (priority == MemoryPriorityMode::FIFO) {
+            for (std::size_t sequence = 0; sequence < requests.size(); ++sequence) {
+                const auto request = std::find_if(
+                    timing.request_traces.begin(), timing.request_traces.end(),
+                    [sequence](const auto& trace) {
+                        return trace.sequence == sequence;
+                    });
+                Check(request != timing.request_traces.end() &&
+                          request->first_admission_cycle == sequence &&
+                          request->last_admission_cycle == sequence,
+                      "FIFO admits one buffer port quantum per cycle");
+            }
+        }
     }
+
+    config.hbm_read_queue_entries_per_channel = 32;
+    config.hbm_write_buffer_entries_per_channel = 32;
+    config.Validate();
+    const auto windowed = MemoryCoordinatorModel::Simulate(
+        {{0, RequestClass::INPUT, 1280, 0, 0, 0}}, config,
+        MemoryPriorityMode::FIFO, AddressMappingMode::ROW_FIRST);
+    std::vector<uint64_t> first_window_issues;
+    for (const auto& command : windowed.command_trace_samples) {
+        if (command.command == MemoryCommandType::READ &&
+            command.sequence == 0 && command.block_offset < 4) {
+            first_window_issues.push_back(command.cycle);
+        }
+    }
+    const uint64_t final_first_window_issue = first_window_issues.size() == 4
+        ? *std::max_element(first_window_issues.begin(), first_window_issues.end())
+        : std::numeric_limits<uint64_t>::max();
+    const uint64_t final_admission = windowed.request_traces.size() == 1
+        ? windowed.request_traces.front().last_admission_cycle : 0;
+    std::cout << "fifo_window_evidence={\"first_window_final_issue\":"
+              << final_first_window_issue << ",\"final_admission\":"
+              << final_admission << ",\"admissions\":[";
+    bool first_admission = true;
+    for (const auto& trace : windowed.admission_traces) {
+        if (trace.terminal_snapshot) {
+            continue;
+        }
+        if (!first_admission) {
+            std::cout << ',';
+        }
+        std::cout << '[' << trace.cycle << ',' << trace.admitted_blocks << ']';
+        first_admission = false;
+    }
+    std::cout << "]}\n";
+    Check(first_window_issues.size() == 4 &&
+              windowed.request_traces.size() == 1 &&
+              final_admission >= final_first_window_issue,
+          "FIFO bounds active row-sized windows by the four source buffers");
 }
 
 void TestDirectionalHbmQueuesAndTiming() {
@@ -560,12 +611,17 @@ void TestDirectionalHbmQueuesAndTiming() {
     const auto timing = MemoryCoordinatorModel::Simulate(
         requests, config, MemoryPriorityMode::FIFO,
         AddressMappingMode::LOW_BITS);
-    Check(!timing.admission_traces.empty() &&
-              timing.admission_traces.front().admitted_read_blocks == 2 &&
-              timing.admission_traces.front().admitted_write_blocks == 1 &&
-              timing.admission_traces.front().channel_read_occupancy_after[0] == 2 &&
-              timing.admission_traces.front().channel_write_occupancy_after[0] == 1,
-          "a full read queue does not consume the independent write-buffer capacity");
+    const auto independent_capacity = std::find_if(
+        timing.admission_traces.begin(), timing.admission_traces.end(),
+        [](const auto& trace) {
+            return !trace.terminal_snapshot &&
+                trace.admitted_write_blocks == 1 &&
+                trace.channel_read_occupancy_before[0] > 0 &&
+                trace.channel_read_occupancy_after[0] > 0 &&
+                trace.channel_write_occupancy_after[0] == 1;
+        });
+    Check(independent_capacity != timing.admission_traces.end(),
+          "outstanding reads do not consume the independent write-buffer capacity");
     const auto read = std::find_if(
         timing.request_traces.begin(), timing.request_traces.end(),
         [](const auto& trace) { return trace.request_class == RequestClass::EDGE; });
@@ -730,6 +786,93 @@ void TestCommandLevelRowRecovery() {
               << read_write.cycles << "}\n";
 }
 
+void TestChannelCommandLaneAndDataIssue() {
+    auto config = ArchitectureConfig::Load("configs/HYGCN_PAPER.ini");
+    config.hbm_channels = 1;
+    config.hbm_banks_per_channel = 1;
+    config.hbm_row_bytes = 256;
+    config.row_first_bank_interleave = 1;
+    config.Validate();
+
+    const auto same_row = MemoryCoordinatorModel::Simulate(
+        {
+            {0, RequestClass::EDGE, 64, 0, 0, 0},
+            {0, RequestClass::EDGE, 64, 64, 0, 1},
+        },
+        config, MemoryPriorityMode::BATCH_CLASS, AddressMappingMode::LOW_BITS);
+    auto request_trace = [](const MemoryTimingResult& timing, uint64_t sequence) {
+        const auto iterator = std::find_if(
+            timing.request_traces.begin(), timing.request_traces.end(),
+            [sequence](const auto& trace) { return trace.sequence == sequence; });
+        if (iterator == timing.request_traces.end()) {
+            throw std::runtime_error("command-lane request trace not found");
+        }
+        return *iterator;
+    };
+    const auto first = request_trace(same_row, 0);
+    const auto second = request_trace(same_row, 1);
+    Check(first.first_issue_cycle == 14 &&
+              second.first_issue_cycle ==
+                  first.first_issue_cycle + config.hbm_read_to_read_cycles,
+          "same-row READ commands use tCCD spacing instead of completion latency");
+    Check(second.first_issue_cycle < first.completion_cycle,
+          "the next same-row READ may issue before the prior read data completes");
+
+    config.hbm_banks_per_channel = 2;
+    config.hbm_row_bytes = 64;
+    config.Validate();
+    const std::vector<MemoryRequest> cross_bank = {
+        {0, RequestClass::EDGE, 64, 0, 0, 0},
+        {0, RequestClass::EDGE, 64, 64, 0, 1},
+        {0, RequestClass::EDGE, 64, 128, 0, 2},
+        {0, RequestClass::EDGE, 64, 64, 0, 3},
+        {0, RequestClass::EDGE, 64, 64, 0, 4},
+        {0, RequestClass::EDGE, 64, 64, 0, 5},
+        {0, RequestClass::EDGE, 64, 64, 0, 6},
+    };
+    const auto lane = MemoryCoordinatorModel::Simulate(
+        cross_bank, config, MemoryPriorityMode::BATCH_CLASS,
+        AddressMappingMode::LOW_BITS);
+    Check(lane.command_lane_violations == 0 &&
+              lane.command_trace_event_count == lane.precharge_commands +
+                  lane.activate_commands + lane.read_commands + lane.write_commands &&
+              lane.command_trace_samples.size() == lane.command_trace_event_count,
+          "small command counterexample preserves a complete legal command trace");
+    for (std::size_t index = 1; index < lane.command_trace_samples.size(); ++index) {
+        Check(lane.command_trace_samples[index].cycle >=
+                  lane.command_trace_samples[index - 1].cycle +
+                      static_cast<uint64_t>(
+                          config.hbm_command_issue_interval_cycles),
+              "one channel issues at most one PRE/ACT/RD/WR command per lane interval");
+    }
+    const auto precharge = std::find_if(
+        lane.command_trace_samples.begin(), lane.command_trace_samples.end(),
+        [](const auto& trace) {
+            return trace.sequence == 2 &&
+                trace.command == MemoryCommandType::PRECHARGE;
+        });
+    const auto competing_read = std::find_if(
+        lane.command_trace_samples.begin(), lane.command_trace_samples.end(),
+        [](const auto& trace) {
+            return trace.sequence == 6 && trace.command == MemoryCommandType::READ;
+        });
+    Check(precharge != lane.command_trace_samples.end() &&
+              competing_read != lane.command_trace_samples.end() &&
+              competing_read->bank != precharge->bank &&
+              std::max(competing_read->cycle, precharge->cycle) >=
+                  std::min(competing_read->cycle, precharge->cycle) +
+                  static_cast<uint64_t>(
+                      config.hbm_command_issue_interval_cycles),
+          "cross-bank PRE and READ commands serialize on the shared channel lane");
+    std::cout << "command_lane_evidence={\"same_row_read_issues\":["
+              << first.first_issue_cycle << ',' << second.first_issue_cycle
+              << "],\"cross_bank_pre\":" << precharge->cycle
+              << ",\"cross_bank_read\":" << competing_read->cycle
+              << ",\"events\":" << lane.command_trace_event_count
+              << ",\"checksum\":\"" << std::hex
+              << lane.command_trace_checksum << std::dec << "\"}\n";
+}
+
 void TestMemoryServiceBandwidthScope() {
     auto config = ArchitectureConfig::Load("configs/HYGCN_SMOKE.ini");
     config.hbm_channels = 1;
@@ -797,26 +940,29 @@ void TestFragmentationInvariant() {
             block,
         });
     }
-    const auto whole = MemoryCoordinatorModel::Simulate(
-        coalesced, config, MemoryPriorityMode::BATCH_CLASS,
-        AddressMappingMode::LOW_BITS);
-    const auto split = MemoryCoordinatorModel::Simulate(
-        fragmented, config, MemoryPriorityMode::BATCH_CLASS,
-        AddressMappingMode::LOW_BITS);
-    Check(whole.cycles == split.cycles,
-          "same block stream completion is invariant to request fragmentation");
-    Check(whole.active_cycles == split.active_cycles,
-          "same block stream active service time is invariant to request fragmentation");
-    Check(whole.row_buffer_hits == split.row_buffer_hits &&
-              whole.row_buffer_misses == split.row_buffer_misses,
-          "same block stream preserves row hit and miss counts after fragmentation");
-    Check(whole.channel_blocks == split.channel_blocks &&
-              whole.bank_blocks == split.bank_blocks,
-          "same block stream preserves channel and bank transaction counts");
-    std::cout << "fragmentation_evidence={\"blocks\":128,\"coalesced_cycles\":"
-              << whole.cycles << ",\"fragmented_cycles\":" << split.cycles
-              << ",\"row_hits\":" << whole.row_buffer_hits
-              << ",\"row_misses\":" << whole.row_buffer_misses << "}\n";
+    for (const auto priority : {MemoryPriorityMode::FIFO,
+                                MemoryPriorityMode::BATCH_CLASS}) {
+        const auto whole = MemoryCoordinatorModel::Simulate(
+            coalesced, config, priority, AddressMappingMode::LOW_BITS);
+        const auto split = MemoryCoordinatorModel::Simulate(
+            fragmented, config, priority, AddressMappingMode::LOW_BITS);
+        Check(whole.cycles == split.cycles,
+              "same block stream completion is invariant to request fragmentation");
+        Check(whole.active_cycles == split.active_cycles,
+              "same block stream active service time is invariant to request fragmentation");
+        Check(whole.row_buffer_hits == split.row_buffer_hits &&
+                  whole.row_buffer_misses == split.row_buffer_misses,
+              "same block stream preserves row hit and miss counts after fragmentation");
+        Check(whole.channel_blocks == split.channel_blocks &&
+                  whole.bank_blocks == split.bank_blocks,
+              "same block stream preserves channel and bank transaction counts");
+        std::cout << "fragmentation_evidence={\"priority\":\""
+                  << ToString(priority)
+                  << "\",\"blocks\":128,\"coalesced_cycles\":"
+                  << whole.cycles << ",\"fragmented_cycles\":" << split.cycles
+                  << ",\"row_hits\":" << whole.row_buffer_hits
+                  << ",\"row_misses\":" << whole.row_buffer_misses << "}\n";
+    }
 }
 
 void TestAggregationBuffer() {
@@ -1141,6 +1287,8 @@ int main() {
                      TestReconstructableDirectionalOccupancyTrace);
         RunNamedTest("V7_01_command_level_row_recovery",
                      TestCommandLevelRowRecovery);
+        RunNamedTest("V8_01_channel_command_lane_and_data_issue",
+                     TestChannelCommandLaneAndDataIssue);
         RunNamedTest("V4_01_memory_service_bandwidth_scope", TestMemoryServiceBandwidthScope);
         RunNamedTest("F02_fragmentation_invariance", TestFragmentationInvariant);
         RunNamedTest("aggregation_buffer", TestAggregationBuffer);

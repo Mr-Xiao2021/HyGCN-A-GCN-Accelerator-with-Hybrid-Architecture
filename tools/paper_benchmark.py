@@ -966,6 +966,53 @@ def validate_transaction_admission(dataset, variant, run):
         "occupancy_reconstruction": "per-channel before/after admission snapshots",
     }
 
+
+def validate_command_trace(dataset, variant, run):
+    interval = run["architecture"]["hbm_command_issue_interval_cycles"]
+    event_count = 0
+    checksums = []
+    for layer in run["layers"]:
+        trace = layer["command_trace"]
+        expected = (
+            layer["precharge_commands"] + layer["activate_commands"]
+            + layer["read_commands"] + layer["write_commands"]
+        )
+        if trace.get("event_count") != expected:
+            raise ValueError(
+                f"{dataset} {variant} command trace count differs from command totals"
+            )
+        if trace.get("command_lane_violations") != 0:
+            raise ValueError(f"{dataset} {variant} reports a command-lane violation")
+        checksum = trace.get("checksum_fnv1a64")
+        if not isinstance(checksum, str) or len(checksum) != 16:
+            raise ValueError(f"{dataset} {variant} command checksum is invalid")
+        last_cycle = {}
+        previous_cycle = None
+        for sample in trace.get("samples", ()):
+            channel = sample["channel"]
+            cycle = sample["cycle"]
+            if sample["command"] not in {"PRE", "ACT", "READ", "WRITE"}:
+                raise ValueError(f"{dataset} {variant} has an invalid command sample")
+            if previous_cycle is not None and cycle < previous_cycle:
+                raise ValueError(
+                    f"{dataset} {variant} command samples are not time ordered"
+                )
+            if channel in last_cycle and cycle < last_cycle[channel] + interval:
+                raise ValueError(
+                    f"{dataset} {variant} sampled commands overlap on channel {channel}"
+                )
+            last_cycle[channel] = cycle
+            previous_cycle = cycle
+        event_count += expected
+        checksums.append(checksum)
+    return {
+        "event_count": event_count,
+        "checksums": checksums,
+        "command_issue_interval_cycles": interval,
+        "command_lane_violations": 0,
+        "sample_policy": "full small run or first/last 32 events",
+    }
+
 def directional_memory_evidence(run):
     evidence = []
     for layer in run["layers"]:
@@ -992,6 +1039,7 @@ def directional_memory_evidence(run):
             if index >= 0 and prefix_completion[index] > trace["first_issue_cycle"]:
                 overlapping_writes[request_class] += 1
         admission = layer["transaction_admission_trace"]
+        command_trace = layer["command_trace"]
         row_transition_samples = [
             {
                 "sequence": trace["sequence"],
@@ -1025,6 +1073,10 @@ def directional_memory_evidence(run):
             "max_channel_write_buffer_occupancy":
                 admission["max_channel_write_buffer_occupancy"],
             "trace_checksum_fnv1a64": admission["trace_checksum_fnv1a64"],
+            "command_trace_event_count": command_trace["event_count"],
+            "command_trace_checksum_fnv1a64": command_trace["checksum_fnv1a64"],
+            "command_lane_violations": command_trace["command_lane_violations"],
+            "command_trace_samples": command_trace["samples"],
         })
     return {
         "read_row_cycles": [
@@ -1158,6 +1210,10 @@ def current_parameters(architecture, workloads):
         "hbm_channels": architecture["hbm_channels"],
         "coordinator_issue_blocks_per_cycle":
             architecture["coordinator_issue_blocks_per_cycle"],
+        "coordinator_fifo_active_windows":
+            architecture["coordinator_fifo_active_windows"],
+        "coordinator_fifo_window_blocks":
+            architecture["coordinator_fifo_window_blocks"],
         "input_ping_pong_regions": architecture["input_ping_pong_regions"],
         "neighbor_index_ready_cycles": architecture["neighbor_index_ready_cycles"],
         "row_first_bank_interleave": architecture["row_first_bank_interleave"],
@@ -1239,6 +1295,10 @@ def main():
             name: validate_transaction_admission(dataset, name, result)
             for name, result in runs.items()
         }
+        command_oracles = {
+            name: validate_command_trace(dataset, name, result)
+            for name, result in runs.items()
+        }
         summaries = {name: summarize_result(result) for name, result in runs.items()}
         metrics = calculate_metrics(
             summaries["optimized"],
@@ -1274,6 +1334,7 @@ def main():
                 ],
             },
             "transaction_admission_oracles": admission_oracles,
+            "command_trace_oracles": command_oracles,
             "directional_memory_evidence": {
                 name: directional_memory_evidence(result)
                 for name, result in runs.items()

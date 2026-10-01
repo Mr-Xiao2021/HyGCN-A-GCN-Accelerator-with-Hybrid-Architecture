@@ -1,6 +1,6 @@
 {
-  "schema_version": 4,
-  "workload_version": "hygcn-hpca2020-table5-gcn-v4-two-stack-hbm",
+  "schema_version": 5,
+  "workload_version": "hygcn-hpca2020-table5-gcn-v5-command-lane-fifo-windows",
   "paper_source": "HyGCN HPCA 2020 Table 5 and Section 5.3",
   "figures": {
     "figure_15": {
@@ -51,8 +51,11 @@
     "command_queue_source": "configs/HBM1_4Gb_x128.ini cmd_queue_size=8; the request-level controller bounds each bank command queue to the same depth",
     "coordinator_issue_blocks_per_cycle": 4,
     "coordinator_issue_width_source": "derived from the paper profile peak interface width: floor(256 bytes/cycle divided by 64 bytes/block)",
-    "coordinator_input_policy": "four-buffer block-level round-robin FIFO for the paper's concurrent uncoordinated baseline; batch-by-batch Edge > Input > Weight > Output assembly with same batch/class open-row continuation when priority is enabled",
-    "coordinator_input_source": "HyGCN HPCA 2020 Figure 9 and Section 4.5.2 show concurrent Edge, Input, Weight, and Output buffer requests interleaved before the coordinator and assembled into continuous batch-local streams after priority sorting",
+    "fifo_active_windows": 4,
+    "fifo_window_blocks": "hbm_row_bytes / block_size",
+    "fifo_window_release": "last admitted block data-command issue",
+    "coordinator_input_policy": "FIFO selects one Edge/Input/Weight/Output port per admission cycle, admits up to four consecutive blocks, and bounds the uncoordinated in-flight row windows to the four Figure 9 request sources; batch-class assembles batch-local Edge > Input > Weight > Output streams with same batch/class open-row continuation",
+    "coordinator_input_source": "HyGCN HPCA 2020 Figure 9 shows four concurrent Edge, Input, Weight, and Output request sources; Section 4.5.2 says the uncoordinated requests are handled sequentially and the coordinator assembles them into continuous batch-local streams before low-bit remapping",
     "admission_policy": "FIFO and batch-class share one global admission clock; at most four 64-byte blocks enter all channel controllers per paper cycle, while each channel independently enforces the 32-entry read queue and 32-entry write buffer",
     "priority_order_source": "HyGCN HPCA 2020 Section 4.5.2 executes requests batch-by-batch: all requests from the current batch, including its lower-priority classes, precede high-priority requests from the next batch",
     "priority_baseline": "fifo",

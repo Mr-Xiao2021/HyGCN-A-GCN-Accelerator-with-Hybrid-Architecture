@@ -175,6 +175,22 @@ struct MemoryRequestTrace {
     std::optional<uint64_t> producer_sequence;
 };
 
+enum class MemoryCommandType {
+    PRECHARGE,
+    ACTIVATE,
+    READ,
+    WRITE,
+};
+
+struct MemoryCommandTrace {
+    uint64_t cycle = 0;
+    uint64_t sequence = 0;
+    uint64_t block_offset = 0;
+    std::size_t channel = 0;
+    std::size_t bank = 0;
+    MemoryCommandType command = MemoryCommandType::READ;
+};
+
 inline constexpr std::size_t kMaxTraceHbmChannels = 16;
 
 struct TransactionAdmissionTrace {
@@ -222,6 +238,9 @@ struct MemoryTimingResult {
     uint64_t activate_commands = 0;
     uint64_t read_commands = 0;
     uint64_t write_commands = 0;
+    uint64_t command_trace_event_count = 0;
+    uint64_t command_trace_checksum = 0;
+    uint64_t command_lane_violations = 0;
     std::array<uint64_t, kRequestClassCount> request_counts{};
     std::array<uint64_t, kRequestClassCount> request_bytes{};
     std::array<uint64_t, kRequestClassCount> request_wait_cycles{};
@@ -230,6 +249,7 @@ struct MemoryTimingResult {
     std::array<uint64_t, kRequestClassCount> class_completion_cycles{};
     std::map<int, std::array<uint64_t, kRequestClassCount>> batch_completion_cycles;
     std::vector<MemoryRequestTrace> request_traces;
+    std::vector<MemoryCommandTrace> command_trace_samples;
     std::vector<TransactionAdmissionTrace> admission_traces;
     std::vector<uint64_t> max_channel_read_queue_occupancy;
     std::vector<uint64_t> max_channel_write_buffer_occupancy;
@@ -351,6 +371,9 @@ struct LayerMetrics {
     uint64_t activate_commands = 0;
     uint64_t read_commands = 0;
     uint64_t write_commands = 0;
+    uint64_t command_trace_event_count = 0;
+    uint64_t command_trace_checksum = 0;
+    uint64_t command_lane_violations = 0;
     uint64_t ae_finish_cycle = 0;
     uint64_t ce_start_cycle = 0;
     uint64_t ce_finish_cycle = 0;
@@ -383,6 +406,7 @@ struct LayerMetrics {
     std::vector<InputWindowTrace> input_window_traces;
     std::vector<MemoryRequestTrace> memory_request_traces;
     std::vector<MemoryRequestTrace> producer_request_traces;
+    std::vector<MemoryCommandTrace> command_trace_samples;
     std::vector<TransactionAdmissionTrace> transaction_admission_traces;
     std::vector<uint64_t> max_channel_read_queue_occupancy;
     std::vector<uint64_t> max_channel_write_buffer_occupancy;

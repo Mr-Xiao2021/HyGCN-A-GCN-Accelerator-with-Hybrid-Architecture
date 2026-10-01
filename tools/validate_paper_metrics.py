@@ -117,6 +117,19 @@ def main():
     internal_rows = [row for row in rows if row[7] == "internal_check"]
     if len(paper_rows) != 14 or len(internal_rows) != 12:
         raise ValueError("validation requires 14 paper metric rows and 12 internal checks")
+    legacy_row_hit_name = "priority_incremental_row_hit_ratio_aggregate"
+    legacy_row_hit_threshold = 1.05
+    legacy_internal_passed = 0
+    legacy_row_hit_measured = aggregate.get(legacy_row_hit_name)
+    legacy_row_hit_passed = False
+    for row in internal_rows:
+        if row[0] == legacy_row_hit_name:
+            legacy_row_hit_passed = range_error(
+                legacy_row_hit_measured, legacy_row_hit_threshold, math.inf
+            ) == 0.0
+            legacy_internal_passed += legacy_row_hit_passed
+        else:
+            legacy_internal_passed += row[5]
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as stream:
         stream.write("# HyGCN Paper Metric And Internal Check Validation\n\n")
@@ -148,6 +161,26 @@ def main():
                 f"| {name} | {scope} | {expected} | {measured_text} | {error_text} | "
                 f"{'PASS' if passed else 'FAIL'} |\n"
             )
+        legacy_measured_text = (
+            "missing" if legacy_row_hit_measured is None
+            else f"{legacy_row_hit_measured:.6f}"
+        )
+        stream.write("\n## Historical Schema v5 Comparison\n\n")
+        stream.write(
+            f"- Current schema v{reference['schema_version']}: "
+            f"{sum(row[5] for row in internal_rows)}/12 internal checks PASS.\n"
+        )
+        stream.write(
+            f"- Historical schema v5: {legacy_internal_passed}/12 internal checks PASS. "
+            "It used the unsupported aggregate row-hit floor 1.05x; this is retained "
+            "as an audit comparison, not as the current acceptance specification.\n\n"
+        )
+        stream.write("| Historical check | Threshold | Measured | Status |\n")
+        stream.write("|---|---:|---:|---|\n")
+        stream.write(
+            f"| {legacy_row_hit_name} | >=1.050000 | {legacy_measured_text} | "
+            f"{'PASS' if legacy_row_hit_passed else 'FAIL'} |\n"
+        )
         stream.write("\n## Diagnostic-Only Metrics\n\n")
         stream.write("| Metric | Dataset | Measured | Reason |\n")
         stream.write("|---|---|---:|---|\n")
@@ -173,6 +206,8 @@ def main():
     internal_passed = sum(row[5] for row in internal_rows)
     print(f"paper_metrics={paper_passed}/14")
     print(f"internal_checks={internal_passed}/12")
+    print(f"internal_checks_schema_v{reference['schema_version']}={internal_passed}/12")
+    print(f"internal_checks_schema_v5={legacy_internal_passed}/12")
     print(f"validation_report={output_path}")
     return 1 if failed else 0
 

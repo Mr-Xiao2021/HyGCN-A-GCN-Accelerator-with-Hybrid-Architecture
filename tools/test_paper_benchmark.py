@@ -23,10 +23,19 @@ def load_partition_module(root, benchmark):
     return module
 
 
+def load_revision_audit_module(root):
+    path = root / "tools/revision_audit.py"
+    spec = importlib.util.spec_from_file_location("revision_audit", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def main():
     root = Path(__file__).resolve().parents[1]
     benchmark = load_benchmark_module(root)
     partition = load_partition_module(root, benchmark)
+    revision_audit = load_revision_audit_module(root)
     with (root / "configs/paper_workloads.json").open(encoding="utf-8") as stream:
         workloads = json.load(stream)
     with (root / "configs/paper_parameter_baseline.json").open(encoding="utf-8") as stream:
@@ -41,11 +50,14 @@ def main():
         raise RuntimeError("batch-class ordering must retain its paper provenance")
     if workloads["memory_ablation"]["command_queue_entries_per_bank"] != 8:
         raise RuntimeError("command queue depth must retain its DRAMSim3 provenance")
-    if workloads.get("schema_version") != 4 or \
+    if workloads.get("schema_version") != 5 or \
             workloads["memory_ablation"]["hbm_stacks"] != 2 or \
             workloads["memory_ablation"]["channels_per_stack"] != 8 or \
             workloads["memory_ablation"]["physical_channels"] != 16:
         raise RuntimeError("workload manifest must version the two-stack HBM topology")
+    if workloads["memory_ablation"]["fifo_active_windows"] != 4 or \
+            "Figure 9" not in workloads["memory_ablation"]["coordinator_input_source"]:
+        raise RuntimeError("FIFO active-window bound must derive from four paper sources")
     if workloads["graph_partition"]["calibrated_fit_datasets"] != [
             "cora", "citeseer", "pubmed"] or \
             workloads["graph_partition"]["independent_holdout_datasets"] != []:
@@ -166,6 +178,8 @@ def main():
         "hbm_command_issue_interval_cycles": 2,
         "hbm_channels": 16,
         "coordinator_issue_blocks_per_cycle": 4,
+        "coordinator_fifo_active_windows": 4,
+        "coordinator_fifo_window_blocks": 32,
         "input_ping_pong_regions": 2,
         "neighbor_index_ready_cycles": 2,
         "row_first_bank_interleave": 1,
@@ -174,6 +188,30 @@ def main():
     audit = benchmark.parameter_audit(architecture, workloads, parameter_baseline)
     if audit["parameter_recalibration"] != bool(audit["differences"]) or not audit["differences"]:
         raise RuntimeError("parameter recalibration must be derived from a non-empty diff")
+    corrected_review_v8 = revision_audit.build_audit(
+        root, "5e3bbda6d3ad2a4328a5b0b6710cc296cea011ee",
+        "7b7083f159788421aa2e888944b56e1d4466a9e0"
+    )
+    channel_change = next(
+        difference for difference in corrected_review_v8["profile_differences"]
+        if difference["parameter"] == "memory.hbm_channels"
+    )
+    if channel_change["before"] != "8" or channel_change["after"] != "16":
+        raise RuntimeError("review v8 audit must reconstruct hbm_channels 8 -> 16")
+    current_revision = revision_audit.build_audit(root, "e3a4f13", "WORKTREE")
+    if not current_revision["no_target_parameter_retuning"] or \
+            current_revision["calibration_differences"] or \
+            any(item["target_parameters_changed"]
+                for item in current_revision["target_files"]):
+        raise RuntimeError("current review no-retuning audit must be derived from git inputs")
+    workload_audit = next(
+        item for item in current_revision["target_files"]
+        if item["path"] == "configs/paper_workloads.json"
+    )
+    if not workload_audit["changed"] or not any(
+            difference["path"] == "memory_ablation.fifo_active_windows"
+            for difference in workload_audit["changed_paths"]):
+        raise RuntimeError("revision audit must disclose the FIFO mechanism policy change")
     external_binary = Path("/tmp/hygcn-external-build/hygcntest")
     if partition.display_path(root, external_binary) != str(external_binary):
         raise RuntimeError("external absolute binary paths must remain printable")

@@ -82,7 +82,9 @@
 ### Requirement: 因果与请求切分不变量
 同一有序 block 流的内存完成时间、row hit/miss 和 channel/bank 事务计数 MUST 不受上层请求切分影响。Output 请求 MUST 在对应 CE producer-ready 后入队；Intermediate Read MUST 访问对应 Write 的同一地址和字节范围，并等待该 Write 完成。已经进入请求级时间线的 intermediate 流量 MUST NOT 再以解析延迟重复计时。
 
-FIFO 与 batch-class MUST 共享全局 transaction admission 带宽。四个 buffer port 每个模型周期合计进入所有 channel controller 的 block 数 MUST 不超过由论文 HBM 接口宽度派生的 4。bundled DRAMSim3 为 `unified_queue=False`，因此每 channel read queue 与 write buffer MUST 分别受 `trans_queue_size=32` 约束，每 bank command queue MUST 受 `cmd_queue_size=8` 约束。read 与 write MUST 分别使用 `CL/tRCDRD` 和 `CWL/tRCDWR` 派生的 data command timing，并施加 DRAMSim3 read/write command switching 约束。换行 MUST 显式执行 PRE→ACT，且 PRE/ACT/data issue 分别受 `tRTP`、`tWR`、`tRAS`、`tRP`、`tRC`、`tRCDRD`、`tRCDWR` 和 `tCCD_L` 约束；请求 completion 不得直接释放 bank command recovery。
+FIFO 与 batch-class MUST 共享全局 transaction admission 带宽。四个 buffer port 每个模型周期合计进入所有 channel controller 的 block 数 MUST 不超过由论文 HBM 接口宽度派生的 4。bundled DRAMSim3 为 `unified_queue=False`，因此每 channel read queue 与 write buffer MUST 分别受 `trans_queue_size=32` 约束，每 bank command queue MUST 受 `cmd_queue_size=8` 约束。read 与 write MUST 分别使用 `CL/tRCDRD` 和 `CWL/tRCDWR` 派生的 data command timing，并施加 DRAMSim3 read/write command switching 约束。换行 MUST 显式执行 PRE→ACT，且 PRE/ACT/data issue 分别受 `tRTP`、`tWR`、`tRAS`、`tRP`、`tRC`、`tRCDRD`、`tRCDWR` 和 `tCCD_L` 约束。同一 channel 的 PRE/ACT/READ/WRITE MUST 共享排他的 command lane；READ/WRITE completion latency MUST 与下一 data-command issue 解耦，请求 completion 不得直接释放 bank command recovery。
+
+未协调 FIFO MUST 每个 admission 周期只选择一个可用 buffer port，并从该 port 的统一 block 流按地址/sequence 顺序放行最多 4 个 block；端口 MUST 仅在下一个 admission 周期轮转。FIFO 同时 active 的连续 block window 总数 MUST 不超过论文 Figure 9 的四个 buffer request source。window MUST 由 `(port, block address / bundled HBM row blocks)` 定义，在已 admission block 全部发出 data command 后释放，不得依赖上层请求边界。batch-class 路径 MAY 在同一周期从同一 batch/class/row 的候选中组装最多 4 个 block，但 MUST 使用与 FIFO 相同的全局 admission 带宽和 controller queue capacity。
 
 论文 256 GB/s HBM1 MUST 建模为两份 bundled 8-channel、128 GB/s HBM1 stack 的复制，共 16 个物理 channel。每个物理 channel MUST 保留 bundled DRAMSim3 的 `tCK/tCCD`、方向队列和 command queue 约束；实现不得通过缩短单 channel data-command spacing 来补足总带宽。
 
@@ -103,6 +105,21 @@ admission 证据 MUST 保存可逆的完整压缩 trace，或明确降级为 sum
 #### Scenario: 命令级换行恢复
 - **WHEN** 同一 bank 依次执行 WRITE→different-row WRITE、WRITE→different-row READ 和 READ→different-row WRITE
 - **THEN** 第二个请求的 PRE 不早于前一 data command recovery 与 tRAS，ACT 不早于 PRE+tRP 和前一 ACT+tRC，实际 READ/WRITE issue 不早于 ACT+tRCDRD/tRCDWR
+
+#### Scenario: 同 row data-command 间隔
+- **WHEN** 同一 bank、同一 open row 连续执行两个 64B READ
+- **THEN** 第二个 READ issue 等于第一个 READ issue 加 `tCCD` 派生间隔，而不是等待第一个请求 completion
+
+#### Scenario: FIFO 按 admission 周期串行选择 buffer port
+- **GIVEN** Edge、Input、Weight、Output 四个 buffer port 各有四个连续 64B block 且 controller queue 有容量
+- **WHEN** 未协调 FIFO 以 4 block/cycle admission 带宽运行
+- **THEN** 每个 admission 周期只包含一个 buffer port 的 block，四个 port 的首次 admission 分别发生在连续四个周期
+- **AND** 第五个 row-sized window 不早于前四个 active window 中至少一个的最后 data command issue
+- **AND** 将任一 port 的相同 block 流拆成多个上层请求不改变完成周期或事务序列
+
+#### Scenario: 跨 bank command lane 排他
+- **WHEN** 同一 channel 的一个 bank 准备 PRE，另一个 bank 同周期准备 READ
+- **THEN** 两条命令按 command issue interval 串行发出，command trace 中不存在同 channel 同周期 PRE/ACT/READ/WRITE 冲突
 
 #### Scenario: Admission 完整证据
 - **WHEN** benchmark 读取一层 transaction admission 证据

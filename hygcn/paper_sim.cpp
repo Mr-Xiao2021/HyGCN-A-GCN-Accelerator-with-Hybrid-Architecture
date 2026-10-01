@@ -126,6 +126,20 @@ std::string RequestClassName(RequestClass request_class) {
     throw std::runtime_error("unknown request class");
 }
 
+std::string MemoryCommandName(MemoryCommandType command) {
+    switch (command) {
+        case MemoryCommandType::PRECHARGE:
+            return "PRE";
+        case MemoryCommandType::ACTIVATE:
+            return "ACT";
+        case MemoryCommandType::READ:
+            return "READ";
+        case MemoryCommandType::WRITE:
+            return "WRITE";
+    }
+    throw std::runtime_error("unknown memory command");
+}
+
 constexpr std::size_t kCoordinatorPorts = 4;
 
 std::size_t CoordinatorPort(RequestClass request_class) {
@@ -189,6 +203,9 @@ json ArchitectureJson(const ArchitectureConfig& architecture) {
          architecture.hbm_command_queue_entries_per_bank},
         {"coordinator_issue_blocks_per_cycle",
          CoordinatorIssueBlocksPerCycle(architecture)},
+        {"coordinator_fifo_active_windows", kCoordinatorPorts},
+        {"coordinator_fifo_window_blocks",
+         architecture.hbm_row_bytes / architecture.block_size},
         {"hbm_read_row_hit_cycles", architecture.hbm_read_row_hit_cycles},
         {"hbm_read_row_miss_cycles", architecture.hbm_read_row_miss_cycles},
         {"hbm_read_row_conflict_cycles", architecture.hbm_read_row_conflict_cycles},
@@ -284,6 +301,24 @@ json LayerJson(const LayerMetrics& layer) {
                 ? json(*trace.producer_sequence) : json(nullptr)},
         });
     }
+    json command_samples = json::array();
+    for (const auto& trace : layer.command_trace_samples) {
+        command_samples.push_back({
+            {"cycle", trace.cycle},
+            {"sequence", trace.sequence},
+            {"block_offset", trace.block_offset},
+            {"channel", trace.channel},
+            {"bank", trace.bank},
+            {"command", MemoryCommandName(trace.command)},
+        });
+    }
+    json command_trace = {
+        {"representation", "full_for_small_runs_first_last_32_for_large_runs_v1"},
+        {"event_count", layer.command_trace_event_count},
+        {"checksum_fnv1a64", Hex64(layer.command_trace_checksum)},
+        {"command_lane_violations", layer.command_lane_violations},
+        {"samples", command_samples},
+    };
     json admission_edge_samples = json::array();
     json admission_histograms = {
         {"admitted_blocks", json::object()},
@@ -555,6 +590,7 @@ json LayerJson(const LayerMetrics& layer) {
         {"activate_commands", layer.activate_commands},
         {"read_commands", layer.read_commands},
         {"write_commands", layer.write_commands},
+        {"command_trace", command_trace},
         {"ae_finish_cycle", layer.ae_finish_cycle},
         {"ce_start_cycle", layer.ce_start_cycle},
         {"ce_finish_cycle", layer.ce_finish_cycle},
@@ -988,7 +1024,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     struct BankState {
         uint64_t next_activate_cycle = 0;
         uint64_t next_precharge_cycle = 0;
-        uint64_t next_data_cycle = 0;
+        uint64_t next_read_cycle = 0;
+        uint64_t next_write_cycle = 0;
         uint64_t open_row = 0;
         bool row_open = false;
     };
@@ -996,7 +1033,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     struct ChannelState {
         uint64_t next_read_cycle = 0;
         uint64_t next_write_cycle = 0;
-        uint64_t next_row_command_cycle = 0;
+        uint64_t next_command_cycle = 0;
         uint64_t last_issue_cycle = 0;
         int last_direction = -1;
     };
@@ -1038,6 +1075,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         std::size_t bank = 0;
         uint64_t row = 0;
         bool is_write = false;
+        bool row_hit = false;
     };
 
     const uint64_t blocks_per_row = architecture.hbm_row_bytes / architecture.block_size;
@@ -1178,6 +1216,12 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         return candidate;
     };
     struct BankQueue {
+        enum class ActiveStage {
+            NONE,
+            ACTIVATE,
+            DATA,
+        };
+
         using Comparator = std::function<bool(const Candidate&, const Candidate&)>;
         using Queue = std::priority_queue<Candidate, std::vector<Candidate>, Comparator>;
         using Set = std::set<Candidate, Comparator>;
@@ -1196,11 +1240,15 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         Set available;
         std::map<uint64_t, Set> available_rows;
         Comparator available_less;
+        std::optional<Candidate> active;
+        ActiveStage active_stage = ActiveStage::NONE;
     };
-    struct BankChoice {
+    struct CommandChoice {
         Candidate candidate;
         std::size_t flat_bank = 0;
         int source = 0;
+        MemoryCommandType command = MemoryCommandType::READ;
+        uint64_t issue_cycle = 0;
         bool valid = false;
     };
 
@@ -1287,45 +1335,60 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     std::vector<std::size_t> command_queue_occupancy(total_banks, 0);
     std::vector<std::pair<uint64_t, uint64_t>> block_active_intervals;
     block_active_intervals.reserve(static_cast<std::size_t>(remaining_blocks));
-    std::size_t fifo_next_port = 0;
-    uint64_t next_admission_order = 0;
-    auto plan_candidate = [&](Candidate candidate) {
-        const std::size_t flat_bank =
-            candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
-        const auto& bank_state = banks[flat_bank];
-        const auto& channel_state = channels[candidate.channel];
-        const bool row_hit = bank_state.row_open && bank_state.open_row == candidate.row;
-        const bool row_conflict = bank_state.row_open && !row_hit;
-        const uint64_t dispatch_cycle = candidate.controller_dispatch_cycle;
-        const uint64_t activate_to_data = candidate.is_write
-            ? architecture.hbm_activate_to_write_cycles
-            : architecture.hbm_activate_to_read_cycles;
-        if (row_conflict) {
-            candidate.precharge_cycle = std::max(
-                {dispatch_cycle, bank_state.next_precharge_cycle,
-                 channel_state.next_row_command_cycle});
-            candidate.activate_cycle = std::max(
-                candidate.precharge_cycle +
-                    architecture.hbm_precharge_to_activate_cycles,
-                bank_state.next_activate_cycle);
-            candidate.command_ready_cycle =
-                candidate.activate_cycle + activate_to_data;
-        } else if (!row_hit) {
-            candidate.activate_cycle = std::max(
-                {dispatch_cycle, bank_state.next_activate_cycle,
-                 channel_state.next_row_command_cycle});
-            candidate.command_ready_cycle =
-                candidate.activate_cycle + activate_to_data;
-        } else {
-            candidate.command_ready_cycle = dispatch_cycle;
+    std::vector<bool> saw_channel_command(architecture.hbm_channels, false);
+    std::vector<uint64_t> last_channel_command_cycle(architecture.hbm_channels, 0);
+    bool saw_command = false;
+    uint64_t last_command_cycle = 0;
+    std::vector<MemoryCommandTrace> first_command_samples;
+    std::deque<MemoryCommandTrace> last_command_samples;
+    constexpr std::size_t kCommandEdgeSamples = 32;
+    result.command_trace_checksum = 1469598103934665603ULL;
+    auto record_command = [&](const Candidate& candidate,
+                              MemoryCommandType command,
+                              uint64_t cycle) {
+        if (saw_command && cycle < last_command_cycle) {
+            throw std::runtime_error("memory command trace is not time ordered");
         }
-        const uint64_t direction_ready = candidate.is_write
-            ? channel_state.next_write_cycle : channel_state.next_read_cycle;
-        candidate.start_cycle = std::max(
-            {candidate.command_ready_cycle, direction_ready,
-             bank_state.next_data_cycle});
-        return candidate;
+        saw_command = true;
+        last_command_cycle = cycle;
+        if (saw_channel_command[candidate.channel] &&
+            cycle < last_channel_command_cycle[candidate.channel] +
+                static_cast<uint64_t>(
+                    architecture.hbm_command_issue_interval_cycles)) {
+            ++result.command_lane_violations;
+            throw std::runtime_error("channel command lane overlap");
+        }
+        saw_channel_command[candidate.channel] = true;
+        last_channel_command_cycle[candidate.channel] = cycle;
+        const MemoryCommandTrace trace{
+            cycle,
+            states[candidate.request_index].request.sequence,
+            candidate.block_offset,
+            candidate.channel,
+            candidate.bank,
+            command,
+        };
+        for (const uint64_t value : {
+                 trace.cycle, trace.sequence, trace.block_offset,
+                 static_cast<uint64_t>(trace.channel),
+                 static_cast<uint64_t>(trace.bank),
+                 static_cast<uint64_t>(trace.command)}) {
+            result.command_trace_checksum ^= value;
+            result.command_trace_checksum *= 1099511628211ULL;
+        }
+        ++result.command_trace_event_count;
+        if (first_command_samples.size() < kCommandEdgeSamples) {
+            first_command_samples.push_back(trace);
+        } else {
+            if (last_command_samples.size() == kCommandEdgeSamples) {
+                last_command_samples.pop_front();
+            }
+            last_command_samples.push_back(trace);
+        }
     };
+    std::size_t fifo_next_port = 0;
+    std::map<std::pair<std::size_t, uint64_t>, std::size_t> fifo_active_windows;
+    uint64_t next_admission_order = 0;
     auto push_available = [&](BankQueue& queue, const Candidate& candidate) {
         queue.available.insert(candidate);
         auto row = queue.available_rows.find(candidate.row);
@@ -1345,10 +1408,17 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     };
     auto peek_bank = [&](std::size_t flat_bank) {
         auto& queue = bank_queues[flat_bank];
-        BankChoice choice;
+        CommandChoice choice;
         choice.flat_bank = flat_bank;
-        if (!queue.available.empty()) {
-            choice.candidate = plan_candidate(*queue.available.begin());
+        if (queue.active.has_value()) {
+            choice.candidate = *queue.active;
+            choice.command = queue.active_stage == BankQueue::ActiveStage::ACTIVATE
+                ? MemoryCommandType::ACTIVATE
+                : (choice.candidate.is_write
+                    ? MemoryCommandType::WRITE : MemoryCommandType::READ);
+            choice.valid = true;
+        } else if (!queue.available.empty()) {
+            choice.candidate = *queue.available.begin();
             choice.source = 1;
             choice.valid = true;
             if (priority == MemoryPriorityMode::BATCH_CLASS &&
@@ -1363,51 +1433,82 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                             states[row_queue.begin()->request_index].request;
                         if (primary_request.batch_id == row_request.batch_id &&
                             primary_request.request_class == row_request.request_class) {
-                            choice.candidate = plan_candidate(*row_queue.begin());
+                            choice.candidate = *row_queue.begin();
                             choice.source = 2;
                         }
                     }
                 }
             }
+            const auto& bank_state = banks[flat_bank];
+            const bool row_hit = bank_state.row_open &&
+                bank_state.open_row == choice.candidate.row;
+            choice.candidate.row_hit = row_hit;
+            choice.command = row_hit
+                ? (choice.candidate.is_write
+                    ? MemoryCommandType::WRITE : MemoryCommandType::READ)
+                : (bank_state.row_open
+                    ? MemoryCommandType::PRECHARGE
+                    : MemoryCommandType::ACTIVATE);
         }
-        for (const bool is_write : {false, true}) {
-            auto& future = queue.Future(is_write);
-            if (future.empty()) {
-                continue;
-            }
-            Candidate candidate = plan_candidate(future.top());
-            if (!choice.valid || candidate.start_cycle < choice.candidate.start_cycle ||
-                (candidate.start_cycle == choice.candidate.start_cycle &&
-                 priority_less(candidate, choice.candidate))) {
-                choice.candidate = candidate;
-                choice.source = is_write ? 4 : 3;
-                choice.valid = true;
-            }
+        if (!choice.valid) {
+            return choice;
         }
+        const auto& bank_state = banks[flat_bank];
+        const auto& channel_state = channels[choice.candidate.channel];
+        const uint64_t dispatch_cycle = choice.candidate.controller_dispatch_cycle;
+        switch (choice.command) {
+            case MemoryCommandType::PRECHARGE:
+                choice.issue_cycle = std::max(
+                    {dispatch_cycle, bank_state.next_precharge_cycle,
+                     channel_state.next_command_cycle});
+                break;
+            case MemoryCommandType::ACTIVATE:
+                choice.issue_cycle = std::max(
+                    {dispatch_cycle, bank_state.next_activate_cycle,
+                     channel_state.next_command_cycle});
+                break;
+            case MemoryCommandType::READ:
+                choice.candidate.command_ready_cycle = std::max(
+                    {dispatch_cycle, bank_state.next_read_cycle,
+                     channel_state.next_command_cycle});
+                choice.issue_cycle = std::max(
+                    choice.candidate.command_ready_cycle,
+                    channel_state.next_read_cycle);
+                break;
+            case MemoryCommandType::WRITE:
+                choice.candidate.command_ready_cycle = std::max(
+                    {dispatch_cycle, bank_state.next_write_cycle,
+                     channel_state.next_command_cycle});
+                choice.issue_cycle = std::max(
+                    choice.candidate.command_ready_cycle,
+                    channel_state.next_write_cycle);
+                break;
+        }
+        choice.candidate.start_cycle = choice.issue_cycle;
         return choice;
     };
-    auto choice_less = [&](const BankChoice& lhs, const BankChoice& rhs) {
+    auto choice_less = [&](const CommandChoice& lhs, const CommandChoice& rhs) {
         if (!lhs.valid) {
             return false;
         }
         if (!rhs.valid) {
             return true;
         }
-        if (lhs.candidate.start_cycle != rhs.candidate.start_cycle) {
-            return lhs.candidate.start_cycle < rhs.candidate.start_cycle;
+        if (lhs.issue_cycle != rhs.issue_cycle) {
+            return lhs.issue_cycle < rhs.issue_cycle;
         }
         return priority_less(lhs.candidate, rhs.candidate);
     };
 
-    std::vector<BankChoice> channel_choices(architecture.hbm_channels);
+    std::vector<CommandChoice> channel_choices(architecture.hbm_channels);
     auto recompute_channel = [&](std::size_t channel) {
-        BankChoice best;
+        CommandChoice best;
         const std::size_t first_bank =
             channel * architecture.hbm_banks_per_channel;
         for (std::size_t bank = 0;
              bank < static_cast<std::size_t>(architecture.hbm_banks_per_channel);
             ++bank) {
-            const BankChoice candidate = peek_bank(first_bank + bank);
+            const CommandChoice candidate = peek_bank(first_bank + bank);
             if (choice_less(candidate, best)) {
                 best = candidate;
             }
@@ -1469,7 +1570,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             ? outstanding_write_blocks[candidate.channel] < write_buffer_capacity
             : outstanding_read_blocks[candidate.channel] < read_queue_capacity;
     };
-    auto select_pending = [&]() {
+    auto select_pending = [&](std::optional<std::size_t> fixed_fifo_port) {
         PendingChoice choice;
         if (priority == MemoryPriorityMode::BATCH_CLASS) {
             if (pending_priority.empty()) {
@@ -1494,12 +1595,21 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             }
             return choice;
         }
-        for (std::size_t distance = 0; distance < kCoordinatorPorts; ++distance) {
-            const std::size_t port = (fifo_next_port + distance) % kCoordinatorPorts;
+        const std::size_t port_count = fixed_fifo_port.has_value()
+            ? 1 : kCoordinatorPorts;
+        for (std::size_t distance = 0; distance < port_count; ++distance) {
+            const std::size_t port = fixed_fifo_port.value_or(
+                (fifo_next_port + distance) % kCoordinatorPorts);
             if (pending_fifo_ports[port].empty()) {
                 continue;
             }
             const auto iterator = pending_fifo_ports[port].begin();
+            const uint64_t logical_window = iterator->block / blocks_per_row;
+            const auto window_key = std::make_pair(port, logical_window);
+            if (fifo_active_windows.count(window_key) == 0 &&
+                fifo_active_windows.size() >= kCoordinatorPorts) {
+                continue;
+            }
             if (!transaction_queue_has_capacity(*iterator)) {
                 continue;
             }
@@ -1537,8 +1647,15 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         std::size_t admitted = 0;
         std::size_t admitted_reads = 0;
         std::size_t admitted_writes = 0;
+        std::optional<std::size_t> fifo_admission_port;
+        if (priority == MemoryPriorityMode::FIFO) {
+            const PendingChoice first = select_pending(std::nullopt);
+            if (first.valid) {
+                fifo_admission_port = first.port;
+            }
+        }
         while (admitted < coordinator_issue_blocks) {
-            PendingChoice choice = select_pending();
+            PendingChoice choice = select_pending(fifo_admission_port);
             if (!choice.valid) {
                 break;
             }
@@ -1549,7 +1666,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             }
             Candidate candidate = choice.candidate;
             if (priority == MemoryPriorityMode::FIFO) {
-                fifo_next_port = (choice.port + 1) % kCoordinatorPorts;
+                const uint64_t logical_window = candidate.block / blocks_per_row;
+                ++fifo_active_windows[{choice.port, logical_window}];
             }
             candidate.admission_cycle = cycle;
             candidate.admission_order = next_admission_order++;
@@ -1572,6 +1690,9 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                                             state.admitted_blocks),
                              cycle);
             }
+        }
+        if (fifo_admission_port.has_value() && admitted != 0) {
+            fifo_next_port = (*fifo_admission_port + 1) % kCoordinatorPorts;
         }
         if (admitted != 0) {
             trace.admitted_blocks = admitted;
@@ -1710,8 +1831,26 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         recompute_channel(channel);
     }
 
+    auto erase_available_candidate = [&](BankQueue& queue,
+                                         const CommandChoice& choice,
+                                         const Candidate& candidate) {
+        if (choice.source != 1 && choice.source != 2) {
+            throw std::runtime_error("unknown bank choice source");
+        }
+        if (queue.available.erase(candidate) != 1) {
+            throw std::runtime_error("available command candidate is inconsistent");
+        }
+        auto row = queue.available_rows.find(candidate.row);
+        if (row == queue.available_rows.end() || row->second.erase(candidate) != 1) {
+            throw std::runtime_error("available row index is inconsistent");
+        }
+        if (row->second.empty()) {
+            queue.available_rows.erase(row);
+        }
+    };
+
     while (remaining_blocks > 0) {
-        BankChoice selected_choice;
+        CommandChoice selected_choice;
         for (const auto& channel_choice : channel_choices) {
             if (choice_less(channel_choice, selected_choice)) {
                 selected_choice = channel_choice;
@@ -1720,7 +1859,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         const auto admission_event = next_admission_event();
         const auto controller_event = next_controller_event();
         const uint64_t bank_event = selected_choice.valid
-            ? selected_choice.candidate.start_cycle
+            ? selected_choice.issue_cycle
             : std::numeric_limits<uint64_t>::max();
         const uint64_t controller_cycle = controller_event.value_or(
             std::numeric_limits<uint64_t>::max());
@@ -1737,7 +1876,14 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                 }
                 continue;
             }
-            next_admission_cycle = std::max(next_admission_cycle, *admission_event + 1);
+            const uint64_t state_change_cycle = std::min(
+                controller_cycle, bank_event);
+            if (state_change_cycle == std::numeric_limits<uint64_t>::max()) {
+                throw std::runtime_error(
+                    "transaction admission is blocked without a future state change");
+            }
+            next_admission_cycle = std::max(
+                next_admission_cycle, state_change_cycle);
         }
         if (controller_event.has_value() && *controller_event <= bank_event) {
             std::vector<bool> affected_channels(architecture.hbm_channels, false);
@@ -1756,10 +1902,12 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         if (!selected_choice.valid) {
             std::size_t bank_available = 0;
             std::size_t bank_future = 0;
+            std::size_t bank_active = 0;
             std::size_t valid_channels = 0;
             for (const auto& queue : bank_queues) {
                 bank_available += queue.available.size();
                 bank_future += queue.future_reads.size() + queue.future_writes.size();
+                bank_active += queue.active.has_value() ? 1 : 0;
             }
             for (const auto& choice : channel_choices) {
                 valid_channels += choice.valid ? 1 : 0;
@@ -1788,35 +1936,102 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                 std::to_string(pending_future.size()) + " controller_pending=" +
                 std::to_string(controller_pending) + " command_pending=" +
                 std::to_string(command_pending) + " bank_available=" +
-                std::to_string(bank_available) + " bank_future=" +
+                std::to_string(bank_available) + " bank_active=" +
+                std::to_string(bank_active) + " bank_future=" +
                 std::to_string(bank_future) + " valid_channels=" +
                 std::to_string(valid_channels));
         }
-        const Candidate selected = plan_candidate(selected_choice.candidate);
+        Candidate selected = selected_choice.candidate;
+        selected.start_cycle = selected_choice.issue_cycle;
         auto& selected_queue = bank_queues[selected_choice.flat_bank];
-        if (selected_choice.source == 1 || selected_choice.source == 2) {
-            selected_queue.available.erase(selected);
-            auto row = selected_queue.available_rows.find(selected.row);
-            if (row == selected_queue.available_rows.end() ||
-                row->second.erase(selected) != 1) {
-                throw std::runtime_error("available row index is inconsistent");
+        auto& state = states[selected.request_index];
+        auto& bank_state = banks[selected_choice.flat_bank];
+        auto& channel_state = channels[selected.channel];
+        const uint64_t command_cycle = selected_choice.issue_cycle;
+        record_command(selected, selected_choice.command, command_cycle);
+        channel_state.next_command_cycle = command_cycle +
+            architecture.hbm_command_issue_interval_cycles;
+
+        if (selected_choice.command == MemoryCommandType::PRECHARGE) {
+            if (selected_queue.active.has_value() || !bank_state.row_open ||
+                bank_state.open_row == selected.row) {
+                throw std::runtime_error("invalid PRE command plan");
             }
-            if (row->second.empty()) {
-                selected_queue.available_rows.erase(row);
+            erase_available_candidate(selected_queue, selected_choice, selected);
+            selected.precharge_cycle = command_cycle;
+            selected.row_hit = false;
+            selected_queue.active = selected;
+            selected_queue.active_stage = BankQueue::ActiveStage::ACTIVATE;
+            bank_state.row_open = false;
+            bank_state.next_activate_cycle = std::max(
+                bank_state.next_activate_cycle,
+                command_cycle + architecture.hbm_precharge_to_activate_cycles);
+            ++result.precharge_commands;
+            ++state.precharge_commands;
+            state.first_precharge = std::min(state.first_precharge, command_cycle);
+            state.last_precharge = std::max(state.last_precharge, command_cycle);
+            recompute_channel(selected.channel);
+            continue;
+        }
+
+        if (selected_choice.command == MemoryCommandType::ACTIVATE) {
+            if (bank_state.row_open) {
+                throw std::runtime_error("ACT command requires a closed bank");
             }
-        } else if (selected_choice.source == 3) {
-            selected_queue.future_reads.pop();
-        } else if (selected_choice.source == 4) {
-            selected_queue.future_writes.pop();
+            if (!selected_queue.active.has_value()) {
+                erase_available_candidate(selected_queue, selected_choice, selected);
+                selected.row_hit = false;
+                selected_queue.active = selected;
+            } else if (selected_queue.active_stage !=
+                       BankQueue::ActiveStage::ACTIVATE) {
+                throw std::runtime_error("invalid active ACT command stage");
+            }
+            selected_queue.active->activate_cycle = command_cycle;
+            selected_queue.active_stage = BankQueue::ActiveStage::DATA;
+            bank_state.open_row = selected.row;
+            bank_state.row_open = true;
+            bank_state.next_read_cycle = std::max(
+                bank_state.next_read_cycle,
+                command_cycle + architecture.hbm_activate_to_read_cycles);
+            bank_state.next_write_cycle = std::max(
+                bank_state.next_write_cycle,
+                command_cycle + architecture.hbm_activate_to_write_cycles);
+            bank_state.next_precharge_cycle = std::max(
+                bank_state.next_precharge_cycle,
+                command_cycle + architecture.hbm_activate_to_precharge_cycles);
+            bank_state.next_activate_cycle = std::max(
+                bank_state.next_activate_cycle,
+                command_cycle + architecture.hbm_activate_to_activate_cycles);
+            ++result.activate_commands;
+            ++state.activate_commands;
+            state.first_activate = std::min(state.first_activate, command_cycle);
+            state.last_activate = std::max(state.last_activate, command_cycle);
+            recompute_channel(selected.channel);
+            continue;
+        }
+
+        if (selected_queue.active.has_value()) {
+            if (selected_queue.active_stage != BankQueue::ActiveStage::DATA ||
+                selected_queue.active->request_index != selected.request_index ||
+                selected_queue.active->block_offset != selected.block_offset) {
+                throw std::runtime_error("invalid active data command stage");
+            }
+            selected = *selected_queue.active;
+            selected.start_cycle = command_cycle;
+            selected.command_ready_cycle =
+                selected_choice.candidate.command_ready_cycle;
         } else {
-            throw std::runtime_error("unknown bank choice source");
+            if (!selected.row_hit || !bank_state.row_open ||
+                bank_state.open_row != selected.row) {
+                throw std::runtime_error("direct data command is not a row hit");
+            }
+            erase_available_candidate(selected_queue, selected_choice, selected);
         }
         if (command_queue_occupancy[selected_choice.flat_bank] == 0) {
             throw std::runtime_error("command queue occupancy underflow");
         }
         --command_queue_occupancy[selected_choice.flat_bank];
 
-        auto& state = states[selected.request_index];
         while (!active_fifo.empty() &&
                issued_candidates.count({active_fifo.top().request_index,
                                         active_fifo.top().block_offset}) != 0) {
@@ -1830,16 +2045,12 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                 ++result.priority_reorders;
             }
         }
-        auto& bank_state = banks[selected_choice.flat_bank];
-        auto& channel_state = channels[selected.channel];
         state.effective_producer_ready = std::max(
             state.effective_producer_ready, selected.producer_ready_cycle);
         state.effective_enqueue = std::max(
             state.effective_enqueue, selected.enqueue_cycle);
-        state.first_issue = std::min(state.first_issue, selected.start_cycle);
-        const bool row_hit = bank_state.row_open && bank_state.open_row == selected.row;
-        const bool row_conflict = bank_state.row_open && !row_hit;
-        if (row_hit) {
+        state.first_issue = std::min(state.first_issue, command_cycle);
+        if (selected.row_hit) {
             ++result.row_buffer_hits;
             ++result.row_buffer_hits_by_class[static_cast<std::size_t>(
                 state.request.request_class)];
@@ -1848,47 +2059,16 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             ++result.row_buffer_misses_by_class[static_cast<std::size_t>(
                 state.request.request_class)];
         }
-        if (row_conflict) {
-            if (selected.precharge_cycle == std::numeric_limits<uint64_t>::max()) {
-                throw std::runtime_error("row conflict lacks a PRE command");
-            }
-            ++result.precharge_commands;
-            ++state.precharge_commands;
-            state.first_precharge = std::min(
-                state.first_precharge, selected.precharge_cycle);
-            state.last_precharge = std::max(
-                state.last_precharge, selected.precharge_cycle);
-        }
-        if (!row_hit) {
-            if (selected.activate_cycle == std::numeric_limits<uint64_t>::max()) {
-                throw std::runtime_error("closed row lacks an ACT command");
-            }
-            ++result.activate_commands;
-            ++state.activate_commands;
-            state.first_activate = std::min(
-                state.first_activate, selected.activate_cycle);
-            state.last_activate = std::max(
-                state.last_activate, selected.activate_cycle);
-            bank_state.next_precharge_cycle = std::max(
-                bank_state.next_precharge_cycle,
-                selected.activate_cycle + architecture.hbm_activate_to_precharge_cycles);
-            bank_state.next_activate_cycle = std::max(
-                bank_state.next_activate_cycle,
-                selected.activate_cycle + architecture.hbm_activate_to_activate_cycles);
-            channel_state.next_row_command_cycle = selected.activate_cycle +
-                architecture.hbm_command_issue_interval_cycles;
-        }
         const uint64_t data_latency = selected.is_write
             ? architecture.hbm_write_row_hit_cycles
             : architecture.hbm_read_row_hit_cycles;
-        const uint64_t completion = selected.start_cycle + data_latency + transfer_cycles;
-        bank_state.next_data_cycle = completion;
-        block_active_intervals.push_back({selected.start_cycle, completion});
+        const uint64_t completion = command_cycle + data_latency + transfer_cycles;
+        block_active_intervals.push_back({command_cycle, completion});
         if (channel_state.last_direction != -1 &&
             channel_state.last_direction != static_cast<int>(selected.is_write)) {
-            if (selected.start_cycle > selected.command_ready_cycle) {
+            if (command_cycle > selected.command_ready_cycle) {
                 result.direction_switch_stall_cycles +=
-                    selected.start_cycle - selected.command_ready_cycle;
+                    command_cycle - selected.command_ready_cycle;
             }
             if (selected.is_write) {
                 ++result.read_to_write_switches;
@@ -1900,31 +2080,44 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             ++result.write_commands;
             channel_state.next_write_cycle = std::max(
                 channel_state.next_write_cycle,
-                selected.start_cycle + architecture.hbm_write_to_write_cycles);
+                command_cycle + architecture.hbm_write_to_write_cycles);
             channel_state.next_read_cycle = std::max(
                 channel_state.next_read_cycle,
-                selected.start_cycle + architecture.hbm_write_to_read_cycles);
+                command_cycle + architecture.hbm_write_to_read_cycles);
             bank_state.next_precharge_cycle = std::max(
                 bank_state.next_precharge_cycle,
-                selected.start_cycle + architecture.hbm_write_to_precharge_cycles);
+                command_cycle + architecture.hbm_write_to_precharge_cycles);
         } else {
             ++result.read_commands;
             channel_state.next_read_cycle = std::max(
                 channel_state.next_read_cycle,
-                selected.start_cycle + architecture.hbm_read_to_read_cycles);
+                command_cycle + architecture.hbm_read_to_read_cycles);
             channel_state.next_write_cycle = std::max(
                 channel_state.next_write_cycle,
-                selected.start_cycle + architecture.hbm_read_to_write_cycles);
+                command_cycle + architecture.hbm_read_to_write_cycles);
             bank_state.next_precharge_cycle = std::max(
                 bank_state.next_precharge_cycle,
-                selected.start_cycle + architecture.hbm_read_to_precharge_cycles);
+                command_cycle + architecture.hbm_read_to_precharge_cycles);
         }
-        channel_state.last_issue_cycle = selected.start_cycle;
+        channel_state.last_issue_cycle = command_cycle;
         channel_state.last_direction = static_cast<int>(selected.is_write);
-        bank_state.open_row = selected.row;
-        bank_state.row_open = true;
+        selected_queue.active.reset();
+        selected_queue.active_stage = BankQueue::ActiveStage::NONE;
         state.completion = std::max(state.completion, completion);
         ++state.issued_blocks;
+        if (priority == MemoryPriorityMode::FIFO) {
+            const std::size_t port = CoordinatorPort(state.request.request_class);
+            const auto window_key = std::make_pair(
+                port, selected.block / blocks_per_row);
+            const auto active_window = fifo_active_windows.find(window_key);
+            if (active_window == fifo_active_windows.end() ||
+                active_window->second == 0) {
+                throw std::runtime_error("FIFO port window occupancy underflow");
+            }
+            if (--active_window->second == 0) {
+                fifo_active_windows.erase(active_window);
+            }
+        }
         issued_candidates.insert({selected.request_index, selected.block_offset});
         --remaining_blocks;
         ++result.channel_blocks[selected.channel];
@@ -1934,7 +2127,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         affected_channels[selected.channel] = true;
         if (state.issued_blocks == state.block_count) {
             for (std::size_t dependent : dependents[selected.request_index]) {
-                push_pending(make_candidate(dependent, 0), selected.start_cycle);
+                push_pending(make_candidate(dependent, 0), command_cycle);
             }
         }
         for (std::size_t channel = 0; channel < affected_channels.size(); ++channel) {
@@ -1942,6 +2135,15 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                 recompute_channel(channel);
             }
         }
+    }
+
+    result.command_trace_samples = std::move(first_command_samples);
+    result.command_trace_samples.insert(
+        result.command_trace_samples.end(),
+        last_command_samples.begin(), last_command_samples.end());
+    if (result.command_trace_event_count != result.precharge_commands +
+            result.activate_commands + result.read_commands + result.write_commands) {
+        throw std::runtime_error("command trace count differs from command totals");
     }
 
     for (const auto& state : states) {
@@ -2634,6 +2836,9 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
         metrics.activate_commands = memory_timing.activate_commands;
         metrics.read_commands = memory_timing.read_commands;
         metrics.write_commands = memory_timing.write_commands;
+        metrics.command_trace_event_count = memory_timing.command_trace_event_count;
+        metrics.command_trace_checksum = memory_timing.command_trace_checksum;
+        metrics.command_lane_violations = memory_timing.command_lane_violations;
         metrics.request_counts = memory_timing.request_counts;
         metrics.request_bytes = memory_timing.request_bytes;
         metrics.request_wait_cycles = memory_timing.request_wait_cycles;
@@ -2642,6 +2847,7 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
         metrics.channel_blocks = memory_timing.channel_blocks;
         metrics.bank_blocks = memory_timing.bank_blocks;
         metrics.memory_request_traces = memory_timing.request_traces;
+        metrics.command_trace_samples = memory_timing.command_trace_samples;
         metrics.transaction_admission_traces = memory_timing.admission_traces;
         metrics.max_channel_read_queue_occupancy =
             memory_timing.max_channel_read_queue_occupancy;
