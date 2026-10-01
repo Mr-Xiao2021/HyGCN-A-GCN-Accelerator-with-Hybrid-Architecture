@@ -864,11 +864,36 @@ void TestChannelCommandLaneAndDataIssue() {
                   static_cast<uint64_t>(
                       config.hbm_command_issue_interval_cycles),
           "cross-bank PRE and READ commands serialize on the shared channel lane");
+
+    config.hbm_banks_per_channel = 1;
+    config.hbm_command_queue_entries_per_bank = 1;
+    config.hbm_row_bytes = 64;
+    config.Validate();
+    const auto backpressured = MemoryCoordinatorModel::Simulate(
+        {
+            {0, RequestClass::EDGE, 64, 0, 0, 0},
+            {0, RequestClass::EDGE, 64, 64, 0, 1},
+            {0, RequestClass::EDGE, 64, 128, 0, 2},
+        },
+        config, MemoryPriorityMode::BATCH_CLASS,
+        AddressMappingMode::ROW_FIRST);
+    Check(backpressured.command_lane_violations == 0 &&
+              backpressured.command_trace_samples.size() ==
+                  backpressured.command_trace_event_count &&
+              std::is_sorted(
+                  backpressured.command_trace_samples.begin(),
+                  backpressured.command_trace_samples.end(),
+                  [](const auto& lhs, const auto& rhs) {
+                      return lhs.cycle < rhs.cycle;
+                  }),
+          "controller backpressure cannot dispatch or issue commands in the past");
     std::cout << "command_lane_evidence={\"same_row_read_issues\":["
               << first.first_issue_cycle << ',' << second.first_issue_cycle
               << "],\"cross_bank_pre\":" << precharge->cycle
               << ",\"cross_bank_read\":" << competing_read->cycle
               << ",\"events\":" << lane.command_trace_event_count
+              << ",\"backpressure_events\":"
+              << backpressured.command_trace_event_count
               << ",\"checksum\":\"" << std::hex
               << lane.command_trace_checksum << std::dec << "\"}\n";
 }

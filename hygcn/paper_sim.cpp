@@ -1389,6 +1389,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     std::size_t fifo_next_port = 0;
     std::map<std::pair<std::size_t, uint64_t>, std::size_t> fifo_active_windows;
     uint64_t next_admission_order = 0;
+    uint64_t simulation_cycle = 0;
     auto push_available = [&](BankQueue& queue, const Candidate& candidate) {
         queue.available.insert(candidate);
         auto row = queue.available_rows.find(candidate.row);
@@ -1624,11 +1625,12 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     uint64_t next_admission_cycle = 0;
     auto next_admission_event = [&]() -> std::optional<uint64_t> {
         if (pending_available_count() != 0) {
-            return next_admission_cycle;
+            return std::max(next_admission_cycle, simulation_cycle);
         }
         if (!pending_future.empty()) {
-            return std::max(next_admission_cycle,
-                            pending_future.top().enqueue_cycle);
+            return std::max({next_admission_cycle,
+                             pending_future.top().enqueue_cycle,
+                             simulation_cycle});
         }
         return std::nullopt;
     };
@@ -1784,7 +1786,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                 continue;
             }
             const uint64_t cycle = std::max(
-                next_controller_dispatch_cycle[channel], candidate.admission_cycle);
+                {next_controller_dispatch_cycle[channel], candidate.admission_cycle,
+                 simulation_cycle});
             if (!earliest.has_value() || cycle < *earliest) {
                 earliest = cycle;
             }
@@ -1856,6 +1859,11 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                 selected_choice = channel_choice;
             }
         }
+        if (selected_choice.valid &&
+            selected_choice.issue_cycle < simulation_cycle) {
+            selected_choice.issue_cycle = simulation_cycle;
+            selected_choice.candidate.start_cycle = simulation_cycle;
+        }
         const auto admission_event = next_admission_event();
         const auto controller_event = next_controller_event();
         const uint64_t bank_event = selected_choice.valid
@@ -1865,6 +1873,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             std::numeric_limits<uint64_t>::max());
         if (admission_event.has_value() &&
             *admission_event <= controller_cycle && *admission_event <= bank_event) {
+            simulation_cycle = *admission_event;
             std::vector<bool> affected_channels(architecture.hbm_channels, false);
             const std::size_t admitted = admit_transaction_blocks(
                 *admission_event, affected_channels);
@@ -1886,6 +1895,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                 next_admission_cycle, state_change_cycle);
         }
         if (controller_event.has_value() && *controller_event <= bank_event) {
+            simulation_cycle = *controller_event;
             std::vector<bool> affected_channels(architecture.hbm_channels, false);
             const std::size_t dispatched = dispatch_controllers(
                 *controller_event, affected_channels);
@@ -1948,6 +1958,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         auto& bank_state = banks[selected_choice.flat_bank];
         auto& channel_state = channels[selected.channel];
         const uint64_t command_cycle = selected_choice.issue_cycle;
+        simulation_cycle = command_cycle;
         record_command(selected, selected_choice.command, command_cycle);
         channel_state.next_command_cycle = command_cycle +
             architecture.hbm_command_issue_interval_cycles;
