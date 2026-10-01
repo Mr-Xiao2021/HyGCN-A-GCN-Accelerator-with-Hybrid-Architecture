@@ -1,0 +1,57 @@
+{
+  "artifact_directory": "res/review-v8-final",
+  "branch": "run/npu",
+  "complete_admission_trace": {
+    "admission_cycles": 17359705,
+    "admitted_blocks": 64675995,
+    "max_blocks_per_cycle": 4,
+    "occupancy_reconstruction": [
+      "per-channel before/after admission snapshots"
+    ],
+    "raw_files": 21,
+    "read_blocks": 61999387,
+    "status": "PASS",
+    "unique_checksums": 21,
+    "write_blocks": 2676608
+  },
+  "date": "2026-10-01",
+  "fixed_binary": "/tmp/hygcn-build-review-v8-7b7083f/hygcntest",
+  "fixed_binary_sha256": "c5a0580318b0d61968f0dadac236bde417cb7a3b8bac79f427a30fa0580308b2",
+  "formal_output_directory": "/tmp/hygcn-review-v8-formal-7b7083f",
+  "implementation_commit": "7b7083f159788421aa2e888944b56e1d4466a9e0",
+  "implementation_parent_remote": "5e3bbda6d3ad2a4328a5b0b6710cc296cea011ee",
+  "internal_checks": {
+    "passed": 12,
+    "total": 12
+  },
+  "model_output_directory": "/tmp/hygcn-review-v8-model-7b7083f",
+  "model_sensitivity": {
+    "scenario_count": 10,
+    "single_stack_diagnostic_present": true
+  },
+  "no_target_parameter_retuning_in_revision": true,
+  "paper_metrics": {
+    "passed": 14,
+    "total": 14
+  },
+  "partition_output_directory": "/tmp/hygcn-review-v8-partition-7b7083f",
+  "partition_sensitivity": {
+    "4_mib": "FAIL",
+    "5_mib": "PASS",
+    "6_mib": "FAIL",
+    "independent_holdout": false
+  },
+  "raw_storage": {
+    "csv": "plain text",
+    "json": "lossless .json.gz"
+  },
+  "schema_version": 1,
+  "tests": {
+    "V7_01_command_level_row_recovery": "PASS",
+    "V7_02_reconstructable_directional_occupancy_trace": "PASS",
+    "clean_release_build": "PASS",
+    "ctest": "9/9 PASS",
+    "legacy": "Cora/Citeseer PASS",
+    "strict_openspec": "PASS"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "admission_cycles": 17359705,
+  "admitted_blocks": 64675995,
+  "max_blocks_per_cycle": 4,
+  "occupancy_reconstruction": [
+    "per-channel before/after admission snapshots"
+  ],
+  "raw_files": 21,
+  "read_blocks": 61999387,
+  "status": "PASS",
+  "unique_checksums": 21,
+  "write_blocks": 2676608
+}

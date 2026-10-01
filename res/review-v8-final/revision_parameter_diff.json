@@ -1,0 +1,62 @@
+{
+  "base_evidence_commit": "5e3bbda6d3ad2a4328a5b0b6710cc296cea011ee",
+  "differences": [
+    {
+      "parameter": "hbm_activate_to_activate_cycles",
+      "review_v7": null,
+      "review_v8": 48
+    },
+    {
+      "parameter": "hbm_activate_to_precharge_cycles",
+      "review_v7": null,
+      "review_v8": 34
+    },
+    {
+      "parameter": "hbm_activate_to_read_cycles",
+      "review_v7": null,
+      "review_v8": 14
+    },
+    {
+      "parameter": "hbm_activate_to_write_cycles",
+      "review_v7": null,
+      "review_v8": 14
+    },
+    {
+      "parameter": "hbm_channels",
+      "review_v7": null,
+      "review_v8": 16
+    },
+    {
+      "parameter": "hbm_command_issue_interval_cycles",
+      "review_v7": null,
+      "review_v8": 2
+    },
+    {
+      "parameter": "hbm_precharge_to_activate_cycles",
+      "review_v7": null,
+      "review_v8": 14
+    },
+    {
+      "parameter": "hbm_read_to_precharge_cycles",
+      "review_v7": null,
+      "review_v8": 10
+    },
+    {
+      "parameter": "hbm_read_to_read_cycles",
+      "review_v7": null,
+      "review_v8": 4
+    },
+    {
+      "parameter": "hbm_write_to_precharge_cycles",
+      "review_v7": null,
+      "review_v8": 24
+    },
+    {
+      "parameter": "hbm_write_to_write_cycles",
+      "review_v7": null,
+      "review_v8": 4
+    }
+  ],
+  "implementation_commit": "7b7083f159788421aa2e888944b56e1d4466a9e0",
+  "no_target_parameter_retuning": true
+}

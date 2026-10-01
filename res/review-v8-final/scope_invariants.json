@@ -1,0 +1,78 @@
+{
+  "calibrated_fit_datasets": [
+    "cora",
+    "citeseer",
+    "pubmed"
+  ],
+  "evidence_counts": {
+    "internal_check_rows": 12,
+    "paper_metric_rows": 14
+  },
+  "independent_holdout_datasets": [],
+  "physical_hbm_topology": {
+    "channels_per_stack": 8,
+    "physical_channels": 16,
+    "stacks": 2
+  },
+  "scope": {
+    "not_validated": [
+      "absolute CPU speedup",
+      "absolute GPU speedup",
+      "DiffPool",
+      "complete chip energy and area",
+      "exact ping-pong half ownership",
+      "automatic SVG redownload and redigitization"
+    ],
+    "validated": "Fig. 15 layer-0 AE-only sparsity and Fig. 16-17 layer-0 request-level microarchitectural effects for GCN"
+  },
+  "workload_manifest": {
+    "figures": {
+      "figure_15": {
+        "aggregation": "per_dataset",
+        "input_features": "dataset_metadata.feature",
+        "model": "gcn",
+        "output_features": 128,
+        "scope": "aggregation",
+        "selected_layer": "0"
+      },
+      "figure_16": {
+        "aggregation": "per_dataset",
+        "input_features": "dataset_metadata.feature",
+        "model": "gcn",
+        "output_features": 128,
+        "scope": "full",
+        "selected_layer": "0"
+      },
+      "figure_17": {
+        "aggregation": "arithmetic_mean_over_datasets",
+        "input_features": "dataset_metadata.feature",
+        "model": "gcn",
+        "output_features": 128,
+        "scope": "full",
+        "selected_layer": "0"
+      }
+    },
+    "graph_partition": {
+      "aggregation_ping_pong_half_capacity_bytes": 8388608,
+      "aggregation_shard_capacity_bytes": 5242880,
+      "calibrated_fit_datasets": [
+        "cora",
+        "citeseer",
+        "pubmed"
+      ],
+      "candidate_capacities_mib": [
+        4,
+        5,
+        6
+      ],
+      "fit_disclosure": "Cora, Citeseer, and PubMed were all exposed before this version; the 5 MiB scheduler cap and the 14 paper rows are reported as a calibrated fit, not independent hold-out validation",
+      "historical_exposure": "Review v4 evaluated all three datasets at 4, 5, and 6 MiB before Review v5; no dataset in this repository remains unexposed for scheduler-cap selection",
+      "independent_holdout_datasets": [],
+      "policy": "fixed dataset-independent scheduler occupancy cap below one physical ping-pong half",
+      "source": "HyGCN Section 4.3.2 requires the destination interval and its aggregation results to fit the on-chip Aggregation Buffer; the paper does not publish the simulator's interval occupancy, so this request-level model reports the fixed scheduler cap separately from the 16 MiB physical capacity"
+    },
+    "path": "configs/paper_workloads.json",
+    "sha256": "25a1802c90b06e33e0bea028961dd1677ee350bd4a9105b60b598a9080a1fb43",
+    "version": "hygcn-hpca2020-table5-gcn-v4-two-stack-hbm"
+  }
+}

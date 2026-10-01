@@ -1,0 +1,13 @@
+scope,metric,before_v8,after_v8,threshold,after_result
+cora,priority_incremental_speedup,1.008982741,1.066540000,1.005000000,PASS
+citeseer,priority_incremental_speedup,1.007251888,1.059054289,1.005000000,PASS
+pubmed,priority_incremental_speedup,1.002276855,1.062261423,1.005000000,PASS
+aggregate,priority_incremental_speedup_aggregate,1.006170494,1.062618570,1.005000000,PASS
+cora,priority_incremental_bandwidth_gain,1.008982741,1.066540000,1.005000000,PASS
+citeseer,priority_incremental_bandwidth_gain,1.007251888,1.059054289,1.005000000,PASS
+pubmed,priority_incremental_bandwidth_gain,1.002276855,1.062261423,1.005000000,PASS
+aggregate,priority_incremental_bandwidth_gain_aggregate,1.006170494,1.062618570,1.005000000,PASS
+cora,priority_incremental_row_hit_ratio,1.040272432,1.041981434,1.030000000,PASS
+citeseer,priority_incremental_row_hit_ratio,1.029866444,1.034889808,1.030000000,PASS
+pubmed,priority_incremental_row_hit_ratio,1.021407282,1.035427007,1.030000000,PASS
+aggregate,priority_incremental_row_hit_ratio_aggregate,1.030515386,1.037432750,1.030000000,PASS

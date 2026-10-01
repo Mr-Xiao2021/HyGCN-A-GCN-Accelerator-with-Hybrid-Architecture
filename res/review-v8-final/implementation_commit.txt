@@ -1,0 +1,25 @@
+commit 7b7083f159788421aa2e888944b56e1d4466a9e0
+Author:     Mr-Xiao2021 <349602396@qq.com>
+AuthorDate: Thu Oct 1 23:58:36 2026 +0800
+Commit:     Mr-Xiao2021 <349602396@qq.com>
+CommitDate: Thu Oct 1 23:58:36 2026 +0800
+
+    close review v7 findings
+
+ configs/HYGCN_LEGACY.ini                           |  10 +
+ configs/HYGCN_PAPER.ini                            |  12 +-
+ configs/HYGCN_SMOKE.ini                            |  10 +
+ configs/paper_metrics.json                         |   8 +-
+ configs/paper_workloads.json                       |  22 +-
+ docs/paper-reproduction.md                         |   9 +-
+ hygcn/paper_sim.cpp                                | 514 ++++++++++++++-------
+ hygcn/paper_sim.h                                  |  47 +-
+ hygcn_test/unit.cpp                                | 192 +++++++-
+ .../reproduce-hygcn-paper-performance/design.md    |   2 +-
+ .../specs/paper-performance-validation/spec.md     |  14 +-
+ .../reproduce-hygcn-paper-performance/tasks.md     |   7 +
+ tools/model_sensitivity.py                         |  30 +-
+ tools/paper_benchmark.py                           | 373 ++++++++++++---
+ tools/test_paper_benchmark.py                      |  38 +-
+ tools/validate_reference_metrics.py                |   4 +-
+ 16 files changed, 1023 insertions(+), 269 deletions(-)

@@ -1,0 +1,234 @@
+{
+  "schema_version": 6,
+  "reference_version": "hygcn-hpca2020-fig15-17-svg-digitized-v4-command-model",
+  "tolerance": 0.20,
+  "datasets": ["cora", "citeseer", "pubmed"],
+  "digitization": {
+    "method": "bar height divided by plotted full-scale height from the arXiv SVG coordinates",
+    "coordinate_uncertainty_points": 0.75,
+    "figure_15": {
+      "source_url": "https://arxiv.org/html/2001.02514v1/x15.svg",
+      "sha256": "807e32b119ff28b157c8d61e9c54ee5f61554d2246194a82b6a925d26a6b5f1b",
+      "baseline_y": 200.62,
+      "full_scale_y": 309.75,
+      "execution_time_bar_top_y": {
+        "cora": 301.47,
+        "citeseer": 238.47,
+        "pubmed": 298.47
+      },
+      "dram_access_bar_top_y": {
+        "cora": 296.60,
+        "citeseer": 237.72,
+        "pubmed": 298.47
+      }
+    },
+    "figure_16": {
+      "source_url": "https://arxiv.org/html/2001.02514v1/x16.svg",
+      "sha256": "3e231d91f2d25dacc983178d916402ebfd572d9f532561f4fdfe98a3af06b5ed",
+      "baseline_y": 207.00,
+      "full_scale_y": 316.12,
+      "execution_time_bar_top_y": {
+        "cora": 258.35,
+        "citeseer": 266.22,
+        "pubmed": 286.85
+      },
+      "dram_access_bar_top_y": {
+        "cora": 261.72,
+        "citeseer": 265.47,
+        "pubmed": 286.85
+      }
+    }
+  },
+  "metrics": {
+    "sparsity_speedup": {
+      "required": true,
+      "evidence_class": "paper_metric",
+      "validation": "per_dataset_relative_error",
+      "reference": {
+        "cora": 1.082102,
+        "citeseer": 2.883223,
+        "pubmed": 1.115278
+      },
+      "unit": "x",
+      "aggregation": "per_dataset",
+      "experiment_scope": "Aggregation Engine cycles only",
+      "source": "HyGCN HPCA 2020 Figure 15(a), digitized from the arXiv SVG"
+    },
+    "sparsity_ae_dram_ratio": {
+      "required": true,
+      "evidence_class": "paper_metric",
+      "validation": "per_dataset_relative_error",
+      "reference": {
+        "cora": 0.879502,
+        "citeseer": 0.339962,
+        "pubmed": 0.896637
+      },
+      "unit": "ratio",
+      "aggregation": "per_dataset",
+      "experiment_scope": "Aggregation Engine Edge plus Input DRAM bytes",
+      "source": "HyGCN HPCA 2020 Figure 15(b), digitized from the arXiv SVG"
+    },
+    "sparsity_input_dram_ratio": {
+      "required": false,
+      "evidence_class": "internal_diagnostic",
+      "validation": "diagnostic_only",
+      "unit": "ratio",
+      "aggregation": "per_dataset",
+      "experiment_scope": "Input-feature DRAM bytes only",
+      "source": "Internal diagnostic; Figure 15(b) validates total Aggregation Engine DRAM access"
+    },
+    "pipeline_speedup": {
+      "required": true,
+      "evidence_class": "paper_metric",
+      "validation": "per_dataset_relative_error",
+      "reference": {
+        "cora": 2.125024,
+        "citeseer": 1.842621,
+        "pubmed": 1.366562
+      },
+      "unit": "x",
+      "aggregation": "per_dataset",
+      "experiment_scope": "full layer execution cycles",
+      "source": "HyGCN HPCA 2020 Figure 16(a), digitized from the arXiv SVG"
+    },
+    "pipeline_dram_ratio": {
+      "required": true,
+      "evidence_class": "paper_metric",
+      "validation": "per_dataset_relative_error",
+      "reference": {
+        "cora": 0.501466,
+        "citeseer": 0.535832,
+        "pubmed": 0.731763
+      },
+      "unit": "ratio",
+      "aggregation": "per_dataset",
+      "experiment_scope": "full layer DRAM bytes",
+      "source": "HyGCN HPCA 2020 Figure 16(b), digitized from the arXiv SVG"
+    },
+    "priority_speedup": {
+      "required": false,
+      "evidence_class": "internal_diagnostic",
+      "validation": "diagnostic_only",
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "experiment_scope": "Fig. 17 priority-only execution cycles with row-first baseline mapping fixed",
+      "source": "Internal causal decomposition of the paper coordinator"
+    },
+    "priority_bandwidth_gain": {
+      "required": false,
+      "evidence_class": "internal_diagnostic",
+      "validation": "diagnostic_only",
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "experiment_scope": "Fig. 17 priority-only effective HBM bandwidth with row-first baseline mapping fixed",
+      "source": "Internal causal decomposition of the paper coordinator"
+    },
+    "priority_incremental_speedup": {
+      "required": true,
+      "evidence_class": "internal_check",
+      "validation": "per_dataset_minimum",
+      "reference_min": 1.005,
+      "unit": "x",
+      "aggregation": "per_dataset",
+      "experiment_scope": "optimized divided by mapping-only on the same low-bits layout, expressed as mapping-only cycles / optimized cycles",
+      "source": "Required positive-effect gate for the isolated batch/class request assembly mechanism"
+    },
+    "priority_incremental_speedup_aggregate": {
+      "required": true,
+      "evidence_class": "internal_check",
+      "validation": "aggregate_minimum",
+      "reference_min": 1.005,
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "experiment_scope": "three-dataset arithmetic mean of optimized versus mapping-only speedup on low-bits layout",
+      "source": "Required aggregate causal gate for the isolated batch/class request assembly mechanism"
+    },
+    "priority_incremental_bandwidth_gain": {
+      "required": true,
+      "evidence_class": "internal_check",
+      "validation": "per_dataset_minimum",
+      "reference_min": 1.005,
+      "unit": "x",
+      "aggregation": "per_dataset",
+      "experiment_scope": "optimized divided by mapping-only effective HBM bandwidth over the complete memory-service interval",
+      "source": "Required positive-effect gate for the isolated batch/class request assembly mechanism"
+    },
+    "priority_incremental_bandwidth_gain_aggregate": {
+      "required": true,
+      "evidence_class": "internal_check",
+      "validation": "aggregate_minimum",
+      "reference_min": 1.005,
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "experiment_scope": "three-dataset arithmetic mean of optimized versus mapping-only complete-interval bandwidth gain",
+      "source": "Required aggregate causal gate for the isolated batch/class request assembly mechanism"
+    },
+    "priority_incremental_row_hit_ratio": {
+      "required": true,
+      "evidence_class": "internal_check",
+      "validation": "per_dataset_minimum",
+      "reference_min": 1.03,
+      "unit": "ratio",
+      "aggregation": "per_dataset",
+      "experiment_scope": "optimized row-hit rate divided by mapping-only row-hit rate on the same low-bits layout",
+      "source": "Required positive row-locality gate on the same low-bits address layout"
+    },
+    "priority_incremental_row_hit_ratio_aggregate": {
+      "required": true,
+      "evidence_class": "internal_check",
+      "validation": "aggregate_minimum",
+      "reference_min": 1.03,
+      "unit": "ratio",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "experiment_scope": "three-dataset arithmetic mean of optimized versus mapping-only row-hit ratio on the same low-bits layout",
+      "source": "Versioned internal consistency gate: the paper gives no isolated row-hit magnitude, so the aggregate minimum matches the already-required 1.03 per-dataset floor instead of imposing an unsupported stricter 1.05 target"
+    },
+    "mapping_speedup": {
+      "required": false,
+      "evidence_class": "internal_diagnostic",
+      "validation": "diagnostic_only",
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "experiment_scope": "Fig. 17 mapping-only execution cycles with FIFO baseline priority fixed",
+      "source": "Internal causal decomposition of the paper coordinator"
+    },
+    "mapping_bandwidth_gain": {
+      "required": false,
+      "evidence_class": "internal_diagnostic",
+      "validation": "diagnostic_only",
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "experiment_scope": "Fig. 17 mapping-only effective HBM bandwidth with FIFO baseline priority fixed",
+      "source": "Internal causal decomposition of the paper coordinator"
+    },
+    "coordination_speedup": {
+      "required": true,
+      "evidence_class": "paper_metric",
+      "validation": "aggregate_relative_error",
+      "reference": 3.70,
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "experiment_scope": "full layer execution cycles",
+      "source": "HyGCN HPCA 2020 Section 5.3 and Figure 17: average 73% execution-time reduction"
+    },
+    "coordination_bandwidth_gain": {
+      "required": true,
+      "evidence_class": "paper_metric",
+      "validation": "aggregate_relative_error",
+      "reference": 4.00,
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "experiment_scope": "effective HBM bandwidth over the common memory-service interval from cycle zero through the final request completion, including producer-idle gaps",
+      "source": "HyGCN HPCA 2020 Section 5.3 and Figure 17: average 4x bandwidth utilization"
+    },
+    "coordination_active_bandwidth_gain": {
+      "required": false,
+      "evidence_class": "internal_diagnostic",
+      "validation": "diagnostic_only",
+      "unit": "x",
+      "aggregation": "arithmetic_mean_over_datasets",
+      "experiment_scope": "effective HBM bandwidth over the union of in-flight request intervals, excluding producer-idle gaps",
+      "source": "Diagnostic only because excluding producer-idle gaps can invert the end-to-end throughput conclusion"
+    }
+  }
+}

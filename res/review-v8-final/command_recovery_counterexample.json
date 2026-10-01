@@ -1,0 +1,13 @@
+{
+  "read_write_cycles": 67,
+  "required_transitions": [
+    "WRITE-to-different-row-WRITE",
+    "WRITE-to-different-row-READ",
+    "READ-to-different-row-WRITE"
+  ],
+  "result": "PASS",
+  "test": "V7_01_command_level_row_recovery",
+  "timing_source": "bundled DRAMSim3 tWR/tRTP/tRAS/tRP/tRC/tRCDRD/tRCDWR/tCCD_L",
+  "write_read_cycles": 81,
+  "write_write_cycles": 71
+}

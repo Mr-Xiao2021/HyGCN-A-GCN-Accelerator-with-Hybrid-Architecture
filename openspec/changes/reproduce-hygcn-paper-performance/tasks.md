@@ -116,4 +116,4 @@
 - [x] 14.1 将 bank 时序改为显式 PRE→ACT→READ/WRITE command plan，用 bundled DRAMSim3 的 `tRTP/tWR/tRAS/tRP/tRC/tRCDRD/tRCDWR/tCCD_L` 约束实际 data-command issue
 - [x] 14.2 增加 WRITE→different-row WRITE/READ 与 READ→different-row WRITE 反例，记录每个请求 PRE/ACT 数量及首末周期
 - [x] 14.3 将 admission trace 升级为逐 channel read/write occupancy before/after 加 terminal zero snapshot，validator 从零推导 dispatch、峰值、容量违规和 checksum
-- [ ] 14.4 将论文 256 GB/s HBM1 显式建模为两份 bundled 8-channel stack，版本化统一 row-hit 逐数据集/aggregate `1.03x` 内部门槛，并执行 clean Release、CTest、legacy、14+12、partition/model sensitivity，固化修正前后证据
+- [x] 14.4 将论文 256 GB/s HBM1 显式建模为两份 bundled 8-channel stack，版本化统一 row-hit 逐数据集/aggregate `1.03x` 内部门槛，并执行 clean Release、CTest、legacy、14+12、partition/model sensitivity，固化修正前后证据

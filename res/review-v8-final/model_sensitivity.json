@@ -1,0 +1,495 @@
+{
+  "base_profile": "configs/HYGCN_PAPER.ini",
+  "base_profile_sha256": "dcde6d7b846bc5cedef5b518cae2b9f897637c049a0e16ed5970ccd13538e973",
+  "binary": "/tmp/hygcn-build-review-v8-7b7083f/hygcntest",
+  "binary_sha256": "c5a0580318b0d61968f0dadac236bde417cb7a3b8bac79f427a30fa0580308b2",
+  "datasets": [
+    "cora",
+    "citeseer",
+    "pubmed"
+  ],
+  "required_dram_timing_basis": {
+    "burst_cycle": 2,
+    "cl": 7,
+    "command_queue_entries_per_bank": 8,
+    "config": "configs/HBM1_4Gb_x128.ini",
+    "config_sha256": "e3558f02ec836645bd53788f52ce4b4a207b0a1e1f7b29ba6da35cffb2b9b832",
+    "cwl": 2,
+    "derived_activate_to_activate_cycles": 48,
+    "derived_activate_to_precharge_cycles": 34,
+    "derived_activate_to_read_cycles": 14,
+    "derived_activate_to_write_cycles": 14,
+    "derived_command_issue_interval_cycles": 2,
+    "derived_precharge_to_activate_cycles": 14,
+    "derived_read_row_conflict_cycles": 42,
+    "derived_read_row_hit_cycles": 14,
+    "derived_read_row_miss_cycles": 28,
+    "derived_read_to_precharge_cycles": 10,
+    "derived_read_to_read_cycles": 4,
+    "derived_read_to_write_cycles": 18,
+    "derived_write_row_conflict_cycles": 32,
+    "derived_write_row_hit_cycles": 4,
+    "derived_write_row_miss_cycles": 18,
+    "derived_write_to_precharge_cycles": 24,
+    "derived_write_to_read_cycles": 16,
+    "derived_write_to_write_cycles": 4,
+    "formula": {
+      "activate_to_activate_formula": "ceil((tRAS + tRP) * tCK / model_cycle_ns)",
+      "activate_to_precharge_formula": "ceil(tRAS * tCK / model_cycle_ns)",
+      "command_issue_interval_formula": "ceil(tCK / model_cycle_ns); each physical channel issues row commands on its own replicated DRAMSim3 command lane",
+      "command_model": "request completion is measured from actual READ/WRITE issue; row conflicts explicitly schedule PRE then ACT before the data command, while tWR/tRTP/tRAS and PRE-to-ACT constrain recovery",
+      "config": "configs/HBM1_4Gb_x128.ini",
+      "model_cycle_ns": "1 / architecture.frequency_ghz",
+      "precharge_to_activate_formula": "ceil(tRP * tCK / model_cycle_ns)",
+      "read_row_conflict_formula": "ceil((tRP + tRCDRD + CL) * tCK / model_cycle_ns)",
+      "read_row_hit_formula": "ceil(CL * tCK / model_cycle_ns)",
+      "read_row_miss_formula": "ceil((tRCDRD + CL) * tCK / model_cycle_ns)",
+      "read_to_precharge_formula": "ceil((AL + tRTP) * tCK / model_cycle_ns); bundled HBM config omits tRTP, so DRAMSim3 default tRTP=5 applies",
+      "read_to_write_formula": "ceil((RL + burst_cycle - WL + tRTRS) * tCK / model_cycle_ns)",
+      "same_direction_formula": "ceil(max(burst_cycle, tCCD_L) * tCK / model_cycle_ns)",
+      "source": "bundled DRAMSim3 HBM timing configuration",
+      "transfer_note": "burst/block transfer is modeled separately by transfer_cycles, so BL is not duplicated in CL/CWL completion latency",
+      "write_row_conflict_formula": "ceil((tRP + tRCDWR + CWL) * tCK / model_cycle_ns)",
+      "write_row_hit_formula": "ceil(CWL * tCK / model_cycle_ns)",
+      "write_row_miss_formula": "ceil((tRCDWR + CWL) * tCK / model_cycle_ns)",
+      "write_to_precharge_formula": "ceil((WL + burst_cycle + tWR) * tCK / model_cycle_ns)",
+      "write_to_read_formula": "ceil((write_delay + tWTR_L) * tCK / model_cycle_ns)"
+    },
+    "model_cycle_ns": 1.0,
+    "model_frequency_ghz": 1.0,
+    "modeled_bandwidth_gbps": 256.0,
+    "modeled_physical_channels": 16,
+    "modeled_stack_count": 2,
+    "read_queue_entries_per_channel": 32,
+    "source_channels_per_stack": 8,
+    "source_stack_bandwidth_gbps": 128.0,
+    "tccd_l": 1,
+    "tck_ns": 2.0,
+    "tras": 17,
+    "trcdrd": 7,
+    "trcdwr": 7,
+    "trp": 7,
+    "trtp": 5,
+    "trtrs": 2,
+    "twr": 8,
+    "twtr_l": 4,
+    "unified_queue": false,
+    "write_buffer_entries_per_channel": 32
+  },
+  "scenarios": {
+    "baseline": {
+      "acceptance_role": "required_external_baseline",
+      "aggregate": {
+        "coordination_bandwidth_gain": 3.265967625312952,
+        "coordination_speedup": 3.265967625312952,
+        "priority_incremental_bandwidth_gain": 1.0626185704822717,
+        "priority_incremental_row_hit_ratio": 1.0374327499381197,
+        "priority_incremental_speedup": 1.0626185704822717
+      },
+      "changes": {},
+      "per_dataset": {
+        "citeseer": {
+          "coordination_bandwidth_gain": 3.637967541815098,
+          "coordination_speedup": 3.637967541815098,
+          "priority_incremental_bandwidth_gain": 1.0590542887314622,
+          "priority_incremental_row_hit_ratio": 1.0348898083328397,
+          "priority_incremental_speedup": 1.0590542887314625
+        },
+        "cora": {
+          "coordination_bandwidth_gain": 2.706476,
+          "coordination_speedup": 2.706476,
+          "priority_incremental_bandwidth_gain": 1.06654,
+          "priority_incremental_row_hit_ratio": 1.0419814342523541,
+          "priority_incremental_speedup": 1.06654
+        },
+        "pubmed": {
+          "coordination_bandwidth_gain": 3.4534593341237585,
+          "coordination_speedup": 3.4534593341237585,
+          "priority_incremental_bandwidth_gain": 1.0622614227153526,
+          "priority_incremental_row_hit_ratio": 1.0354270072291656,
+          "priority_incremental_speedup": 1.0622614227153526
+        }
+      },
+      "profile_sha256": "42dcfce5468c2cfaae2dd618154cfb6cd2baea1a59dfe005a650781ca05662b0"
+    },
+    "direction_switching_slow": {
+      "acceptance_role": "diagnostic",
+      "aggregate": {
+        "coordination_bandwidth_gain": 3.2669093493911348,
+        "coordination_speedup": 3.2669093493911348,
+        "priority_incremental_bandwidth_gain": 1.0619263226291717,
+        "priority_incremental_row_hit_ratio": 1.0377108985619945,
+        "priority_incremental_speedup": 1.0619263226291717
+      },
+      "changes": {
+        "memory.hbm_read_to_write_cycles": 22,
+        "memory.hbm_write_to_read_cycles": 20
+      },
+      "per_dataset": {
+        "citeseer": {
+          "coordination_bandwidth_gain": 3.637967541815098,
+          "coordination_speedup": 3.637967541815098,
+          "priority_incremental_bandwidth_gain": 1.0590542887314622,
+          "priority_incremental_row_hit_ratio": 1.035341576853343,
+          "priority_incremental_speedup": 1.0590542887314625
+        },
+        "cora": {
+          "coordination_bandwidth_gain": 2.706476,
+          "coordination_speedup": 2.706476,
+          "priority_incremental_bandwidth_gain": 1.06654,
+          "priority_incremental_row_hit_ratio": 1.0427408063721118,
+          "priority_incremental_speedup": 1.06654
+        },
+        "pubmed": {
+          "coordination_bandwidth_gain": 3.4562845063583065,
+          "coordination_speedup": 3.456284506358306,
+          "priority_incremental_bandwidth_gain": 1.0601846791560527,
+          "priority_incremental_row_hit_ratio": 1.035050312460529,
+          "priority_incremental_speedup": 1.0601846791560527
+        }
+      },
+      "profile_sha256": "fd5db4337c28651896f132aa960716ff5b1efdc4d9cfa500ad8fff22df9ebbe0"
+    },
+    "dram_timing_fast": {
+      "acceptance_role": "diagnostic",
+      "aggregate": {
+        "coordination_bandwidth_gain": 2.6520763030893852,
+        "coordination_speedup": 2.652076303089385,
+        "priority_incremental_bandwidth_gain": 1.066599791136693,
+        "priority_incremental_row_hit_ratio": 1.0390517396342709,
+        "priority_incremental_speedup": 1.066599791136693
+      },
+      "changes": {
+        "memory.hbm_activate_to_activate_cycles": 44,
+        "memory.hbm_activate_to_precharge_cycles": 30,
+        "memory.hbm_activate_to_read_cycles": 14,
+        "memory.hbm_activate_to_write_cycles": 12,
+        "memory.hbm_precharge_to_activate_cycles": 14,
+        "memory.hbm_read_row_conflict_cycles": 38,
+        "memory.hbm_read_row_hit_cycles": 10,
+        "memory.hbm_read_row_miss_cycles": 24,
+        "memory.hbm_read_to_precharge_cycles": 8,
+        "memory.hbm_read_to_read_cycles": 2,
+        "memory.hbm_read_to_write_cycles": 14,
+        "memory.hbm_write_row_conflict_cycles": 28,
+        "memory.hbm_write_row_hit_cycles": 2,
+        "memory.hbm_write_row_miss_cycles": 14,
+        "memory.hbm_write_to_precharge_cycles": 20,
+        "memory.hbm_write_to_read_cycles": 12,
+        "memory.hbm_write_to_write_cycles": 2
+      },
+      "per_dataset": {
+        "citeseer": {
+          "coordination_bandwidth_gain": 2.979573046670019,
+          "coordination_speedup": 2.9795730466700188,
+          "priority_incremental_bandwidth_gain": 1.0613973192449604,
+          "priority_incremental_row_hit_ratio": 1.0371774099224615,
+          "priority_incremental_speedup": 1.0613973192449604
+        },
+        "cora": {
+          "coordination_bandwidth_gain": 2.1989063540588467,
+          "coordination_speedup": 2.1989063540588467,
+          "priority_incremental_bandwidth_gain": 1.0670550192972743,
+          "priority_incremental_row_hit_ratio": 1.043481222057083,
+          "priority_incremental_speedup": 1.0670550192972743
+        },
+        "pubmed": {
+          "coordination_bandwidth_gain": 2.777749508539289,
+          "coordination_speedup": 2.777749508539289,
+          "priority_incremental_bandwidth_gain": 1.0713470348678442,
+          "priority_incremental_row_hit_ratio": 1.0364965869232678,
+          "priority_incremental_speedup": 1.0713470348678442
+        }
+      },
+      "profile_sha256": "39cc9d998c74223f073d8a36717b8f872b4dc10e4eda9812a7e4a8753ccb2c30"
+    },
+    "dram_timing_slow": {
+      "acceptance_role": "diagnostic",
+      "aggregate": {
+        "coordination_bandwidth_gain": 2.7561828529902055,
+        "coordination_speedup": 2.7561828529902055,
+        "priority_incremental_bandwidth_gain": 1.051119938747979,
+        "priority_incremental_row_hit_ratio": 1.0369043805101796,
+        "priority_incremental_speedup": 1.051119938747979
+      },
+      "changes": {
+        "memory.hbm_activate_to_activate_cycles": 60,
+        "memory.hbm_activate_to_precharge_cycles": 42,
+        "memory.hbm_activate_to_read_cycles": 18,
+        "memory.hbm_activate_to_write_cycles": 16,
+        "memory.hbm_precharge_to_activate_cycles": 18,
+        "memory.hbm_read_row_conflict_cycles": 54,
+        "memory.hbm_read_row_hit_cycles": 18,
+        "memory.hbm_read_row_miss_cycles": 36,
+        "memory.hbm_read_to_precharge_cycles": 14,
+        "memory.hbm_read_to_read_cycles": 6,
+        "memory.hbm_read_to_write_cycles": 22,
+        "memory.hbm_write_row_conflict_cycles": 40,
+        "memory.hbm_write_row_hit_cycles": 6,
+        "memory.hbm_write_row_miss_cycles": 22,
+        "memory.hbm_write_to_precharge_cycles": 30,
+        "memory.hbm_write_to_read_cycles": 20,
+        "memory.hbm_write_to_write_cycles": 6
+      },
+      "per_dataset": {
+        "citeseer": {
+          "coordination_bandwidth_gain": 3.0083230011791,
+          "coordination_speedup": 3.0083230011791,
+          "priority_incremental_bandwidth_gain": 1.0486231494684557,
+          "priority_incremental_row_hit_ratio": 1.0301082148968812,
+          "priority_incremental_speedup": 1.0486231494684557
+        },
+        "cora": {
+          "coordination_bandwidth_gain": 2.421053418452016,
+          "coordination_speedup": 2.4210534184520163,
+          "priority_incremental_bandwidth_gain": 1.0567255221492966,
+          "priority_incremental_row_hit_ratio": 1.0476859904411742,
+          "priority_incremental_speedup": 1.0567255221492966
+        },
+        "pubmed": {
+          "coordination_bandwidth_gain": 2.8391721393395013,
+          "coordination_speedup": 2.839172139339501,
+          "priority_incremental_bandwidth_gain": 1.048011144626185,
+          "priority_incremental_row_hit_ratio": 1.0329189361924833,
+          "priority_incremental_speedup": 1.048011144626185
+        }
+      },
+      "profile_sha256": "e001afb3cb74438a9836e77afdc2dff47c20009211700801e7a94c4d1d0ca21e"
+    },
+    "legacy_12_28_timing": {
+      "acceptance_role": "diagnostic",
+      "aggregate": {
+        "coordination_bandwidth_gain": 2.9480057057399276,
+        "coordination_speedup": 2.9480057057399276,
+        "priority_incremental_bandwidth_gain": 1.0572139467898112,
+        "priority_incremental_row_hit_ratio": 1.0377426895467734,
+        "priority_incremental_speedup": 1.0572139467898112
+      },
+      "changes": {
+        "memory.hbm_activate_to_read_cycles": 16,
+        "memory.hbm_read_row_conflict_cycles": 42,
+        "memory.hbm_read_row_hit_cycles": 12,
+        "memory.hbm_read_row_miss_cycles": 28
+      },
+      "per_dataset": {
+        "citeseer": {
+          "coordination_bandwidth_gain": 3.3113544142976403,
+          "coordination_speedup": 3.3113544142976403,
+          "priority_incremental_bandwidth_gain": 1.0589024025588327,
+          "priority_incremental_row_hit_ratio": 1.0353028481516564,
+          "priority_incremental_speedup": 1.0589024025588327
+        },
+        "cora": {
+          "coordination_bandwidth_gain": 2.4601622891821893,
+          "coordination_speedup": 2.460162289182189,
+          "priority_incremental_bandwidth_gain": 1.0669332788899966,
+          "priority_incremental_row_hit_ratio": 1.0421482108317215,
+          "priority_incremental_speedup": 1.0669332788899963
+        },
+        "pubmed": {
+          "coordination_bandwidth_gain": 3.0725004137399545,
+          "coordination_speedup": 3.072500413739954,
+          "priority_incremental_bandwidth_gain": 1.045806158920604,
+          "priority_incremental_row_hit_ratio": 1.0357770096569419,
+          "priority_incremental_speedup": 1.045806158920604
+        }
+      },
+      "profile_sha256": "b23df89b493034e69442c35f07bce7b22b5637aca814f22e8d837ab30cade484"
+    },
+    "neighbor_delay_0": {
+      "acceptance_role": "diagnostic",
+      "aggregate": {
+        "coordination_bandwidth_gain": 3.26642438363395,
+        "coordination_speedup": 3.26642438363395,
+        "priority_incremental_bandwidth_gain": 1.0627591054934886,
+        "priority_incremental_row_hit_ratio": 1.0374804359659053,
+        "priority_incremental_speedup": 1.0627591054934886
+      },
+      "changes": {
+        "model.neighbor_index_ready_cycles": 0
+      },
+      "per_dataset": {
+        "citeseer": {
+          "coordination_bandwidth_gain": 3.637510717444286,
+          "coordination_speedup": 3.637510717444286,
+          "priority_incremental_bandwidth_gain": 1.058921301890996,
+          "priority_incremental_row_hit_ratio": 1.0350129634731293,
+          "priority_incremental_speedup": 1.058921301890996
+        },
+        "cora": {
+          "coordination_bandwidth_gain": 2.706486825947304,
+          "coordination_speedup": 2.706486825947304,
+          "priority_incremental_bandwidth_gain": 1.0665442661770648,
+          "priority_incremental_row_hit_ratio": 1.0419814342523541,
+          "priority_incremental_speedup": 1.0665442661770648
+        },
+        "pubmed": {
+          "coordination_bandwidth_gain": 3.455275607510262,
+          "coordination_speedup": 3.455275607510262,
+          "priority_incremental_bandwidth_gain": 1.062811748412405,
+          "priority_incremental_row_hit_ratio": 1.0354469101722321,
+          "priority_incremental_speedup": 1.0628117484124049
+        }
+      },
+      "profile_sha256": "594232972da8cef6d0de916673925f83511e0f3f2b2539ab978e86725d7cf401"
+    },
+    "neighbor_delay_4": {
+      "acceptance_role": "diagnostic",
+      "aggregate": {
+        "coordination_bandwidth_gain": 3.2627728459715093,
+        "coordination_speedup": 3.2627728459715097,
+        "priority_incremental_bandwidth_gain": 1.0616500772378827,
+        "priority_incremental_row_hit_ratio": 1.0375403417139772,
+        "priority_incremental_speedup": 1.0616500772378827
+      },
+      "changes": {
+        "model.neighbor_index_ready_cycles": 4
+      },
+      "per_dataset": {
+        "citeseer": {
+          "coordination_bandwidth_gain": 3.638124755229645,
+          "coordination_speedup": 3.6381247552296454,
+          "priority_incremental_bandwidth_gain": 1.0591000553687422,
+          "priority_incremental_row_hit_ratio": 1.035052870887927,
+          "priority_incremental_speedup": 1.0591000553687424
+        },
+        "cora": {
+          "coordination_bandwidth_gain": 2.706443522677728,
+          "coordination_speedup": 2.706443522677728,
+          "priority_incremental_bandwidth_gain": 1.0665752010975869,
+          "priority_incremental_row_hit_ratio": 1.0419874777899991,
+          "priority_incremental_speedup": 1.0665752010975869
+        },
+        "pubmed": {
+          "coordination_bandwidth_gain": 3.4437502600071555,
+          "coordination_speedup": 3.4437502600071555,
+          "priority_incremental_bandwidth_gain": 1.059274975247319,
+          "priority_incremental_row_hit_ratio": 1.035580676464006,
+          "priority_incremental_speedup": 1.0592749752473187
+        }
+      },
+      "profile_sha256": "77963398ad9784a45448fa81734efcf418c6913e300ca3ac5fd847d186ee477a"
+    },
+    "row_first_interleave_2": {
+      "acceptance_role": "diagnostic",
+      "aggregate": {
+        "coordination_bandwidth_gain": 6.712325624194904,
+        "coordination_speedup": 6.712325624194904,
+        "priority_incremental_bandwidth_gain": 1.0626185704822717,
+        "priority_incremental_row_hit_ratio": 1.0374327499381197,
+        "priority_incremental_speedup": 1.0626185704822717
+      },
+      "changes": {
+        "model.row_first_bank_interleave": 2
+      },
+      "per_dataset": {
+        "citeseer": {
+          "coordination_bandwidth_gain": 6.917961924156202,
+          "coordination_speedup": 6.917961924156203,
+          "priority_incremental_bandwidth_gain": 1.0590542887314622,
+          "priority_incremental_row_hit_ratio": 1.0348898083328397,
+          "priority_incremental_speedup": 1.0590542887314625
+        },
+        "cora": {
+          "coordination_bandwidth_gain": 5.769895999999999,
+          "coordination_speedup": 5.769896,
+          "priority_incremental_bandwidth_gain": 1.06654,
+          "priority_incremental_row_hit_ratio": 1.0419814342523541,
+          "priority_incremental_speedup": 1.06654
+        },
+        "pubmed": {
+          "coordination_bandwidth_gain": 7.449118948428508,
+          "coordination_speedup": 7.4491189484285085,
+          "priority_incremental_bandwidth_gain": 1.0622614227153526,
+          "priority_incremental_row_hit_ratio": 1.0354270072291656,
+          "priority_incremental_speedup": 1.0622614227153526
+        }
+      },
+      "profile_sha256": "97a1823eee1bf4febbcd38ff05cd68a151d10b481b6e9691c272b78144546afb"
+    },
+    "single_hbm_stack_128gbps": {
+      "acceptance_role": "diagnostic",
+      "aggregate": {
+        "coordination_bandwidth_gain": 3.195260191249872,
+        "coordination_speedup": 3.1952601912498717,
+        "priority_incremental_bandwidth_gain": 1.060552744821603,
+        "priority_incremental_row_hit_ratio": 1.0411294387172163,
+        "priority_incremental_speedup": 1.060552744821603
+      },
+      "changes": {
+        "memory.hbm_bandwidth_gbps": 128,
+        "memory.hbm_channels": 8
+      },
+      "per_dataset": {
+        "citeseer": {
+          "coordination_bandwidth_gain": 3.2750797488389893,
+          "coordination_speedup": 3.275079748838989,
+          "priority_incremental_bandwidth_gain": 1.037441775520498,
+          "priority_incremental_row_hit_ratio": 1.0341267861658,
+          "priority_incremental_speedup": 1.037441775520498
+        },
+        "cora": {
+          "coordination_bandwidth_gain": 3.057334431576538,
+          "coordination_speedup": 3.0573344315765376,
+          "priority_incremental_bandwidth_gain": 1.080664232594694,
+          "priority_incremental_row_hit_ratio": 1.0526219422879741,
+          "priority_incremental_speedup": 1.080664232594694
+        },
+        "pubmed": {
+          "coordination_bandwidth_gain": 3.2533663933340877,
+          "coordination_speedup": 3.253366393334088,
+          "priority_incremental_bandwidth_gain": 1.0635522263496169,
+          "priority_incremental_row_hit_ratio": 1.0366395876978756,
+          "priority_incremental_speedup": 1.063552226349617
+        }
+      },
+      "profile_sha256": "72409d35f654e4a288dab058b591769c32987bc98c8faf5a9f614a9c8e495a38"
+    },
+    "write_timing_slow": {
+      "acceptance_role": "diagnostic",
+      "aggregate": {
+        "coordination_bandwidth_gain": 3.2583419257981805,
+        "coordination_speedup": 3.2583419257981805,
+        "priority_incremental_bandwidth_gain": 1.0618441223618948,
+        "priority_incremental_row_hit_ratio": 1.0374157210756538,
+        "priority_incremental_speedup": 1.0618441223618948
+      },
+      "changes": {
+        "memory.hbm_activate_to_write_cycles": 16,
+        "memory.hbm_write_row_conflict_cycles": 36,
+        "memory.hbm_write_row_hit_cycles": 6,
+        "memory.hbm_write_row_miss_cycles": 22,
+        "memory.hbm_write_to_precharge_cycles": 30,
+        "memory.hbm_write_to_write_cycles": 6
+      },
+      "per_dataset": {
+        "citeseer": {
+          "coordination_bandwidth_gain": 3.637490009072842,
+          "coordination_speedup": 3.637490009072842,
+          "priority_incremental_bandwidth_gain": 1.059042329128143,
+          "priority_incremental_row_hit_ratio": 1.0340482563375,
+          "priority_incremental_speedup": 1.059042329128143
+        },
+        "cora": {
+          "coordination_bandwidth_gain": 2.701294196449931,
+          "coordination_speedup": 2.7012941964499304,
+          "priority_incremental_bandwidth_gain": 1.0663245777713986,
+          "priority_incremental_row_hit_ratio": 1.041313300078856,
+          "priority_incremental_speedup": 1.0663245777713986
+        },
+        "pubmed": {
+          "coordination_bandwidth_gain": 3.436241571871768,
+          "coordination_speedup": 3.4362415718717685,
+          "priority_incremental_bandwidth_gain": 1.0601654601861428,
+          "priority_incremental_row_hit_ratio": 1.036885606810606,
+          "priority_incremental_speedup": 1.0601654601861428
+        }
+      },
+      "profile_sha256": "bc81452efa5705bcb2045994517195d7cb43ca255f2c47bd0a8dea85ae5e3fb9"
+    }
+  },
+  "schema_version": 1,
+  "selection_policy": "The required baseline is derived from bundled DRAMSim3 read, write, and direction-switch timing. Alternative values are diagnostic sensitivity points and are not selected using paper targets.",
+  "workload_manifest": "configs/paper_workloads.json",
+  "workload_manifest_sha256": "25a1802c90b06e33e0bea028961dd1677ee350bd4a9105b60b598a9080a1fb43"
+}
