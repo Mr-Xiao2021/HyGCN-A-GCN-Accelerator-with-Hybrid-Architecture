@@ -1,0 +1,526 @@
+{
+  "base_ref": "738083279143c7b9fa80724e086e2faab30a2232",
+  "calibration_differences": [
+    {
+      "after": "1",
+      "before": "2",
+      "parameter": "model.row_first_bank_interleave"
+    }
+  ],
+  "calibration_keys": [
+    "model.aggregation_shard_capacity_bytes",
+    "model.batch_launch_interval_cycles",
+    "model.neighbor_index_ready_cycles",
+    "model.row_first_bank_interleave"
+  ],
+  "implementation_ref": "59b3d8c91118547e435a42cb070c3d996ad15791",
+  "no_target_parameter_retuning": false,
+  "no_target_parameter_retuning_derivation": "Computed from versioned paper target files and declared calibration keys. Descriptive/model-policy changes are listed in changed_paths but do not count as target retuning; this is not a claim about arbitrary source-code equivalence.",
+  "profile_differences": [
+    {
+      "after": "48",
+      "before": null,
+      "parameter": "memory.hbm_activate_to_activate_cycles"
+    },
+    {
+      "after": "34",
+      "before": null,
+      "parameter": "memory.hbm_activate_to_precharge_cycles"
+    },
+    {
+      "after": "14",
+      "before": null,
+      "parameter": "memory.hbm_activate_to_read_cycles"
+    },
+    {
+      "after": "14",
+      "before": null,
+      "parameter": "memory.hbm_activate_to_write_cycles"
+    },
+    {
+      "after": "16",
+      "before": "8",
+      "parameter": "memory.hbm_channels"
+    },
+    {
+      "after": "2",
+      "before": null,
+      "parameter": "memory.hbm_command_issue_interval_cycles"
+    },
+    {
+      "after": "8",
+      "before": null,
+      "parameter": "memory.hbm_command_queue_entries_per_bank"
+    },
+    {
+      "after": "14",
+      "before": null,
+      "parameter": "memory.hbm_precharge_to_activate_cycles"
+    },
+    {
+      "after": "32",
+      "before": null,
+      "parameter": "memory.hbm_read_queue_entries_per_channel"
+    },
+    {
+      "after": "42",
+      "before": null,
+      "parameter": "memory.hbm_read_row_conflict_cycles"
+    },
+    {
+      "after": "14",
+      "before": null,
+      "parameter": "memory.hbm_read_row_hit_cycles"
+    },
+    {
+      "after": "28",
+      "before": null,
+      "parameter": "memory.hbm_read_row_miss_cycles"
+    },
+    {
+      "after": "10",
+      "before": null,
+      "parameter": "memory.hbm_read_to_precharge_cycles"
+    },
+    {
+      "after": "4",
+      "before": null,
+      "parameter": "memory.hbm_read_to_read_cycles"
+    },
+    {
+      "after": "18",
+      "before": null,
+      "parameter": "memory.hbm_read_to_write_cycles"
+    },
+    {
+      "after": null,
+      "before": "12",
+      "parameter": "memory.hbm_row_hit_cycles"
+    },
+    {
+      "after": null,
+      "before": "28",
+      "parameter": "memory.hbm_row_miss_cycles"
+    },
+    {
+      "after": "32",
+      "before": null,
+      "parameter": "memory.hbm_write_buffer_entries_per_channel"
+    },
+    {
+      "after": "32",
+      "before": null,
+      "parameter": "memory.hbm_write_row_conflict_cycles"
+    },
+    {
+      "after": "4",
+      "before": null,
+      "parameter": "memory.hbm_write_row_hit_cycles"
+    },
+    {
+      "after": "18",
+      "before": null,
+      "parameter": "memory.hbm_write_row_miss_cycles"
+    },
+    {
+      "after": "24",
+      "before": null,
+      "parameter": "memory.hbm_write_to_precharge_cycles"
+    },
+    {
+      "after": "16",
+      "before": null,
+      "parameter": "memory.hbm_write_to_read_cycles"
+    },
+    {
+      "after": "4",
+      "before": null,
+      "parameter": "memory.hbm_write_to_write_cycles"
+    },
+    {
+      "after": "1",
+      "before": "2",
+      "parameter": "model.row_first_bank_interleave"
+    }
+  ],
+  "profile_path": "configs/HYGCN_PAPER.ini",
+  "schema_version": 1,
+  "target_files": [
+    {
+      "after_sha256": "30ba145017b0c9f028c6a11b2bc747e402d0d83bdbc7aab3724c9117e3e8291a",
+      "before_sha256": "499935d0145dd76f8eb5ef8af4e8d995e255a1c76385c919198cc2fea7cf2bde",
+      "changed": true,
+      "changed_paths": [
+        {
+          "after": {
+            "aggregation": "arithmetic_mean_over_datasets",
+            "evidence_class": "internal_diagnostic",
+            "experiment_scope": "effective HBM bandwidth over the union of in-flight request intervals, excluding producer-idle gaps",
+            "required": false,
+            "source": "Diagnostic only because excluding producer-idle gaps can invert the end-to-end throughput conclusion",
+            "unit": "x",
+            "validation": "diagnostic_only"
+          },
+          "before": null,
+          "path": "metrics.coordination_active_bandwidth_gain"
+        },
+        {
+          "after": "paper_metric",
+          "before": null,
+          "path": "metrics.coordination_bandwidth_gain.evidence_class"
+        },
+        {
+          "after": "effective HBM bandwidth over the common memory-service interval from cycle zero through the final request completion, including producer-idle gaps",
+          "before": "effective HBM bandwidth over the union of in-flight request intervals, excluding producer-idle gaps",
+          "path": "metrics.coordination_bandwidth_gain.experiment_scope"
+        },
+        {
+          "after": "paper_metric",
+          "before": null,
+          "path": "metrics.coordination_speedup.evidence_class"
+        },
+        {
+          "after": "internal_diagnostic",
+          "before": null,
+          "path": "metrics.mapping_bandwidth_gain.evidence_class"
+        },
+        {
+          "after": "internal_diagnostic",
+          "before": null,
+          "path": "metrics.mapping_speedup.evidence_class"
+        },
+        {
+          "after": "paper_metric",
+          "before": null,
+          "path": "metrics.pipeline_dram_ratio.evidence_class"
+        },
+        {
+          "after": "paper_metric",
+          "before": null,
+          "path": "metrics.pipeline_speedup.evidence_class"
+        },
+        {
+          "after": "internal_diagnostic",
+          "before": null,
+          "path": "metrics.priority_bandwidth_gain.evidence_class"
+        },
+        {
+          "after": {
+            "aggregation": "per_dataset",
+            "evidence_class": "internal_check",
+            "experiment_scope": "optimized divided by mapping-only effective HBM bandwidth over the complete memory-service interval",
+            "reference_min": 1.005,
+            "required": true,
+            "source": "Required positive-effect gate for the isolated batch/class request assembly mechanism",
+            "unit": "x",
+            "validation": "per_dataset_minimum"
+          },
+          "before": null,
+          "path": "metrics.priority_incremental_bandwidth_gain"
+        },
+        {
+          "after": {
+            "aggregation": "arithmetic_mean_over_datasets",
+            "evidence_class": "internal_check",
+            "experiment_scope": "three-dataset arithmetic mean of optimized versus mapping-only complete-interval bandwidth gain",
+            "reference_min": 1.005,
+            "required": true,
+            "source": "Required aggregate causal gate for the isolated batch/class request assembly mechanism",
+            "unit": "x",
+            "validation": "aggregate_minimum"
+          },
+          "before": null,
+          "path": "metrics.priority_incremental_bandwidth_gain_aggregate"
+        },
+        {
+          "after": {
+            "aggregation": "per_dataset",
+            "evidence_class": "internal_check",
+            "experiment_scope": "optimized row-hit rate divided by mapping-only row-hit rate on the same low-bits layout",
+            "reference_min": 1.03,
+            "required": true,
+            "source": "Required positive row-locality gate on the same low-bits address layout",
+            "unit": "ratio",
+            "validation": "per_dataset_minimum"
+          },
+          "before": null,
+          "path": "metrics.priority_incremental_row_hit_ratio"
+        },
+        {
+          "after": {
+            "aggregation": "arithmetic_mean_over_datasets",
+            "evidence_class": "internal_check",
+            "experiment_scope": "three-dataset arithmetic mean of optimized versus mapping-only row-hit ratio on the same low-bits layout",
+            "reference_min": 1.03,
+            "required": true,
+            "source": "Versioned internal consistency gate: the paper gives no isolated row-hit magnitude, so the aggregate minimum matches the already-required 1.03 per-dataset floor instead of imposing an unsupported stricter 1.05 target",
+            "unit": "ratio",
+            "validation": "aggregate_minimum"
+          },
+          "before": null,
+          "path": "metrics.priority_incremental_row_hit_ratio_aggregate"
+        },
+        {
+          "after": {
+            "aggregation": "per_dataset",
+            "evidence_class": "internal_check",
+            "experiment_scope": "optimized divided by mapping-only on the same low-bits layout, expressed as mapping-only cycles / optimized cycles",
+            "reference_min": 1.005,
+            "required": true,
+            "source": "Required positive-effect gate for the isolated batch/class request assembly mechanism",
+            "unit": "x",
+            "validation": "per_dataset_minimum"
+          },
+          "before": null,
+          "path": "metrics.priority_incremental_speedup"
+        },
+        {
+          "after": {
+            "aggregation": "arithmetic_mean_over_datasets",
+            "evidence_class": "internal_check",
+            "experiment_scope": "three-dataset arithmetic mean of optimized versus mapping-only speedup on low-bits layout",
+            "reference_min": 1.005,
+            "required": true,
+            "source": "Required aggregate causal gate for the isolated batch/class request assembly mechanism",
+            "unit": "x",
+            "validation": "aggregate_minimum"
+          },
+          "before": null,
+          "path": "metrics.priority_incremental_speedup_aggregate"
+        },
+        {
+          "after": "internal_diagnostic",
+          "before": null,
+          "path": "metrics.priority_speedup.evidence_class"
+        },
+        {
+          "after": "paper_metric",
+          "before": null,
+          "path": "metrics.sparsity_ae_dram_ratio.evidence_class"
+        },
+        {
+          "after": "internal_diagnostic",
+          "before": null,
+          "path": "metrics.sparsity_input_dram_ratio.evidence_class"
+        },
+        {
+          "after": "paper_metric",
+          "before": null,
+          "path": "metrics.sparsity_speedup.evidence_class"
+        },
+        {
+          "after": "hygcn-hpca2020-fig15-17-svg-digitized-v4-command-model",
+          "before": "hygcn-hpca2020-fig15-17-svg-digitized-v1",
+          "path": "reference_version"
+        },
+        {
+          "after": 6,
+          "before": 3,
+          "path": "schema_version"
+        }
+      ],
+      "path": "configs/paper_metrics.json",
+      "target_parameters_after_sha256": "3431fb583c6814d533e649a8418e9ba9f002249db6b17e4a45b36c6e0ac857eb",
+      "target_parameters_before_sha256": "056b2c2c89430b020e69b093a4386807c83f0e79610d24c9ae8eb587d6dc708b",
+      "target_parameters_changed": true
+    },
+    {
+      "after_sha256": "6f9dd8c460d1e90f7076ef9f18b5139ecb00a4269d590e2a39e395de754b5348",
+      "before_sha256": "a3b1f00078ccd97f866196c85eade35c9dfed2a2a7e52685abe2522486102c7b",
+      "changed": true,
+      "changed_paths": [
+        {
+          "after": [
+            "cora",
+            "citeseer",
+            "pubmed"
+          ],
+          "before": null,
+          "path": "graph_partition.calibrated_fit_datasets"
+        },
+        {
+          "after": null,
+          "before": "changed from the review-v3 implicit 4 MiB value and covered by 4/5/6 MiB sensitivity evidence",
+          "path": "graph_partition.calibration_disclosure"
+        },
+        {
+          "after": [
+            4,
+            5,
+            6
+          ],
+          "before": null,
+          "path": "graph_partition.candidate_capacities_mib"
+        },
+        {
+          "after": "Cora, Citeseer, and PubMed were all exposed before this version; the 5 MiB scheduler cap and the 14 paper rows are reported as a calibrated fit, not independent hold-out validation",
+          "before": null,
+          "path": "graph_partition.fit_disclosure"
+        },
+        {
+          "after": "Review v4 evaluated all three datasets at 4, 5, and 6 MiB before Review v5; no dataset in this repository remains unexposed for scheduler-cap selection",
+          "before": null,
+          "path": "graph_partition.historical_exposure"
+        },
+        {
+          "after": [],
+          "before": null,
+          "path": "graph_partition.independent_holdout_datasets"
+        },
+        {
+          "after": "FIFO and batch-class share one global admission clock; at most four 64-byte blocks enter all channel controllers per paper cycle, while each channel independently enforces the 32-entry read queue and 32-entry write buffer",
+          "before": null,
+          "path": "memory_ablation.admission_policy"
+        },
+        {
+          "after": 8,
+          "before": null,
+          "path": "memory_ablation.channels_per_stack"
+        },
+        {
+          "after": 8,
+          "before": null,
+          "path": "memory_ablation.command_queue_entries_per_bank"
+        },
+        {
+          "after": "configs/HBM1_4Gb_x128.ini cmd_queue_size=8; the request-level controller bounds each bank command queue to the same depth",
+          "before": null,
+          "path": "memory_ablation.command_queue_source"
+        },
+        {
+          "after": "FIFO selects one Edge/Input/Weight/Output port per admission cycle, admits up to four consecutive blocks, and bounds the uncoordinated in-flight row windows to the four Figure 9 request sources; batch-class assembles batch-local Edge > Input > Weight > Output streams with same batch/class open-row continuation",
+          "before": null,
+          "path": "memory_ablation.coordinator_input_policy"
+        },
+        {
+          "after": "HyGCN HPCA 2020 Figure 9 shows four concurrent Edge, Input, Weight, and Output request sources; Section 4.5.2 says the uncoordinated requests are handled sequentially and the coordinator assembles them into continuous batch-local streams before low-bit remapping",
+          "before": null,
+          "path": "memory_ablation.coordinator_input_source"
+        },
+        {
+          "after": 4,
+          "before": null,
+          "path": "memory_ablation.coordinator_issue_blocks_per_cycle"
+        },
+        {
+          "after": "derived from the paper profile peak interface width: floor(256 bytes/cycle divided by 64 bytes/block)",
+          "before": null,
+          "path": "memory_ablation.coordinator_issue_width_source"
+        },
+        {
+          "after": {
+            "activate_to_activate_formula": "ceil((tRAS + tRP) * tCK / model_cycle_ns)",
+            "activate_to_precharge_formula": "ceil(tRAS * tCK / model_cycle_ns)",
+            "command_issue_interval_formula": "ceil(tCK / model_cycle_ns); each physical channel issues row commands on its own replicated DRAMSim3 command lane",
+            "command_model": "request completion is measured from actual READ/WRITE issue; row conflicts explicitly schedule PRE then ACT before the data command, while tWR/tRTP/tRAS and PRE-to-ACT constrain recovery",
+            "config": "configs/HBM1_4Gb_x128.ini",
+            "model_cycle_ns": "1 / architecture.frequency_ghz",
+            "precharge_to_activate_formula": "ceil(tRP * tCK / model_cycle_ns)",
+            "read_row_conflict_formula": "ceil((tRP + tRCDRD + CL) * tCK / model_cycle_ns)",
+            "read_row_hit_formula": "ceil(CL * tCK / model_cycle_ns)",
+            "read_row_miss_formula": "ceil((tRCDRD + CL) * tCK / model_cycle_ns)",
+            "read_to_precharge_formula": "ceil((AL + tRTP) * tCK / model_cycle_ns); bundled HBM config omits tRTP, so DRAMSim3 default tRTP=5 applies",
+            "read_to_write_formula": "ceil((RL + burst_cycle - WL + tRTRS) * tCK / model_cycle_ns)",
+            "same_direction_formula": "ceil(max(burst_cycle, tCCD_L) * tCK / model_cycle_ns)",
+            "source": "bundled DRAMSim3 HBM timing configuration",
+            "transfer_note": "burst/block transfer is modeled separately by transfer_cycles, so BL is not duplicated in CL/CWL completion latency",
+            "write_row_conflict_formula": "ceil((tRP + tRCDWR + CWL) * tCK / model_cycle_ns)",
+            "write_row_hit_formula": "ceil(CWL * tCK / model_cycle_ns)",
+            "write_row_miss_formula": "ceil((tRCDWR + CWL) * tCK / model_cycle_ns)",
+            "write_to_precharge_formula": "ceil((WL + burst_cycle + tWR) * tCK / model_cycle_ns)",
+            "write_to_read_formula": "ceil((write_delay + tWTR_L) * tCK / model_cycle_ns)"
+          },
+          "before": null,
+          "path": "memory_ablation.dram_timing"
+        },
+        {
+          "after": 4,
+          "before": null,
+          "path": "memory_ablation.fifo_active_windows"
+        },
+        {
+          "after": "hbm_row_bytes / block_size",
+          "before": null,
+          "path": "memory_ablation.fifo_window_blocks"
+        },
+        {
+          "after": "last admitted block data-command issue",
+          "before": null,
+          "path": "memory_ablation.fifo_window_release"
+        },
+        {
+          "after": 2,
+          "before": null,
+          "path": "memory_ablation.hbm_stacks"
+        },
+        {
+          "after": {
+            "policy": "every admission records per-channel read/write occupancy before and after mutation; a terminal zero snapshot lets the validator infer all intervening dispatch counts from zero and independently recompute peaks, capacity violations, totals, histograms, edge samples, and checksum",
+            "representation": "directional_occupancy_delta_varint_base64_v2"
+          },
+          "before": null,
+          "path": "memory_ablation.occupancy_trace"
+        },
+        {
+          "after": 16,
+          "before": null,
+          "path": "memory_ablation.physical_channels"
+        },
+        {
+          "after": "HyGCN HPCA 2020 Section 4.5.2 executes requests batch-by-batch: all requests from the current batch, including its lower-priority classes, precede high-priority requests from the next batch",
+          "before": null,
+          "path": "memory_ablation.priority_order_source"
+        },
+        {
+          "after": 32,
+          "before": null,
+          "path": "memory_ablation.read_queue_entries_per_channel"
+        },
+        {
+          "after": 1,
+          "before": 2,
+          "path": "memory_ablation.row_first_bank_interleave"
+        },
+        {
+          "after": "one row-sized block span stays in one bank, then the collapsed mapping advances channel and bank fields in the order represented by rorabgbachco",
+          "before": "configs/HBM1_4Gb_x128.ini uses address_mapping=rorabgbachco; the request-level row-first baseline preserves full-row locality before distributing rows across channels and reports the collapsed mapping formula in source and tests",
+          "path": "memory_ablation.row_first_layout_basis"
+        },
+        {
+          "after": "configs/HBM1_4Gb_x128.ini selects address_mapping=rorabgbachco. The collapsed request-level baseline therefore keeps every contiguous row span in one bank; it does not add an unsupported adjacent-bank striping factor.",
+          "before": "The review-v3 baseline used kUncoordinatedBankInterleave=2. This version preserves that baseline value for comparability but moves it into configuration and reports it explicitly. DRAMSim3 enables a second HBM command per cycle when read/write classes differ; the two-bank striping is only a request-level width approximation, not a claim that DRAMSim3 pairs adjacent banks.",
+          "path": "memory_ablation.row_first_source"
+        },
+        {
+          "after": "HyGCN reports 256 GB/s HBM1. The bundled DRAMSim3 HBM1_4Gb_x128 profile is one 8-channel 128 GB/s stack, so the paper profile replicates that timing and queue topology across two stacks rather than inventing a faster per-channel command rate.",
+          "before": null,
+          "path": "memory_ablation.topology_source"
+        },
+        {
+          "after": "configs/HBM1_4Gb_x128.ini sets unified_queue=False and trans_queue_size=32; DRAMSim3 therefore allocates an independent 32-entry read_queue and 32-entry write_buffer in every channel controller",
+          "before": null,
+          "path": "memory_ablation.transaction_queue_source"
+        },
+        {
+          "after": 32,
+          "before": null,
+          "path": "memory_ablation.write_buffer_entries_per_channel"
+        },
+        {
+          "after": 5,
+          "before": 1,
+          "path": "schema_version"
+        },
+        {
+          "after": "hygcn-hpca2020-table5-gcn-v5-command-lane-fifo-windows",
+          "before": "hygcn-hpca2020-table5-gcn-v1",
+          "path": "workload_version"
+        }
+      ],
+      "path": "configs/paper_workloads.json",
+      "target_parameters_after_sha256": "18bd6a840cc83e05b7dd72f37f7dc07a697c9dc9d3dfd3db74fc269ade3fc87b",
+      "target_parameters_before_sha256": "0b3311b04ff8d6fafc54b275769ef1067316ab0ba5a2d49cdc896e04141d7eb7",
+      "target_parameters_changed": true
+    }
+  ]
+}

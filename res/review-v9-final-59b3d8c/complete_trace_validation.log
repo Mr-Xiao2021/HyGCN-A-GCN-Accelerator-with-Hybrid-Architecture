@@ -1,0 +1,14 @@
+{
+  "admission_cycles": 16341862,
+  "admitted_blocks": 64675995,
+  "command_events": 71245737,
+  "command_lane_violations": 0,
+  "max_blocks_per_cycle": 4,
+  "occupancy_reconstruction": "per-channel before/after admission snapshots plus terminal zero",
+  "raw_files": 21,
+  "read_blocks": 61999387,
+  "status": "PASS",
+  "unique_admission_checksums": 21,
+  "unique_command_checksums": 21,
+  "write_blocks": 2676608
+}

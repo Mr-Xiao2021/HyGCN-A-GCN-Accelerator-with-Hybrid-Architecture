@@ -1,0 +1,86 @@
+{
+  "artifact_directory": "res/review-v9-final-59b3d8c",
+  "branch": "run/npu",
+  "complete_admission_trace": {
+    "admission_cycles": 16341862,
+    "admitted_blocks": 64675995,
+    "max_blocks_per_cycle": 4,
+    "occupancy_reconstruction": [
+      "per-channel before/after admission snapshots"
+    ],
+    "raw_files": 21,
+    "read_blocks": 61999387,
+    "status": "PASS",
+    "unique_checksums": 21,
+    "write_blocks": 2676608
+  },
+  "complete_command_trace": {
+    "command_events": 71245737,
+    "command_lane_violations": 0,
+    "raw_files": 21,
+    "status": "PASS",
+    "unique_checksums": 21
+  },
+  "date": "2026-10-01",
+  "fig17": {
+    "bandwidth_gain": 4.208020114189668,
+    "speedup": 4.208020114189669
+  },
+  "fixed_binary": "/tmp/hygcn-build-review-v9-59b3d8c/hygcntest",
+  "fixed_binary_sha256": "22f17e01e22e3fb134e92fc77a39c6d8b6f79554201b86c20fb7e4978c28188c",
+  "formal_output_directory": "/train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/res/review-v9-final-59b3d8c",
+  "implementation_commit": "59b3d8c91118547e435a42cb070c3d996ad15791",
+  "implementation_parent_remote": "e3a4f130c427829cdd1abbf6f63c9fcb1f8e785c",
+  "internal_checks_schema_v5": {
+    "aggregate_row_hit_floor": 1.05,
+    "passed": 12,
+    "total": 12
+  },
+  "internal_checks_schema_v6": {
+    "passed": 12,
+    "total": 12
+  },
+  "model_output_directory": "/tmp/hygcn-review-v9-model-59b3d8c",
+  "model_sensitivity": {
+    "required_baseline": "bundled two-stack HBM profile",
+    "scenario_count": 10
+  },
+  "no_target_parameter_retuning_in_revision": true,
+  "paper_metrics": {
+    "passed": 14,
+    "total": 14
+  },
+  "partition_output_directory": "/tmp/hygcn-review-v9-partition-59b3d8c",
+  "partition_sensitivity": {
+    "4_mib": "FAIL",
+    "5_mib": "PASS",
+    "6_mib": "FAIL",
+    "independent_holdout": false
+  },
+  "raw_storage": {
+    "csv": "plain text",
+    "json": "lossless .json.gz"
+  },
+  "revision_audits": {
+    "historical_7380832_to_implementation": {
+      "file": "revision_parameter_diff.json",
+      "hbm_channels": "8 -> 16",
+      "no_target_parameter_retuning": false,
+      "scope": "historical evolution; includes earlier row-first calibration change"
+    },
+    "review_v8_e3a4f13_to_implementation": {
+      "file": "v8_revision_no_retuning_audit.json",
+      "no_target_parameter_retuning": true,
+      "scope": "current review implementation revision"
+    }
+  },
+  "schema_version": 1,
+  "tests": {
+    "V7_02_reconstructable_directional_occupancy_trace": "PASS",
+    "V8_01_channel_command_lane_and_data_issue": "PASS",
+    "clean_release_build": "PASS",
+    "ctest": "9/9 PASS",
+    "legacy": "Cora/Citeseer PASS",
+    "strict_openspec": "PASS"
+  }
+}

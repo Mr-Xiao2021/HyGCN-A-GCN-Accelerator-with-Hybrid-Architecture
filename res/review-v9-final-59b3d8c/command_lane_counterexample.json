@@ -1,0 +1,20 @@
+{
+  "backpressure_event_count": 8,
+  "checksum_fnv1a64": "b0ca767fa2023898",
+  "cross_bank_pre_cycle": 36,
+  "cross_bank_read_cycle": 34,
+  "event_count": 11,
+  "invariants": [
+    "READ completion latency is decoupled from next data issue",
+    "PRE/ACT/READ/WRITE share one exclusive command lane per channel",
+    "admission, dispatch, and command events use one monotonic simulation clock"
+  ],
+  "required_tccd_cycles": 4,
+  "result": "PASS",
+  "same_row_read_issue_cycles": [
+    14,
+    18
+  ],
+  "shared_lane_same_cycle": false,
+  "test": "V8_01_channel_command_lane_and_data_issue"
+}

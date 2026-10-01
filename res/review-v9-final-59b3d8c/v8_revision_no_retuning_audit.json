@@ -1,0 +1,74 @@
+{
+  "base_ref": "e3a4f130c427829cdd1abbf6f63c9fcb1f8e785c",
+  "calibration_differences": [],
+  "calibration_keys": [
+    "model.aggregation_shard_capacity_bytes",
+    "model.batch_launch_interval_cycles",
+    "model.neighbor_index_ready_cycles",
+    "model.row_first_bank_interleave"
+  ],
+  "implementation_ref": "59b3d8c91118547e435a42cb070c3d996ad15791",
+  "no_target_parameter_retuning": true,
+  "no_target_parameter_retuning_derivation": "Computed from versioned paper target files and declared calibration keys. Descriptive/model-policy changes are listed in changed_paths but do not count as target retuning; this is not a claim about arbitrary source-code equivalence.",
+  "profile_differences": [],
+  "profile_path": "configs/HYGCN_PAPER.ini",
+  "schema_version": 1,
+  "target_files": [
+    {
+      "after_sha256": "30ba145017b0c9f028c6a11b2bc747e402d0d83bdbc7aab3724c9117e3e8291a",
+      "before_sha256": "30ba145017b0c9f028c6a11b2bc747e402d0d83bdbc7aab3724c9117e3e8291a",
+      "changed": false,
+      "changed_paths": [],
+      "path": "configs/paper_metrics.json",
+      "target_parameters_after_sha256": "3431fb583c6814d533e649a8418e9ba9f002249db6b17e4a45b36c6e0ac857eb",
+      "target_parameters_before_sha256": "3431fb583c6814d533e649a8418e9ba9f002249db6b17e4a45b36c6e0ac857eb",
+      "target_parameters_changed": false
+    },
+    {
+      "after_sha256": "6f9dd8c460d1e90f7076ef9f18b5139ecb00a4269d590e2a39e395de754b5348",
+      "before_sha256": "25a1802c90b06e33e0bea028961dd1677ee350bd4a9105b60b598a9080a1fb43",
+      "changed": true,
+      "changed_paths": [
+        {
+          "after": "FIFO selects one Edge/Input/Weight/Output port per admission cycle, admits up to four consecutive blocks, and bounds the uncoordinated in-flight row windows to the four Figure 9 request sources; batch-class assembles batch-local Edge > Input > Weight > Output streams with same batch/class open-row continuation",
+          "before": "four-buffer block-level round-robin FIFO for the paper's concurrent uncoordinated baseline; batch-by-batch Edge > Input > Weight > Output assembly with same batch/class open-row continuation when priority is enabled",
+          "path": "memory_ablation.coordinator_input_policy"
+        },
+        {
+          "after": "HyGCN HPCA 2020 Figure 9 shows four concurrent Edge, Input, Weight, and Output request sources; Section 4.5.2 says the uncoordinated requests are handled sequentially and the coordinator assembles them into continuous batch-local streams before low-bit remapping",
+          "before": "HyGCN HPCA 2020 Figure 9 and Section 4.5.2 show concurrent Edge, Input, Weight, and Output buffer requests interleaved before the coordinator and assembled into continuous batch-local streams after priority sorting",
+          "path": "memory_ablation.coordinator_input_source"
+        },
+        {
+          "after": 4,
+          "before": null,
+          "path": "memory_ablation.fifo_active_windows"
+        },
+        {
+          "after": "hbm_row_bytes / block_size",
+          "before": null,
+          "path": "memory_ablation.fifo_window_blocks"
+        },
+        {
+          "after": "last admitted block data-command issue",
+          "before": null,
+          "path": "memory_ablation.fifo_window_release"
+        },
+        {
+          "after": 5,
+          "before": 4,
+          "path": "schema_version"
+        },
+        {
+          "after": "hygcn-hpca2020-table5-gcn-v5-command-lane-fifo-windows",
+          "before": "hygcn-hpca2020-table5-gcn-v4-two-stack-hbm",
+          "path": "workload_version"
+        }
+      ],
+      "path": "configs/paper_workloads.json",
+      "target_parameters_after_sha256": "18bd6a840cc83e05b7dd72f37f7dc07a697c9dc9d3dfd3db74fc269ade3fc87b",
+      "target_parameters_before_sha256": "18bd6a840cc83e05b7dd72f37f7dc07a697c9dc9d3dfd3db74fc269ade3fc87b",
+      "target_parameters_changed": false
+    }
+  ]
+}

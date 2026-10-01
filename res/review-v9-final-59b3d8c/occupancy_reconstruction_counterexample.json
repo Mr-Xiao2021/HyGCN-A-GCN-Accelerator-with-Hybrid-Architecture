@@ -1,0 +1,10 @@
+{
+  "admitted_read": 4,
+  "admitted_write": 4,
+  "dispatched_read": 4,
+  "dispatched_write": 4,
+  "reconstruction": "per-channel read/write before/after snapshots plus terminal zero",
+  "representation": "directional_occupancy_delta_varint_base64_v2",
+  "result": "PASS",
+  "test": "V7_02_reconstructable_directional_occupancy_trace"
+}

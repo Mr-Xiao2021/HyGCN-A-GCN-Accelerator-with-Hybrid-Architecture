@@ -1,0 +1,1439 @@
+diff --git a/configs/paper_workloads.json b/configs/paper_workloads.json
+index 6f5c0d8..a1a1737 100644
+--- a/configs/paper_workloads.json
++++ b/configs/paper_workloads.json
+@@ -1,6 +1,6 @@
+ {
+-  "schema_version": 4,
+-  "workload_version": "hygcn-hpca2020-table5-gcn-v4-two-stack-hbm",
++  "schema_version": 5,
++  "workload_version": "hygcn-hpca2020-table5-gcn-v5-command-lane-fifo-windows",
+   "paper_source": "HyGCN HPCA 2020 Table 5 and Section 5.3",
+   "figures": {
+     "figure_15": {
+@@ -51,8 +51,11 @@
+     "command_queue_source": "configs/HBM1_4Gb_x128.ini cmd_queue_size=8; the request-level controller bounds each bank command queue to the same depth",
+     "coordinator_issue_blocks_per_cycle": 4,
+     "coordinator_issue_width_source": "derived from the paper profile peak interface width: floor(256 bytes/cycle divided by 64 bytes/block)",
+-    "coordinator_input_policy": "four-buffer block-level round-robin FIFO for the paper's concurrent uncoordinated baseline; batch-by-batch Edge > Input > Weight > Output assembly with same batch/class open-row continuation when priority is enabled",
+-    "coordinator_input_source": "HyGCN HPCA 2020 Figure 9 and Section 4.5.2 show concurrent Edge, Input, Weight, and Output buffer requests interleaved before the coordinator and assembled into continuous batch-local streams after priority sorting",
++    "fifo_active_windows": 4,
++    "fifo_window_blocks": "hbm_row_bytes / block_size",
++    "fifo_window_release": "last admitted block data-command issue",
++    "coordinator_input_policy": "FIFO selects one Edge/Input/Weight/Output port per admission cycle, admits up to four consecutive blocks, and bounds the uncoordinated in-flight row windows to the four Figure 9 request sources; batch-class assembles batch-local Edge > Input > Weight > Output streams with same batch/class open-row continuation",
++    "coordinator_input_source": "HyGCN HPCA 2020 Figure 9 shows four concurrent Edge, Input, Weight, and Output request sources; Section 4.5.2 says the uncoordinated requests are handled sequentially and the coordinator assembles them into continuous batch-local streams before low-bit remapping",
+     "admission_policy": "FIFO and batch-class share one global admission clock; at most four 64-byte blocks enter all channel controllers per paper cycle, while each channel independently enforces the 32-entry read queue and 32-entry write buffer",
+     "priority_order_source": "HyGCN HPCA 2020 Section 4.5.2 executes requests batch-by-batch: all requests from the current batch, including its lower-priority classes, precede high-priority requests from the next batch",
+     "priority_baseline": "fifo",
+diff --git a/hygcn/paper_sim.cpp b/hygcn/paper_sim.cpp
+index e802a8b..7e987fa 100644
+--- a/hygcn/paper_sim.cpp
++++ b/hygcn/paper_sim.cpp
+@@ -126,6 +126,20 @@ std::string RequestClassName(RequestClass request_class) {
+     throw std::runtime_error("unknown request class");
+ }
+
++std::string MemoryCommandName(MemoryCommandType command) {
++    switch (command) {
++        case MemoryCommandType::PRECHARGE:
++            return "PRE";
++        case MemoryCommandType::ACTIVATE:
++            return "ACT";
++        case MemoryCommandType::READ:
++            return "READ";
++        case MemoryCommandType::WRITE:
++            return "WRITE";
++    }
++    throw std::runtime_error("unknown memory command");
++}
++
+ constexpr std::size_t kCoordinatorPorts = 4;
+
+ std::size_t CoordinatorPort(RequestClass request_class) {
+@@ -189,6 +203,9 @@ json ArchitectureJson(const ArchitectureConfig& architecture) {
+          architecture.hbm_command_queue_entries_per_bank},
+         {"coordinator_issue_blocks_per_cycle",
+          CoordinatorIssueBlocksPerCycle(architecture)},
++        {"coordinator_fifo_active_windows", kCoordinatorPorts},
++        {"coordinator_fifo_window_blocks",
++         architecture.hbm_row_bytes / architecture.block_size},
+         {"hbm_read_row_hit_cycles", architecture.hbm_read_row_hit_cycles},
+         {"hbm_read_row_miss_cycles", architecture.hbm_read_row_miss_cycles},
+         {"hbm_read_row_conflict_cycles", architecture.hbm_read_row_conflict_cycles},
+@@ -284,6 +301,24 @@ json LayerJson(const LayerMetrics& layer) {
+                 ? json(*trace.producer_sequence) : json(nullptr)},
+         });
+     }
++    json command_samples = json::array();
++    for (const auto& trace : layer.command_trace_samples) {
++        command_samples.push_back({
++            {"cycle", trace.cycle},
++            {"sequence", trace.sequence},
++            {"block_offset", trace.block_offset},
++            {"channel", trace.channel},
++            {"bank", trace.bank},
++            {"command", MemoryCommandName(trace.command)},
++        });
++    }
++    json command_trace = {
++        {"representation", "full_for_small_runs_first_last_32_for_large_runs_v1"},
++        {"event_count", layer.command_trace_event_count},
++        {"checksum_fnv1a64", Hex64(layer.command_trace_checksum)},
++        {"command_lane_violations", layer.command_lane_violations},
++        {"samples", command_samples},
++    };
+     json admission_edge_samples = json::array();
+     json admission_histograms = {
+         {"admitted_blocks", json::object()},
+@@ -555,6 +590,7 @@ json LayerJson(const LayerMetrics& layer) {
+         {"activate_commands", layer.activate_commands},
+         {"read_commands", layer.read_commands},
+         {"write_commands", layer.write_commands},
++        {"command_trace", command_trace},
+         {"ae_finish_cycle", layer.ae_finish_cycle},
+         {"ce_start_cycle", layer.ce_start_cycle},
+         {"ce_finish_cycle", layer.ce_finish_cycle},
+@@ -988,7 +1024,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+     struct BankState {
+         uint64_t next_activate_cycle = 0;
+         uint64_t next_precharge_cycle = 0;
+-        uint64_t next_data_cycle = 0;
++        uint64_t next_read_cycle = 0;
++        uint64_t next_write_cycle = 0;
+         uint64_t open_row = 0;
+         bool row_open = false;
+     };
+@@ -996,7 +1033,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+     struct ChannelState {
+         uint64_t next_read_cycle = 0;
+         uint64_t next_write_cycle = 0;
+-        uint64_t next_row_command_cycle = 0;
++        uint64_t next_command_cycle = 0;
+         uint64_t last_issue_cycle = 0;
+         int last_direction = -1;
+     };
+@@ -1038,6 +1075,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         std::size_t bank = 0;
+         uint64_t row = 0;
+         bool is_write = false;
++        bool row_hit = false;
+     };
+
+     const uint64_t blocks_per_row = architecture.hbm_row_bytes / architecture.block_size;
+@@ -1178,6 +1216,12 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         return candidate;
+     };
+     struct BankQueue {
++        enum class ActiveStage {
++            NONE,
++            ACTIVATE,
++            DATA,
++        };
++
+         using Comparator = std::function<bool(const Candidate&, const Candidate&)>;
+         using Queue = std::priority_queue<Candidate, std::vector<Candidate>, Comparator>;
+         using Set = std::set<Candidate, Comparator>;
+@@ -1196,11 +1240,15 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         Set available;
+         std::map<uint64_t, Set> available_rows;
+         Comparator available_less;
++        std::optional<Candidate> active;
++        ActiveStage active_stage = ActiveStage::NONE;
+     };
+-    struct BankChoice {
++    struct CommandChoice {
+         Candidate candidate;
+         std::size_t flat_bank = 0;
+         int source = 0;
++        MemoryCommandType command = MemoryCommandType::READ;
++        uint64_t issue_cycle = 0;
+         bool valid = false;
+     };
+
+@@ -1287,45 +1335,61 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+     std::vector<std::size_t> command_queue_occupancy(total_banks, 0);
+     std::vector<std::pair<uint64_t, uint64_t>> block_active_intervals;
+     block_active_intervals.reserve(static_cast<std::size_t>(remaining_blocks));
+-    std::size_t fifo_next_port = 0;
+-    uint64_t next_admission_order = 0;
+-    auto plan_candidate = [&](Candidate candidate) {
+-        const std::size_t flat_bank =
+-            candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
+-        const auto& bank_state = banks[flat_bank];
+-        const auto& channel_state = channels[candidate.channel];
+-        const bool row_hit = bank_state.row_open && bank_state.open_row == candidate.row;
+-        const bool row_conflict = bank_state.row_open && !row_hit;
+-        const uint64_t dispatch_cycle = candidate.controller_dispatch_cycle;
+-        const uint64_t activate_to_data = candidate.is_write
+-            ? architecture.hbm_activate_to_write_cycles
+-            : architecture.hbm_activate_to_read_cycles;
+-        if (row_conflict) {
+-            candidate.precharge_cycle = std::max(
+-                {dispatch_cycle, bank_state.next_precharge_cycle,
+-                 channel_state.next_row_command_cycle});
+-            candidate.activate_cycle = std::max(
+-                candidate.precharge_cycle +
+-                    architecture.hbm_precharge_to_activate_cycles,
+-                bank_state.next_activate_cycle);
+-            candidate.command_ready_cycle =
+-                candidate.activate_cycle + activate_to_data;
+-        } else if (!row_hit) {
+-            candidate.activate_cycle = std::max(
+-                {dispatch_cycle, bank_state.next_activate_cycle,
+-                 channel_state.next_row_command_cycle});
+-            candidate.command_ready_cycle =
+-                candidate.activate_cycle + activate_to_data;
++    std::vector<bool> saw_channel_command(architecture.hbm_channels, false);
++    std::vector<uint64_t> last_channel_command_cycle(architecture.hbm_channels, 0);
++    bool saw_command = false;
++    uint64_t last_command_cycle = 0;
++    std::vector<MemoryCommandTrace> first_command_samples;
++    std::deque<MemoryCommandTrace> last_command_samples;
++    constexpr std::size_t kCommandEdgeSamples = 32;
++    result.command_trace_checksum = 1469598103934665603ULL;
++    auto record_command = [&](const Candidate& candidate,
++                              MemoryCommandType command,
++                              uint64_t cycle) {
++        if (saw_command && cycle < last_command_cycle) {
++            throw std::runtime_error("memory command trace is not time ordered");
++        }
++        saw_command = true;
++        last_command_cycle = cycle;
++        if (saw_channel_command[candidate.channel] &&
++            cycle < last_channel_command_cycle[candidate.channel] +
++                static_cast<uint64_t>(
++                    architecture.hbm_command_issue_interval_cycles)) {
++            ++result.command_lane_violations;
++            throw std::runtime_error("channel command lane overlap");
++        }
++        saw_channel_command[candidate.channel] = true;
++        last_channel_command_cycle[candidate.channel] = cycle;
++        const MemoryCommandTrace trace{
++            cycle,
++            states[candidate.request_index].request.sequence,
++            candidate.block_offset,
++            candidate.channel,
++            candidate.bank,
++            command,
++        };
++        for (const uint64_t value : {
++                 trace.cycle, trace.sequence, trace.block_offset,
++                 static_cast<uint64_t>(trace.channel),
++                 static_cast<uint64_t>(trace.bank),
++                 static_cast<uint64_t>(trace.command)}) {
++            result.command_trace_checksum ^= value;
++            result.command_trace_checksum *= 1099511628211ULL;
++        }
++        ++result.command_trace_event_count;
++        if (first_command_samples.size() < kCommandEdgeSamples) {
++            first_command_samples.push_back(trace);
+         } else {
+-            candidate.command_ready_cycle = dispatch_cycle;
++            if (last_command_samples.size() == kCommandEdgeSamples) {
++                last_command_samples.pop_front();
++            }
++            last_command_samples.push_back(trace);
+         }
+-        const uint64_t direction_ready = candidate.is_write
+-            ? channel_state.next_write_cycle : channel_state.next_read_cycle;
+-        candidate.start_cycle = std::max(
+-            {candidate.command_ready_cycle, direction_ready,
+-             bank_state.next_data_cycle});
+-        return candidate;
+     };
++    std::size_t fifo_next_port = 0;
++    std::map<std::pair<std::size_t, uint64_t>, std::size_t> fifo_active_windows;
++    uint64_t next_admission_order = 0;
++    uint64_t simulation_cycle = 0;
+     auto push_available = [&](BankQueue& queue, const Candidate& candidate) {
+         queue.available.insert(candidate);
+         auto row = queue.available_rows.find(candidate.row);
+@@ -1345,10 +1409,17 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+     };
+     auto peek_bank = [&](std::size_t flat_bank) {
+         auto& queue = bank_queues[flat_bank];
+-        BankChoice choice;
++        CommandChoice choice;
+         choice.flat_bank = flat_bank;
+-        if (!queue.available.empty()) {
+-            choice.candidate = plan_candidate(*queue.available.begin());
++        if (queue.active.has_value()) {
++            choice.candidate = *queue.active;
++            choice.command = queue.active_stage == BankQueue::ActiveStage::ACTIVATE
++                ? MemoryCommandType::ACTIVATE
++                : (choice.candidate.is_write
++                    ? MemoryCommandType::WRITE : MemoryCommandType::READ);
++            choice.valid = true;
++        } else if (!queue.available.empty()) {
++            choice.candidate = *queue.available.begin();
+             choice.source = 1;
+             choice.valid = true;
+             if (priority == MemoryPriorityMode::BATCH_CLASS &&
+@@ -1363,51 +1434,82 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+                             states[row_queue.begin()->request_index].request;
+                         if (primary_request.batch_id == row_request.batch_id &&
+                             primary_request.request_class == row_request.request_class) {
+-                            choice.candidate = plan_candidate(*row_queue.begin());
++                            choice.candidate = *row_queue.begin();
+                             choice.source = 2;
+                         }
+                     }
+                 }
+             }
++            const auto& bank_state = banks[flat_bank];
++            const bool row_hit = bank_state.row_open &&
++                bank_state.open_row == choice.candidate.row;
++            choice.candidate.row_hit = row_hit;
++            choice.command = row_hit
++                ? (choice.candidate.is_write
++                    ? MemoryCommandType::WRITE : MemoryCommandType::READ)
++                : (bank_state.row_open
++                    ? MemoryCommandType::PRECHARGE
++                    : MemoryCommandType::ACTIVATE);
++        }
++        if (!choice.valid) {
++            return choice;
+         }
+-        for (const bool is_write : {false, true}) {
+-            auto& future = queue.Future(is_write);
+-            if (future.empty()) {
+-                continue;
+-            }
+-            Candidate candidate = plan_candidate(future.top());
+-            if (!choice.valid || candidate.start_cycle < choice.candidate.start_cycle ||
+-                (candidate.start_cycle == choice.candidate.start_cycle &&
+-                 priority_less(candidate, choice.candidate))) {
+-                choice.candidate = candidate;
+-                choice.source = is_write ? 4 : 3;
+-                choice.valid = true;
+-            }
++        const auto& bank_state = banks[flat_bank];
++        const auto& channel_state = channels[choice.candidate.channel];
++        const uint64_t dispatch_cycle = choice.candidate.controller_dispatch_cycle;
++        switch (choice.command) {
++            case MemoryCommandType::PRECHARGE:
++                choice.issue_cycle = std::max(
++                    {dispatch_cycle, bank_state.next_precharge_cycle,
++                     channel_state.next_command_cycle});
++                break;
++            case MemoryCommandType::ACTIVATE:
++                choice.issue_cycle = std::max(
++                    {dispatch_cycle, bank_state.next_activate_cycle,
++                     channel_state.next_command_cycle});
++                break;
++            case MemoryCommandType::READ:
++                choice.candidate.command_ready_cycle = std::max(
++                    {dispatch_cycle, bank_state.next_read_cycle,
++                     channel_state.next_command_cycle});
++                choice.issue_cycle = std::max(
++                    choice.candidate.command_ready_cycle,
++                    channel_state.next_read_cycle);
++                break;
++            case MemoryCommandType::WRITE:
++                choice.candidate.command_ready_cycle = std::max(
++                    {dispatch_cycle, bank_state.next_write_cycle,
++                     channel_state.next_command_cycle});
++                choice.issue_cycle = std::max(
++                    choice.candidate.command_ready_cycle,
++                    channel_state.next_write_cycle);
++                break;
+         }
++        choice.candidate.start_cycle = choice.issue_cycle;
+         return choice;
+     };
+-    auto choice_less = [&](const BankChoice& lhs, const BankChoice& rhs) {
++    auto choice_less = [&](const CommandChoice& lhs, const CommandChoice& rhs) {
+         if (!lhs.valid) {
+             return false;
+         }
+         if (!rhs.valid) {
+             return true;
+         }
+-        if (lhs.candidate.start_cycle != rhs.candidate.start_cycle) {
+-            return lhs.candidate.start_cycle < rhs.candidate.start_cycle;
++        if (lhs.issue_cycle != rhs.issue_cycle) {
++            return lhs.issue_cycle < rhs.issue_cycle;
+         }
+         return priority_less(lhs.candidate, rhs.candidate);
+     };
+
+-    std::vector<BankChoice> channel_choices(architecture.hbm_channels);
++    std::vector<CommandChoice> channel_choices(architecture.hbm_channels);
+     auto recompute_channel = [&](std::size_t channel) {
+-        BankChoice best;
++        CommandChoice best;
+         const std::size_t first_bank =
+             channel * architecture.hbm_banks_per_channel;
+         for (std::size_t bank = 0;
+              bank < static_cast<std::size_t>(architecture.hbm_banks_per_channel);
+             ++bank) {
+-            const BankChoice candidate = peek_bank(first_bank + bank);
++            const CommandChoice candidate = peek_bank(first_bank + bank);
+             if (choice_less(candidate, best)) {
+                 best = candidate;
+             }
+@@ -1469,7 +1571,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+             ? outstanding_write_blocks[candidate.channel] < write_buffer_capacity
+             : outstanding_read_blocks[candidate.channel] < read_queue_capacity;
+     };
+-    auto select_pending = [&]() {
++    auto select_pending = [&](std::optional<std::size_t> fixed_fifo_port) {
+         PendingChoice choice;
+         if (priority == MemoryPriorityMode::BATCH_CLASS) {
+             if (pending_priority.empty()) {
+@@ -1494,12 +1596,21 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+             }
+             return choice;
+         }
+-        for (std::size_t distance = 0; distance < kCoordinatorPorts; ++distance) {
+-            const std::size_t port = (fifo_next_port + distance) % kCoordinatorPorts;
++        const std::size_t port_count = fixed_fifo_port.has_value()
++            ? 1 : kCoordinatorPorts;
++        for (std::size_t distance = 0; distance < port_count; ++distance) {
++            const std::size_t port = fixed_fifo_port.value_or(
++                (fifo_next_port + distance) % kCoordinatorPorts);
+             if (pending_fifo_ports[port].empty()) {
+                 continue;
+             }
+             const auto iterator = pending_fifo_ports[port].begin();
++            const uint64_t logical_window = iterator->block / blocks_per_row;
++            const auto window_key = std::make_pair(port, logical_window);
++            if (fifo_active_windows.count(window_key) == 0 &&
++                fifo_active_windows.size() >= kCoordinatorPorts) {
++                continue;
++            }
+             if (!transaction_queue_has_capacity(*iterator)) {
+                 continue;
+             }
+@@ -1514,11 +1625,12 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+     uint64_t next_admission_cycle = 0;
+     auto next_admission_event = [&]() -> std::optional<uint64_t> {
+         if (pending_available_count() != 0) {
+-            return next_admission_cycle;
++            return std::max(next_admission_cycle, simulation_cycle);
+         }
+         if (!pending_future.empty()) {
+-            return std::max(next_admission_cycle,
+-                            pending_future.top().enqueue_cycle);
++            return std::max({next_admission_cycle,
++                             pending_future.top().enqueue_cycle,
++                             simulation_cycle});
+         }
+         return std::nullopt;
+     };
+@@ -1537,8 +1649,15 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         std::size_t admitted = 0;
+         std::size_t admitted_reads = 0;
+         std::size_t admitted_writes = 0;
++        std::optional<std::size_t> fifo_admission_port;
++        if (priority == MemoryPriorityMode::FIFO) {
++            const PendingChoice first = select_pending(std::nullopt);
++            if (first.valid) {
++                fifo_admission_port = first.port;
++            }
++        }
+         while (admitted < coordinator_issue_blocks) {
+-            PendingChoice choice = select_pending();
++            PendingChoice choice = select_pending(fifo_admission_port);
+             if (!choice.valid) {
+                 break;
+             }
+@@ -1549,7 +1668,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+             }
+             Candidate candidate = choice.candidate;
+             if (priority == MemoryPriorityMode::FIFO) {
+-                fifo_next_port = (choice.port + 1) % kCoordinatorPorts;
++                const uint64_t logical_window = candidate.block / blocks_per_row;
++                ++fifo_active_windows[{choice.port, logical_window}];
+             }
+             candidate.admission_cycle = cycle;
+             candidate.admission_order = next_admission_order++;
+@@ -1573,6 +1693,9 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+                              cycle);
+             }
+         }
++        if (fifo_admission_port.has_value() && admitted != 0) {
++            fifo_next_port = (*fifo_admission_port + 1) % kCoordinatorPorts;
++        }
+         if (admitted != 0) {
+             trace.admitted_blocks = admitted;
+             trace.admitted_read_blocks = admitted_reads;
+@@ -1663,7 +1786,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+                 continue;
+             }
+             const uint64_t cycle = std::max(
+-                next_controller_dispatch_cycle[channel], candidate.admission_cycle);
++                {next_controller_dispatch_cycle[channel], candidate.admission_cycle,
++                 simulation_cycle});
+             if (!earliest.has_value() || cycle < *earliest) {
+                 earliest = cycle;
+             }
+@@ -1710,22 +1834,46 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         recompute_channel(channel);
+     }
+
++    auto erase_available_candidate = [&](BankQueue& queue,
++                                         const CommandChoice& choice,
++                                         const Candidate& candidate) {
++        if (choice.source != 1 && choice.source != 2) {
++            throw std::runtime_error("unknown bank choice source");
++        }
++        if (queue.available.erase(candidate) != 1) {
++            throw std::runtime_error("available command candidate is inconsistent");
++        }
++        auto row = queue.available_rows.find(candidate.row);
++        if (row == queue.available_rows.end() || row->second.erase(candidate) != 1) {
++            throw std::runtime_error("available row index is inconsistent");
++        }
++        if (row->second.empty()) {
++            queue.available_rows.erase(row);
++        }
++    };
++
+     while (remaining_blocks > 0) {
+-        BankChoice selected_choice;
++        CommandChoice selected_choice;
+         for (const auto& channel_choice : channel_choices) {
+             if (choice_less(channel_choice, selected_choice)) {
+                 selected_choice = channel_choice;
+             }
+         }
++        if (selected_choice.valid &&
++            selected_choice.issue_cycle < simulation_cycle) {
++            selected_choice.issue_cycle = simulation_cycle;
++            selected_choice.candidate.start_cycle = simulation_cycle;
++        }
+         const auto admission_event = next_admission_event();
+         const auto controller_event = next_controller_event();
+         const uint64_t bank_event = selected_choice.valid
+-            ? selected_choice.candidate.start_cycle
++            ? selected_choice.issue_cycle
+             : std::numeric_limits<uint64_t>::max();
+         const uint64_t controller_cycle = controller_event.value_or(
+             std::numeric_limits<uint64_t>::max());
+         if (admission_event.has_value() &&
+             *admission_event <= controller_cycle && *admission_event <= bank_event) {
++            simulation_cycle = *admission_event;
+             std::vector<bool> affected_channels(architecture.hbm_channels, false);
+             const std::size_t admitted = admit_transaction_blocks(
+                 *admission_event, affected_channels);
+@@ -1737,9 +1885,17 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+                 }
+                 continue;
+             }
+-            next_admission_cycle = std::max(next_admission_cycle, *admission_event + 1);
++            const uint64_t state_change_cycle = std::min(
++                controller_cycle, bank_event);
++            if (state_change_cycle == std::numeric_limits<uint64_t>::max()) {
++                throw std::runtime_error(
++                    "transaction admission is blocked without a future state change");
++            }
++            next_admission_cycle = std::max(
++                next_admission_cycle, state_change_cycle);
+         }
+         if (controller_event.has_value() && *controller_event <= bank_event) {
++            simulation_cycle = *controller_event;
+             std::vector<bool> affected_channels(architecture.hbm_channels, false);
+             const std::size_t dispatched = dispatch_controllers(
+                 *controller_event, affected_channels);
+@@ -1756,10 +1912,12 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         if (!selected_choice.valid) {
+             std::size_t bank_available = 0;
+             std::size_t bank_future = 0;
++            std::size_t bank_active = 0;
+             std::size_t valid_channels = 0;
+             for (const auto& queue : bank_queues) {
+                 bank_available += queue.available.size();
+                 bank_future += queue.future_reads.size() + queue.future_writes.size();
++                bank_active += queue.active.has_value() ? 1 : 0;
+             }
+             for (const auto& choice : channel_choices) {
+                 valid_channels += choice.valid ? 1 : 0;
+@@ -1788,35 +1946,103 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+                 std::to_string(pending_future.size()) + " controller_pending=" +
+                 std::to_string(controller_pending) + " command_pending=" +
+                 std::to_string(command_pending) + " bank_available=" +
+-                std::to_string(bank_available) + " bank_future=" +
++                std::to_string(bank_available) + " bank_active=" +
++                std::to_string(bank_active) + " bank_future=" +
+                 std::to_string(bank_future) + " valid_channels=" +
+                 std::to_string(valid_channels));
+         }
+-        const Candidate selected = plan_candidate(selected_choice.candidate);
++        Candidate selected = selected_choice.candidate;
++        selected.start_cycle = selected_choice.issue_cycle;
+         auto& selected_queue = bank_queues[selected_choice.flat_bank];
+-        if (selected_choice.source == 1 || selected_choice.source == 2) {
+-            selected_queue.available.erase(selected);
+-            auto row = selected_queue.available_rows.find(selected.row);
+-            if (row == selected_queue.available_rows.end() ||
+-                row->second.erase(selected) != 1) {
+-                throw std::runtime_error("available row index is inconsistent");
+-            }
+-            if (row->second.empty()) {
+-                selected_queue.available_rows.erase(row);
+-            }
+-        } else if (selected_choice.source == 3) {
+-            selected_queue.future_reads.pop();
+-        } else if (selected_choice.source == 4) {
+-            selected_queue.future_writes.pop();
++        auto& state = states[selected.request_index];
++        auto& bank_state = banks[selected_choice.flat_bank];
++        auto& channel_state = channels[selected.channel];
++        const uint64_t command_cycle = selected_choice.issue_cycle;
++        simulation_cycle = command_cycle;
++        record_command(selected, selected_choice.command, command_cycle);
++        channel_state.next_command_cycle = command_cycle +
++            architecture.hbm_command_issue_interval_cycles;
++
++        if (selected_choice.command == MemoryCommandType::PRECHARGE) {
++            if (selected_queue.active.has_value() || !bank_state.row_open ||
++                bank_state.open_row == selected.row) {
++                throw std::runtime_error("invalid PRE command plan");
++            }
++            erase_available_candidate(selected_queue, selected_choice, selected);
++            selected.precharge_cycle = command_cycle;
++            selected.row_hit = false;
++            selected_queue.active = selected;
++            selected_queue.active_stage = BankQueue::ActiveStage::ACTIVATE;
++            bank_state.row_open = false;
++            bank_state.next_activate_cycle = std::max(
++                bank_state.next_activate_cycle,
++                command_cycle + architecture.hbm_precharge_to_activate_cycles);
++            ++result.precharge_commands;
++            ++state.precharge_commands;
++            state.first_precharge = std::min(state.first_precharge, command_cycle);
++            state.last_precharge = std::max(state.last_precharge, command_cycle);
++            recompute_channel(selected.channel);
++            continue;
++        }
++
++        if (selected_choice.command == MemoryCommandType::ACTIVATE) {
++            if (bank_state.row_open) {
++                throw std::runtime_error("ACT command requires a closed bank");
++            }
++            if (!selected_queue.active.has_value()) {
++                erase_available_candidate(selected_queue, selected_choice, selected);
++                selected.row_hit = false;
++                selected_queue.active = selected;
++            } else if (selected_queue.active_stage !=
++                       BankQueue::ActiveStage::ACTIVATE) {
++                throw std::runtime_error("invalid active ACT command stage");
++            }
++            selected_queue.active->activate_cycle = command_cycle;
++            selected_queue.active_stage = BankQueue::ActiveStage::DATA;
++            bank_state.open_row = selected.row;
++            bank_state.row_open = true;
++            bank_state.next_read_cycle = std::max(
++                bank_state.next_read_cycle,
++                command_cycle + architecture.hbm_activate_to_read_cycles);
++            bank_state.next_write_cycle = std::max(
++                bank_state.next_write_cycle,
++                command_cycle + architecture.hbm_activate_to_write_cycles);
++            bank_state.next_precharge_cycle = std::max(
++                bank_state.next_precharge_cycle,
++                command_cycle + architecture.hbm_activate_to_precharge_cycles);
++            bank_state.next_activate_cycle = std::max(
++                bank_state.next_activate_cycle,
++                command_cycle + architecture.hbm_activate_to_activate_cycles);
++            ++result.activate_commands;
++            ++state.activate_commands;
++            state.first_activate = std::min(state.first_activate, command_cycle);
++            state.last_activate = std::max(state.last_activate, command_cycle);
++            recompute_channel(selected.channel);
++            continue;
++        }
++
++        if (selected_queue.active.has_value()) {
++            if (selected_queue.active_stage != BankQueue::ActiveStage::DATA ||
++                selected_queue.active->request_index != selected.request_index ||
++                selected_queue.active->block_offset != selected.block_offset) {
++                throw std::runtime_error("invalid active data command stage");
++            }
++            selected = *selected_queue.active;
++            selected.start_cycle = command_cycle;
++            selected.command_ready_cycle =
++                selected_choice.candidate.command_ready_cycle;
+         } else {
+-            throw std::runtime_error("unknown bank choice source");
++            if (!selected.row_hit || !bank_state.row_open ||
++                bank_state.open_row != selected.row) {
++                throw std::runtime_error("direct data command is not a row hit");
++            }
++            erase_available_candidate(selected_queue, selected_choice, selected);
+         }
+         if (command_queue_occupancy[selected_choice.flat_bank] == 0) {
+             throw std::runtime_error("command queue occupancy underflow");
+         }
+         --command_queue_occupancy[selected_choice.flat_bank];
+
+-        auto& state = states[selected.request_index];
+         while (!active_fifo.empty() &&
+                issued_candidates.count({active_fifo.top().request_index,
+                                         active_fifo.top().block_offset}) != 0) {
+@@ -1830,16 +2056,12 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+                 ++result.priority_reorders;
+             }
+         }
+-        auto& bank_state = banks[selected_choice.flat_bank];
+-        auto& channel_state = channels[selected.channel];
+         state.effective_producer_ready = std::max(
+             state.effective_producer_ready, selected.producer_ready_cycle);
+         state.effective_enqueue = std::max(
+             state.effective_enqueue, selected.enqueue_cycle);
+-        state.first_issue = std::min(state.first_issue, selected.start_cycle);
+-        const bool row_hit = bank_state.row_open && bank_state.open_row == selected.row;
+-        const bool row_conflict = bank_state.row_open && !row_hit;
+-        if (row_hit) {
++        state.first_issue = std::min(state.first_issue, command_cycle);
++        if (selected.row_hit) {
+             ++result.row_buffer_hits;
+             ++result.row_buffer_hits_by_class[static_cast<std::size_t>(
+                 state.request.request_class)];
+@@ -1848,47 +2070,16 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+             ++result.row_buffer_misses_by_class[static_cast<std::size_t>(
+                 state.request.request_class)];
+         }
+-        if (row_conflict) {
+-            if (selected.precharge_cycle == std::numeric_limits<uint64_t>::max()) {
+-                throw std::runtime_error("row conflict lacks a PRE command");
+-            }
+-            ++result.precharge_commands;
+-            ++state.precharge_commands;
+-            state.first_precharge = std::min(
+-                state.first_precharge, selected.precharge_cycle);
+-            state.last_precharge = std::max(
+-                state.last_precharge, selected.precharge_cycle);
+-        }
+-        if (!row_hit) {
+-            if (selected.activate_cycle == std::numeric_limits<uint64_t>::max()) {
+-                throw std::runtime_error("closed row lacks an ACT command");
+-            }
+-            ++result.activate_commands;
+-            ++state.activate_commands;
+-            state.first_activate = std::min(
+-                state.first_activate, selected.activate_cycle);
+-            state.last_activate = std::max(
+-                state.last_activate, selected.activate_cycle);
+-            bank_state.next_precharge_cycle = std::max(
+-                bank_state.next_precharge_cycle,
+-                selected.activate_cycle + architecture.hbm_activate_to_precharge_cycles);
+-            bank_state.next_activate_cycle = std::max(
+-                bank_state.next_activate_cycle,
+-                selected.activate_cycle + architecture.hbm_activate_to_activate_cycles);
+-            channel_state.next_row_command_cycle = selected.activate_cycle +
+-                architecture.hbm_command_issue_interval_cycles;
+-        }
+         const uint64_t data_latency = selected.is_write
+             ? architecture.hbm_write_row_hit_cycles
+             : architecture.hbm_read_row_hit_cycles;
+-        const uint64_t completion = selected.start_cycle + data_latency + transfer_cycles;
+-        bank_state.next_data_cycle = completion;
+-        block_active_intervals.push_back({selected.start_cycle, completion});
++        const uint64_t completion = command_cycle + data_latency + transfer_cycles;
++        block_active_intervals.push_back({command_cycle, completion});
+         if (channel_state.last_direction != -1 &&
+             channel_state.last_direction != static_cast<int>(selected.is_write)) {
+-            if (selected.start_cycle > selected.command_ready_cycle) {
++            if (command_cycle > selected.command_ready_cycle) {
+                 result.direction_switch_stall_cycles +=
+-                    selected.start_cycle - selected.command_ready_cycle;
++                    command_cycle - selected.command_ready_cycle;
+             }
+             if (selected.is_write) {
+                 ++result.read_to_write_switches;
+@@ -1900,31 +2091,44 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+             ++result.write_commands;
+             channel_state.next_write_cycle = std::max(
+                 channel_state.next_write_cycle,
+-                selected.start_cycle + architecture.hbm_write_to_write_cycles);
++                command_cycle + architecture.hbm_write_to_write_cycles);
+             channel_state.next_read_cycle = std::max(
+                 channel_state.next_read_cycle,
+-                selected.start_cycle + architecture.hbm_write_to_read_cycles);
++                command_cycle + architecture.hbm_write_to_read_cycles);
+             bank_state.next_precharge_cycle = std::max(
+                 bank_state.next_precharge_cycle,
+-                selected.start_cycle + architecture.hbm_write_to_precharge_cycles);
++                command_cycle + architecture.hbm_write_to_precharge_cycles);
+         } else {
+             ++result.read_commands;
+             channel_state.next_read_cycle = std::max(
+                 channel_state.next_read_cycle,
+-                selected.start_cycle + architecture.hbm_read_to_read_cycles);
++                command_cycle + architecture.hbm_read_to_read_cycles);
+             channel_state.next_write_cycle = std::max(
+                 channel_state.next_write_cycle,
+-                selected.start_cycle + architecture.hbm_read_to_write_cycles);
++                command_cycle + architecture.hbm_read_to_write_cycles);
+             bank_state.next_precharge_cycle = std::max(
+                 bank_state.next_precharge_cycle,
+-                selected.start_cycle + architecture.hbm_read_to_precharge_cycles);
++                command_cycle + architecture.hbm_read_to_precharge_cycles);
+         }
+-        channel_state.last_issue_cycle = selected.start_cycle;
++        channel_state.last_issue_cycle = command_cycle;
+         channel_state.last_direction = static_cast<int>(selected.is_write);
+-        bank_state.open_row = selected.row;
+-        bank_state.row_open = true;
++        selected_queue.active.reset();
++        selected_queue.active_stage = BankQueue::ActiveStage::NONE;
+         state.completion = std::max(state.completion, completion);
+         ++state.issued_blocks;
++        if (priority == MemoryPriorityMode::FIFO) {
++            const std::size_t port = CoordinatorPort(state.request.request_class);
++            const auto window_key = std::make_pair(
++                port, selected.block / blocks_per_row);
++            const auto active_window = fifo_active_windows.find(window_key);
++            if (active_window == fifo_active_windows.end() ||
++                active_window->second == 0) {
++                throw std::runtime_error("FIFO port window occupancy underflow");
++            }
++            if (--active_window->second == 0) {
++                fifo_active_windows.erase(active_window);
++            }
++        }
+         issued_candidates.insert({selected.request_index, selected.block_offset});
+         --remaining_blocks;
+         ++result.channel_blocks[selected.channel];
+@@ -1934,7 +2138,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         affected_channels[selected.channel] = true;
+         if (state.issued_blocks == state.block_count) {
+             for (std::size_t dependent : dependents[selected.request_index]) {
+-                push_pending(make_candidate(dependent, 0), selected.start_cycle);
++                push_pending(make_candidate(dependent, 0), command_cycle);
+             }
+         }
+         for (std::size_t channel = 0; channel < affected_channels.size(); ++channel) {
+@@ -1944,6 +2148,15 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+         }
+     }
+
++    result.command_trace_samples = std::move(first_command_samples);
++    result.command_trace_samples.insert(
++        result.command_trace_samples.end(),
++        last_command_samples.begin(), last_command_samples.end());
++    if (result.command_trace_event_count != result.precharge_commands +
++            result.activate_commands + result.read_commands + result.write_commands) {
++        throw std::runtime_error("command trace count differs from command totals");
++    }
++
+     for (const auto& state : states) {
+         const auto& request = state.request;
+         const auto class_index = static_cast<std::size_t>(request.request_class);
+@@ -2634,6 +2847,9 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+         metrics.activate_commands = memory_timing.activate_commands;
+         metrics.read_commands = memory_timing.read_commands;
+         metrics.write_commands = memory_timing.write_commands;
++        metrics.command_trace_event_count = memory_timing.command_trace_event_count;
++        metrics.command_trace_checksum = memory_timing.command_trace_checksum;
++        metrics.command_lane_violations = memory_timing.command_lane_violations;
+         metrics.request_counts = memory_timing.request_counts;
+         metrics.request_bytes = memory_timing.request_bytes;
+         metrics.request_wait_cycles = memory_timing.request_wait_cycles;
+@@ -2642,6 +2858,7 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
+         metrics.channel_blocks = memory_timing.channel_blocks;
+         metrics.bank_blocks = memory_timing.bank_blocks;
+         metrics.memory_request_traces = memory_timing.request_traces;
++        metrics.command_trace_samples = memory_timing.command_trace_samples;
+         metrics.transaction_admission_traces = memory_timing.admission_traces;
+         metrics.max_channel_read_queue_occupancy =
+             memory_timing.max_channel_read_queue_occupancy;
+diff --git a/hygcn/paper_sim.h b/hygcn/paper_sim.h
+index 1c7ae83..9f817a5 100644
+--- a/hygcn/paper_sim.h
++++ b/hygcn/paper_sim.h
+@@ -175,6 +175,22 @@ struct MemoryRequestTrace {
+     std::optional<uint64_t> producer_sequence;
+ };
+
++enum class MemoryCommandType {
++    PRECHARGE,
++    ACTIVATE,
++    READ,
++    WRITE,
++};
++
++struct MemoryCommandTrace {
++    uint64_t cycle = 0;
++    uint64_t sequence = 0;
++    uint64_t block_offset = 0;
++    std::size_t channel = 0;
++    std::size_t bank = 0;
++    MemoryCommandType command = MemoryCommandType::READ;
++};
++
+ inline constexpr std::size_t kMaxTraceHbmChannels = 16;
+
+ struct TransactionAdmissionTrace {
+@@ -222,6 +238,9 @@ struct MemoryTimingResult {
+     uint64_t activate_commands = 0;
+     uint64_t read_commands = 0;
+     uint64_t write_commands = 0;
++    uint64_t command_trace_event_count = 0;
++    uint64_t command_trace_checksum = 0;
++    uint64_t command_lane_violations = 0;
+     std::array<uint64_t, kRequestClassCount> request_counts{};
+     std::array<uint64_t, kRequestClassCount> request_bytes{};
+     std::array<uint64_t, kRequestClassCount> request_wait_cycles{};
+@@ -230,6 +249,7 @@ struct MemoryTimingResult {
+     std::array<uint64_t, kRequestClassCount> class_completion_cycles{};
+     std::map<int, std::array<uint64_t, kRequestClassCount>> batch_completion_cycles;
+     std::vector<MemoryRequestTrace> request_traces;
++    std::vector<MemoryCommandTrace> command_trace_samples;
+     std::vector<TransactionAdmissionTrace> admission_traces;
+     std::vector<uint64_t> max_channel_read_queue_occupancy;
+     std::vector<uint64_t> max_channel_write_buffer_occupancy;
+@@ -351,6 +371,9 @@ struct LayerMetrics {
+     uint64_t activate_commands = 0;
+     uint64_t read_commands = 0;
+     uint64_t write_commands = 0;
++    uint64_t command_trace_event_count = 0;
++    uint64_t command_trace_checksum = 0;
++    uint64_t command_lane_violations = 0;
+     uint64_t ae_finish_cycle = 0;
+     uint64_t ce_start_cycle = 0;
+     uint64_t ce_finish_cycle = 0;
+@@ -383,6 +406,7 @@ struct LayerMetrics {
+     std::vector<InputWindowTrace> input_window_traces;
+     std::vector<MemoryRequestTrace> memory_request_traces;
+     std::vector<MemoryRequestTrace> producer_request_traces;
++    std::vector<MemoryCommandTrace> command_trace_samples;
+     std::vector<TransactionAdmissionTrace> transaction_admission_traces;
+     std::vector<uint64_t> max_channel_read_queue_occupancy;
+     std::vector<uint64_t> max_channel_write_buffer_occupancy;
+diff --git a/openspec/changes/reproduce-hygcn-paper-performance/design.md b/openspec/changes/reproduce-hygcn-paper-performance/design.md
+index 1184884..bfd8a2d 100644
+--- a/openspec/changes/reproduce-hygcn-paper-performance/design.md
++++ b/openspec/changes/reproduce-hygcn-paper-performance/design.md
+@@ -55,7 +55,7 @@
+
+ ### 5. Coordinator 使用 batch 仲裁、低位交织映射和请求级 HBM 时序
+
+-每个 DRAM 请求携带 batch ID、请求类别、地址、字节数、producer sequence、producer-ready 与入队周期。Input 由对应 Edge completion 加邻居索引延迟动态释放。模型把请求推进为统一 64B block 流，保证同一地址/事务序列的完成时间不依赖上层请求切分。映射前，FIFO 逐 block 轮转 Edge、Input、Weight、Output 四个并发端口，复现论文所述未协调访问的频繁地址切换；batch-class 按 batch 和 `Edge > Input > Weight > Output` 组装连续流。两者共享全局四 block/cycle admission 带宽。论文 256 GB/s HBM1 由两份 bundled 8-channel、128 GB/s stack 复制为 16 个物理 channel，每个 channel 仍保留原 `tCK/tCCD`，不缩短单 channel 时序。bundled DRAMSim3 HBM 配置为 `unified_queue=False`，因此每 channel 独立限制 32-entry read queue 和 32-entry write buffer，再共享每 bank 8-entry command queue。控制器与 bundled 实现一致只检查方向 transaction queue 队首，避免绕过 head-of-line blocking。bank 侧显式规划 PRE、ACT 和实际 READ/WRITE issue，使用 `tRTP/tWR/tRAS/tRP/tRC/tRCDRD/tRCDWR/tCCD_L` 及 read-to-write/write-to-read command spacing；request-level bank service lane 可以保守限制同 bank 数据服务，但 completion 不再直接释放 PRE/ACT recovery。bank 侧只在同 batch/class 内延续 open row，不跨 RAW 或优先级组绕行。priority 与 mapping 独立；low-bits 对应论文 §4.5.2；row-first 直接折叠 `rorabgbachco`，一个 row span 不再使用无来源的二路 bank striping。admission 证据保存逐 channel read/write occupancy before/after 和 terminal zero snapshot，独立 validator 由此推导 dispatch、峰值和容量违规。
++每个 DRAM 请求携带 batch ID、请求类别、地址、字节数、producer sequence、producer-ready 与入队周期。Input 由对应 Edge completion 加邻居索引延迟动态释放。模型把请求推进为统一 64B block 流，保证同一地址/事务序列的完成时间不依赖上层请求切分。映射前，FIFO 每个 admission 周期顺序选择 Edge、Input、Weight、Output 中一个可用 buffer port，并从该 port 的统一 block 流连续放行最多四个 block；端口只在下一个周期轮转。未协调路径最多保留四个由 bundled HBM row size 派生的连续 block window，对应论文 Figure 9 的四个并发 buffer request source；window 由 `(port, block address)` 定义并在最后一个 data command issue 后释放，不依赖上层请求边界。这复现论文 §4.5.2 所述四类 buffer 请求被顺序处理、产生不连续访问且 conventional mapping 的 bank-level parallelism 受限的路径，同时保持 fragmentation invariant。batch-class 则按 batch 和 `Edge > Input > Weight > Output` 组装连续流。两者共享全局四 block/cycle admission 带宽。论文 256 GB/s HBM1 由两份 bundled 8-channel、128 GB/s stack 复制为 16 个物理 channel，每个 channel 仍保留原 `tCK/tCCD`，不缩短单 channel 时序。bundled DRAMSim3 HBM 配置为 `unified_queue=False`，因此每 channel 独立限制 32-entry read queue 和 32-entry write buffer，再共享每 bank 8-entry command queue。控制器与 bundled 实现一致只检查方向 transaction queue 队首，避免绕过 head-of-line blocking。bank 侧把事务推进为 PRE、ACT、READ/WRITE 三阶段状态机；同一 channel 的所有 bank 共享单一 command lane，命令按 `tCK` 派生间隔排他发出，PRE/ACT 间隙允许其他 bank 的 ready command 使用。实际 data-command issue 使用 `tRTP/tWR/tRAS/tRP/tRC/tRCDRD/tRCDWR/tCCD_L` 及 read-to-write/write-to-read spacing，READ/WRITE completion 只记录数据返回时间，不再占用下一 data-command issue 槽，也不直接释放 PRE/ACT recovery。bank 侧只在同 batch/class 内延续 open row，不跨 RAW 或优先级组绕行。priority 与 mapping 独立；low-bits 对应论文 §4.5.2；row-first 直接折叠 `rorabgbachco`，一个 row span 不再使用无来源的二路 bank striping。admission 证据保存逐 channel read/write occupancy before/after 和 terminal zero snapshot，独立 validator 由此推导 dispatch、峰值和容量违规；command 证据保存全量计数与校验和，并对大运行保留首尾样本、小反例保留完整序列。
+
+ 该规则对应论文“当前批次低优先级请求先于后续批次高优先级请求”的描述，避免现有全局严格优先级造成跨批次饥饿。
+
+diff --git a/openspec/changes/reproduce-hygcn-paper-performance/specs/paper-performance-validation/spec.md b/openspec/changes/reproduce-hygcn-paper-performance/specs/paper-performance-validation/spec.md
+index f8e416e..c0c8d1d 100644
+--- a/openspec/changes/reproduce-hygcn-paper-performance/specs/paper-performance-validation/spec.md
++++ b/openspec/changes/reproduce-hygcn-paper-performance/specs/paper-performance-validation/spec.md
+@@ -82,7 +82,9 @@
+ ### Requirement: 因果与请求切分不变量
+ 同一有序 block 流的内存完成时间、row hit/miss 和 channel/bank 事务计数 MUST 不受上层请求切分影响。Output 请求 MUST 在对应 CE producer-ready 后入队；Intermediate Read MUST 访问对应 Write 的同一地址和字节范围，并等待该 Write 完成。已经进入请求级时间线的 intermediate 流量 MUST NOT 再以解析延迟重复计时。
+
+-FIFO 与 batch-class MUST 共享全局 transaction admission 带宽。四个 buffer port 每个模型周期合计进入所有 channel controller 的 block 数 MUST 不超过由论文 HBM 接口宽度派生的 4。bundled DRAMSim3 为 `unified_queue=False`，因此每 channel read queue 与 write buffer MUST 分别受 `trans_queue_size=32` 约束，每 bank command queue MUST 受 `cmd_queue_size=8` 约束。read 与 write MUST 分别使用 `CL/tRCDRD` 和 `CWL/tRCDWR` 派生的 data command timing，并施加 DRAMSim3 read/write command switching 约束。换行 MUST 显式执行 PRE→ACT，且 PRE/ACT/data issue 分别受 `tRTP`、`tWR`、`tRAS`、`tRP`、`tRC`、`tRCDRD`、`tRCDWR` 和 `tCCD_L` 约束；请求 completion 不得直接释放 bank command recovery。
++FIFO 与 batch-class MUST 共享全局 transaction admission 带宽。四个 buffer port 每个模型周期合计进入所有 channel controller 的 block 数 MUST 不超过由论文 HBM 接口宽度派生的 4。bundled DRAMSim3 为 `unified_queue=False`，因此每 channel read queue 与 write buffer MUST 分别受 `trans_queue_size=32` 约束，每 bank command queue MUST 受 `cmd_queue_size=8` 约束。read 与 write MUST 分别使用 `CL/tRCDRD` 和 `CWL/tRCDWR` 派生的 data command timing，并施加 DRAMSim3 read/write command switching 约束。换行 MUST 显式执行 PRE→ACT，且 PRE/ACT/data issue 分别受 `tRTP`、`tWR`、`tRAS`、`tRP`、`tRC`、`tRCDRD`、`tRCDWR` 和 `tCCD_L` 约束。同一 channel 的 PRE/ACT/READ/WRITE MUST 共享排他的 command lane；READ/WRITE completion latency MUST 与下一 data-command issue 解耦，请求 completion 不得直接释放 bank command recovery。
++
++未协调 FIFO MUST 每个 admission 周期只选择一个可用 buffer port，并从该 port 的统一 block 流按地址/sequence 顺序放行最多 4 个 block；端口 MUST 仅在下一个 admission 周期轮转。FIFO 同时 active 的连续 block window 总数 MUST 不超过论文 Figure 9 的四个 buffer request source。window MUST 由 `(port, block address / bundled HBM row blocks)` 定义，在已 admission block 全部发出 data command 后释放，不得依赖上层请求边界。batch-class 路径 MAY 在同一周期从同一 batch/class/row 的候选中组装最多 4 个 block，但 MUST 使用与 FIFO 相同的全局 admission 带宽和 controller queue capacity。
+
+ 论文 256 GB/s HBM1 MUST 建模为两份 bundled 8-channel、128 GB/s HBM1 stack 的复制，共 16 个物理 channel。每个物理 channel MUST 保留 bundled DRAMSim3 的 `tCK/tCCD`、方向队列和 command queue 约束；实现不得通过缩短单 channel data-command spacing 来补足总带宽。
+
+@@ -104,6 +106,21 @@ admission 证据 MUST 保存可逆的完整压缩 trace，或明确降级为 sum
+ - **WHEN** 同一 bank 依次执行 WRITE→different-row WRITE、WRITE→different-row READ 和 READ→different-row WRITE
+ - **THEN** 第二个请求的 PRE 不早于前一 data command recovery 与 tRAS，ACT 不早于 PRE+tRP 和前一 ACT+tRC，实际 READ/WRITE issue 不早于 ACT+tRCDRD/tRCDWR
+
++#### Scenario: 同 row data-command 间隔
++- **WHEN** 同一 bank、同一 open row 连续执行两个 64B READ
++- **THEN** 第二个 READ issue 等于第一个 READ issue 加 `tCCD` 派生间隔，而不是等待第一个请求 completion
++
++#### Scenario: FIFO 按 admission 周期串行选择 buffer port
++- **GIVEN** Edge、Input、Weight、Output 四个 buffer port 各有四个连续 64B block 且 controller queue 有容量
++- **WHEN** 未协调 FIFO 以 4 block/cycle admission 带宽运行
++- **THEN** 每个 admission 周期只包含一个 buffer port 的 block，四个 port 的首次 admission 分别发生在连续四个周期
++- **AND** 第五个 row-sized window 不早于前四个 active window 中至少一个的最后 data command issue
++- **AND** 将任一 port 的相同 block 流拆成多个上层请求不改变完成周期或事务序列
++
++#### Scenario: 跨 bank command lane 排他
++- **WHEN** 同一 channel 的一个 bank 准备 PRE，另一个 bank 同周期准备 READ
++- **THEN** 两条命令按 command issue interval 串行发出，command trace 中不存在同 channel 同周期 PRE/ACT/READ/WRITE 冲突
++
+ #### Scenario: Admission 完整证据
+ - **WHEN** benchmark 读取一层 transaction admission 证据
+ - **THEN** validator 从压缩分块恢复逐 channel occupancy before/after 和 terminal zero snapshot，从零推导 dispatch totals、peak/capacity，再独立重算 histogram、weighted totals、actual maxima、edge samples 与 FNV-1a checksum
+diff --git a/openspec/changes/reproduce-hygcn-paper-performance/tasks.md b/openspec/changes/reproduce-hygcn-paper-performance/tasks.md
+index b8a5ddc..c181e23 100644
+--- a/openspec/changes/reproduce-hygcn-paper-performance/tasks.md
++++ b/openspec/changes/reproduce-hygcn-paper-performance/tasks.md
+@@ -117,3 +117,10 @@
+ - [x] 14.2 增加 WRITE→different-row WRITE/READ 与 READ→different-row WRITE 反例，记录每个请求 PRE/ACT 数量及首末周期
+ - [x] 14.3 将 admission trace 升级为逐 channel read/write occupancy before/after 加 terminal zero snapshot，validator 从零推导 dispatch、峰值、容量违规和 checksum
+ - [x] 14.4 将论文 256 GB/s HBM1 显式建模为两份 bundled 8-channel stack，版本化统一 row-hit 逐数据集/aggregate `1.03x` 内部门槛，并执行 clean Release、CTest、legacy、14+12、partition/model sensitivity，固化修正前后证据
++
++## 15. Review v8 channel command lane 与审计整改
++
++- [x] 15.1 将 bank 请求改为 PRE/ACT/DATA 分阶段状态机，让同一 channel 的所有命令共享排他 command lane，并将 READ/WRITE completion 与下一 data issue 解耦
++- [x] 15.2 增加同 row 两个 READ 的 `tCCD` 反例和跨 bank PRE/READ 冲突反例，保存命令计数、校验和及小运行完整 trace
++- [x] 15.3 修正 revision audit 的 `8 -> 16` channel 差异并由 git/config diff 生成 no-retuning 证据，同时并列报告 schema v6 `12/12` 与原 schema v5 结果
++- [ ] 15.4 在不调整论文目标或校准参数的前提下执行 clean Release、CTest、legacy、14+12、partition/model sensitivity 和严格 OpenSpec，固化并推送完整证据
+diff --git a/tools/paper_benchmark.py b/tools/paper_benchmark.py
+index daf2ba4..29d54ea 100755
+--- a/tools/paper_benchmark.py
++++ b/tools/paper_benchmark.py
+@@ -966,6 +966,53 @@ def validate_transaction_admission(dataset, variant, run):
+         "occupancy_reconstruction": "per-channel before/after admission snapshots",
+     }
+
++
++def validate_command_trace(dataset, variant, run):
++    interval = run["architecture"]["hbm_command_issue_interval_cycles"]
++    event_count = 0
++    checksums = []
++    for layer in run["layers"]:
++        trace = layer["command_trace"]
++        expected = (
++            layer["precharge_commands"] + layer["activate_commands"]
++            + layer["read_commands"] + layer["write_commands"]
++        )
++        if trace.get("event_count") != expected:
++            raise ValueError(
++                f"{dataset} {variant} command trace count differs from command totals"
++            )
++        if trace.get("command_lane_violations") != 0:
++            raise ValueError(f"{dataset} {variant} reports a command-lane violation")
++        checksum = trace.get("checksum_fnv1a64")
++        if not isinstance(checksum, str) or len(checksum) != 16:
++            raise ValueError(f"{dataset} {variant} command checksum is invalid")
++        last_cycle = {}
++        previous_cycle = None
++        for sample in trace.get("samples", ()):
++            channel = sample["channel"]
++            cycle = sample["cycle"]
++            if sample["command"] not in {"PRE", "ACT", "READ", "WRITE"}:
++                raise ValueError(f"{dataset} {variant} has an invalid command sample")
++            if previous_cycle is not None and cycle < previous_cycle:
++                raise ValueError(
++                    f"{dataset} {variant} command samples are not time ordered"
++                )
++            if channel in last_cycle and cycle < last_cycle[channel] + interval:
++                raise ValueError(
++                    f"{dataset} {variant} sampled commands overlap on channel {channel}"
++                )
++            last_cycle[channel] = cycle
++            previous_cycle = cycle
++        event_count += expected
++        checksums.append(checksum)
++    return {
++        "event_count": event_count,
++        "checksums": checksums,
++        "command_issue_interval_cycles": interval,
++        "command_lane_violations": 0,
++        "sample_policy": "full small run or first/last 32 events",
++    }
++
+ def directional_memory_evidence(run):
+     evidence = []
+     for layer in run["layers"]:
+@@ -992,6 +1039,7 @@ def directional_memory_evidence(run):
+             if index >= 0 and prefix_completion[index] > trace["first_issue_cycle"]:
+                 overlapping_writes[request_class] += 1
+         admission = layer["transaction_admission_trace"]
++        command_trace = layer["command_trace"]
+         row_transition_samples = [
+             {
+                 "sequence": trace["sequence"],
+@@ -1025,6 +1073,10 @@ def directional_memory_evidence(run):
+             "max_channel_write_buffer_occupancy":
+                 admission["max_channel_write_buffer_occupancy"],
+             "trace_checksum_fnv1a64": admission["trace_checksum_fnv1a64"],
++            "command_trace_event_count": command_trace["event_count"],
++            "command_trace_checksum_fnv1a64": command_trace["checksum_fnv1a64"],
++            "command_lane_violations": command_trace["command_lane_violations"],
++            "command_trace_samples": command_trace["samples"],
+         })
+     return {
+         "read_row_cycles": [
+@@ -1158,6 +1210,10 @@ def current_parameters(architecture, workloads):
+         "hbm_channels": architecture["hbm_channels"],
+         "coordinator_issue_blocks_per_cycle":
+             architecture["coordinator_issue_blocks_per_cycle"],
++        "coordinator_fifo_active_windows":
++            architecture["coordinator_fifo_active_windows"],
++        "coordinator_fifo_window_blocks":
++            architecture["coordinator_fifo_window_blocks"],
+         "input_ping_pong_regions": architecture["input_ping_pong_regions"],
+         "neighbor_index_ready_cycles": architecture["neighbor_index_ready_cycles"],
+         "row_first_bank_interleave": architecture["row_first_bank_interleave"],
+@@ -1239,6 +1295,10 @@ def main():
+             name: validate_transaction_admission(dataset, name, result)
+             for name, result in runs.items()
+         }
++        command_oracles = {
++            name: validate_command_trace(dataset, name, result)
++            for name, result in runs.items()
++        }
+         summaries = {name: summarize_result(result) for name, result in runs.items()}
+         metrics = calculate_metrics(
+             summaries["optimized"],
+@@ -1274,6 +1334,7 @@ def main():
+                 ],
+             },
+             "transaction_admission_oracles": admission_oracles,
++            "command_trace_oracles": command_oracles,
+             "directional_memory_evidence": {
+                 name: directional_memory_evidence(result)
+                 for name, result in runs.items()
+diff --git a/tools/revision_audit.py b/tools/revision_audit.py
+new file mode 100644
+index 0000000..bbf3305
+--- /dev/null
++++ b/tools/revision_audit.py
+@@ -0,0 +1,201 @@
++#!/usr/bin/env python3
++import argparse
++import configparser
++import io
++import json
++import subprocess
++import sys
++from pathlib import Path
++
++
++PROFILE_PATH = "configs/HYGCN_PAPER.ini"
++TARGET_FILES = (
++    "configs/paper_metrics.json",
++    "configs/paper_workloads.json",
++)
++TARGET_PARAMETER_PATHS = {
++    "configs/paper_metrics.json": (
++        "tolerance", "datasets", "digitization", "metrics",
++    ),
++    "configs/paper_workloads.json": (
++        "figures", "graph_partition",
++        "memory_ablation.hbm_stacks",
++        "memory_ablation.channels_per_stack",
++        "memory_ablation.physical_channels",
++        "memory_ablation.read_queue_entries_per_channel",
++        "memory_ablation.write_buffer_entries_per_channel",
++        "memory_ablation.command_queue_entries_per_bank",
++        "memory_ablation.coordinator_issue_blocks_per_cycle",
++        "memory_ablation.priority_baseline",
++        "memory_ablation.priority_optimized",
++        "memory_ablation.mapping_baseline",
++        "memory_ablation.mapping_optimized",
++        "memory_ablation.row_first_bank_interleave",
++        "memory_ablation.dram_timing",
++    ),
++}
++CALIBRATION_KEYS = (
++    "model.aggregation_shard_capacity_bytes",
++    "model.batch_launch_interval_cycles",
++    "model.neighbor_index_ready_cycles",
++    "model.row_first_bank_interleave",
++)
++
++
++def parse_args():
++    parser = argparse.ArgumentParser(
++        description="Derive a review-to-review HyGCN configuration audit"
++    )
++    parser.add_argument("--base-ref", required=True)
++    parser.add_argument("--implementation-ref", default="WORKTREE")
++    parser.add_argument("--output", required=True)
++    return parser.parse_args()
++
++
++def git_text(root, revision, path):
++    if revision == "WORKTREE":
++        return (root / path).read_text(encoding="utf-8")
++    return subprocess.check_output(
++        ["git", "show", f"{revision}:{path}"], cwd=root, text=True
++    )
++
++
++def resolve_revision(root, revision):
++    if revision == "WORKTREE":
++        return "WORKTREE"
++    return subprocess.check_output(
++        ["git", "rev-parse", revision], cwd=root, text=True
++    ).strip()
++
++
++def profile_values(text):
++    parser = configparser.ConfigParser()
++    parser.read_file(io.StringIO(text))
++    return {
++        f"{section}.{key}": value
++        for section in parser.sections()
++        for key, value in parser.items(section)
++    }
++
++
++def file_digest(text):
++    import hashlib
++
++    return hashlib.sha256(text.encode("utf-8")).hexdigest()
++
++
++def json_path(document, path):
++    value = document
++    for key in path.split("."):
++        if not isinstance(value, dict) or key not in value:
++            return {"__missing__": True}
++        value = value[key]
++    return value
++
++
++def target_parameter_digest(text, paths):
++    document = json.loads(text)
++    selected = {path: json_path(document, path) for path in paths}
++    return file_digest(json.dumps(selected, sort_keys=True, separators=(",", ":")))
++
++
++def json_leaf_differences(before_text, after_text):
++    before = json.loads(before_text)
++    after = json.loads(after_text)
++    differences = []
++
++    def walk(path, lhs, rhs):
++        if isinstance(lhs, dict) and isinstance(rhs, dict):
++            for key in sorted(set(lhs) | set(rhs)):
++                walk(path + [key], lhs.get(key), rhs.get(key))
++            return
++        if lhs != rhs:
++            differences.append({
++                "path": ".".join(path),
++                "before": lhs,
++                "after": rhs,
++            })
++
++    walk([], before, after)
++    return differences
++
++
++def build_audit(root, base_ref, implementation_ref):
++    base_profile = profile_values(git_text(root, base_ref, PROFILE_PATH))
++    implementation_profile = profile_values(
++        git_text(root, implementation_ref, PROFILE_PATH)
++    )
++    profile_differences = [
++        {
++            "parameter": key,
++            "before": base_profile.get(key),
++            "after": implementation_profile.get(key),
++        }
++        for key in sorted(set(base_profile) | set(implementation_profile))
++        if base_profile.get(key) != implementation_profile.get(key)
++    ]
++    target_files = []
++    for path in TARGET_FILES:
++        before = git_text(root, base_ref, path)
++        after = git_text(root, implementation_ref, path)
++        target_before = target_parameter_digest(
++            before, TARGET_PARAMETER_PATHS[path])
++        target_after = target_parameter_digest(
++            after, TARGET_PARAMETER_PATHS[path])
++        target_files.append({
++            "path": path,
++            "before_sha256": file_digest(before),
++            "after_sha256": file_digest(after),
++            "changed": before != after,
++            "changed_paths": json_leaf_differences(before, after),
++            "target_parameters_before_sha256": target_before,
++            "target_parameters_after_sha256": target_after,
++            "target_parameters_changed": target_before != target_after,
++        })
++    calibration_differences = [
++        difference for difference in profile_differences
++        if difference["parameter"] in CALIBRATION_KEYS
++    ]
++    no_target_retuning = not calibration_differences and not any(
++        item["target_parameters_changed"] for item in target_files
++    )
++    return {
++        "schema_version": 1,
++        "base_ref": resolve_revision(root, base_ref),
++        "implementation_ref": resolve_revision(root, implementation_ref),
++        "profile_path": PROFILE_PATH,
++        "profile_differences": profile_differences,
++        "target_files": target_files,
++        "calibration_keys": list(CALIBRATION_KEYS),
++        "calibration_differences": calibration_differences,
++        "no_target_parameter_retuning": no_target_retuning,
++        "no_target_parameter_retuning_derivation": (
++            "Computed from versioned paper target files and declared calibration "
++            "keys. Descriptive/model-policy changes are listed in changed_paths but "
++            "do not count as target retuning; this is not a claim about arbitrary "
++            "source-code equivalence."
++        ),
++    }
++
++
++def main():
++    args = parse_args()
++    root = Path(__file__).resolve().parents[1]
++    output = Path(args.output)
++    if not output.is_absolute():
++        output = root / output
++    audit = build_audit(root, args.base_ref, args.implementation_ref)
++    output.parent.mkdir(parents=True, exist_ok=True)
++    with output.open("w", encoding="utf-8") as stream:
++        json.dump(audit, stream, indent=2, sort_keys=True)
++        stream.write("\n")
++    print(output)
++    return 0
++
++
++if __name__ == "__main__":
++    try:
++        sys.exit(main())
++    except (OSError, subprocess.CalledProcessError, configparser.Error) as error:
++        print(f"error: {error}", file=sys.stderr)
++        sys.exit(2)
+diff --git a/tools/test_metric_validator.py b/tools/test_metric_validator.py
+index 4e42e58..185fb50 100644
+--- a/tools/test_metric_validator.py
++++ b/tools/test_metric_validator.py
+@@ -36,6 +36,12 @@ def run_case(root, reference, aggregate, per_dataset, expected_returncode, name,
+             f"{name}: expected return code {expected_returncode}, got "
+             f"{completed.returncode}: {completed.stdout}{completed.stderr}"
+         )
++    if name == "valid":
++        output = output_path.read_text(encoding="utf-8")
++        if "Historical Schema v5 Comparison" not in output or \
++                "internal_checks_schema_v6=12/12" not in completed.stdout or \
++                "internal_checks_schema_v5=11/12" not in completed.stdout:
++            raise RuntimeError("valid: schema v5/v6 audit comparison is missing")
+
+
+ def main():
+diff --git a/tools/test_paper_benchmark.py b/tools/test_paper_benchmark.py
+index 57956db..ccff9bc 100644
+--- a/tools/test_paper_benchmark.py
++++ b/tools/test_paper_benchmark.py
+@@ -23,10 +23,19 @@ def load_partition_module(root, benchmark):
+     return module
+
+
++def load_revision_audit_module(root):
++    path = root / "tools/revision_audit.py"
++    spec = importlib.util.spec_from_file_location("revision_audit", path)
++    module = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(module)
++    return module
++
++
+ def main():
+     root = Path(__file__).resolve().parents[1]
+     benchmark = load_benchmark_module(root)
+     partition = load_partition_module(root, benchmark)
++    revision_audit = load_revision_audit_module(root)
+     with (root / "configs/paper_workloads.json").open(encoding="utf-8") as stream:
+         workloads = json.load(stream)
+     with (root / "configs/paper_parameter_baseline.json").open(encoding="utf-8") as stream:
+@@ -41,11 +50,14 @@ def main():
+         raise RuntimeError("batch-class ordering must retain its paper provenance")
+     if workloads["memory_ablation"]["command_queue_entries_per_bank"] != 8:
+         raise RuntimeError("command queue depth must retain its DRAMSim3 provenance")
+-    if workloads.get("schema_version") != 4 or \
++    if workloads.get("schema_version") != 5 or \
+             workloads["memory_ablation"]["hbm_stacks"] != 2 or \
+             workloads["memory_ablation"]["channels_per_stack"] != 8 or \
+             workloads["memory_ablation"]["physical_channels"] != 16:
+         raise RuntimeError("workload manifest must version the two-stack HBM topology")
++    if workloads["memory_ablation"]["fifo_active_windows"] != 4 or \
++            "Figure 9" not in workloads["memory_ablation"]["coordinator_input_source"]:
++        raise RuntimeError("FIFO active-window bound must derive from four paper sources")
+     if workloads["graph_partition"]["calibrated_fit_datasets"] != [
+             "cora", "citeseer", "pubmed"] or \
+             workloads["graph_partition"]["independent_holdout_datasets"] != []:
+@@ -166,6 +178,8 @@ def main():
+         "hbm_command_issue_interval_cycles": 2,
+         "hbm_channels": 16,
+         "coordinator_issue_blocks_per_cycle": 4,
++        "coordinator_fifo_active_windows": 4,
++        "coordinator_fifo_window_blocks": 32,
+         "input_ping_pong_regions": 2,
+         "neighbor_index_ready_cycles": 2,
+         "row_first_bank_interleave": 1,
+@@ -174,6 +188,30 @@ def main():
+     audit = benchmark.parameter_audit(architecture, workloads, parameter_baseline)
+     if audit["parameter_recalibration"] != bool(audit["differences"]) or not audit["differences"]:
+         raise RuntimeError("parameter recalibration must be derived from a non-empty diff")
++    corrected_review_v8 = revision_audit.build_audit(
++        root, "5e3bbda6d3ad2a4328a5b0b6710cc296cea011ee",
++        "7b7083f159788421aa2e888944b56e1d4466a9e0"
++    )
++    channel_change = next(
++        difference for difference in corrected_review_v8["profile_differences"]
++        if difference["parameter"] == "memory.hbm_channels"
++    )
++    if channel_change["before"] != "8" or channel_change["after"] != "16":
++        raise RuntimeError("review v8 audit must reconstruct hbm_channels 8 -> 16")
++    current_revision = revision_audit.build_audit(root, "e3a4f13", "WORKTREE")
++    if not current_revision["no_target_parameter_retuning"] or \
++            current_revision["calibration_differences"] or \
++            any(item["target_parameters_changed"]
++                for item in current_revision["target_files"]):
++        raise RuntimeError("current review no-retuning audit must be derived from git inputs")
++    workload_audit = next(
++        item for item in current_revision["target_files"]
++        if item["path"] == "configs/paper_workloads.json"
++    )
++    if not workload_audit["changed"] or not any(
++            difference["path"] == "memory_ablation.fifo_active_windows"
++            for difference in workload_audit["changed_paths"]):
++        raise RuntimeError("revision audit must disclose the FIFO mechanism policy change")
+     external_binary = Path("/tmp/hygcn-external-build/hygcntest")
+     if partition.display_path(root, external_binary) != str(external_binary):
+         raise RuntimeError("external absolute binary paths must remain printable")
+diff --git a/tools/validate_paper_metrics.py b/tools/validate_paper_metrics.py
+index 1f0e095..d4e4f55 100755
+--- a/tools/validate_paper_metrics.py
++++ b/tools/validate_paper_metrics.py
+@@ -117,6 +117,19 @@ def main():
+     internal_rows = [row for row in rows if row[7] == "internal_check"]
+     if len(paper_rows) != 14 or len(internal_rows) != 12:
+         raise ValueError("validation requires 14 paper metric rows and 12 internal checks")
++    legacy_row_hit_name = "priority_incremental_row_hit_ratio_aggregate"
++    legacy_row_hit_threshold = 1.05
++    legacy_internal_passed = 0
++    legacy_row_hit_measured = aggregate.get(legacy_row_hit_name)
++    legacy_row_hit_passed = False
++    for row in internal_rows:
++        if row[0] == legacy_row_hit_name:
++            legacy_row_hit_passed = range_error(
++                legacy_row_hit_measured, legacy_row_hit_threshold, math.inf
++            ) == 0.0
++            legacy_internal_passed += legacy_row_hit_passed
++        else:
++            legacy_internal_passed += row[5]
+     output_path.parent.mkdir(parents=True, exist_ok=True)
+     with output_path.open("w", encoding="utf-8") as stream:
+         stream.write("# HyGCN Paper Metric And Internal Check Validation\n\n")
+@@ -148,6 +161,26 @@ def main():
+                 f"| {name} | {scope} | {expected} | {measured_text} | {error_text} | "
+                 f"{'PASS' if passed else 'FAIL'} |\n"
+             )
++        legacy_measured_text = (
++            "missing" if legacy_row_hit_measured is None
++            else f"{legacy_row_hit_measured:.6f}"
++        )
++        stream.write("\n## Historical Schema v5 Comparison\n\n")
++        stream.write(
++            f"- Current schema v{reference['schema_version']}: "
++            f"{sum(row[5] for row in internal_rows)}/12 internal checks PASS.\n"
++        )
++        stream.write(
++            f"- Historical schema v5: {legacy_internal_passed}/12 internal checks PASS. "
++            "It used the unsupported aggregate row-hit floor 1.05x; this is retained "
++            "as an audit comparison, not as the current acceptance specification.\n\n"
++        )
++        stream.write("| Historical check | Threshold | Measured | Status |\n")
++        stream.write("|---|---:|---:|---|\n")
++        stream.write(
++            f"| {legacy_row_hit_name} | >=1.050000 | {legacy_measured_text} | "
++            f"{'PASS' if legacy_row_hit_passed else 'FAIL'} |\n"
++        )
+         stream.write("\n## Diagnostic-Only Metrics\n\n")
+         stream.write("| Metric | Dataset | Measured | Reason |\n")
+         stream.write("|---|---|---:|---|\n")
+@@ -173,6 +206,8 @@ def main():
+     internal_passed = sum(row[5] for row in internal_rows)
+     print(f"paper_metrics={paper_passed}/14")
+     print(f"internal_checks={internal_passed}/12")
++    print(f"internal_checks_schema_v{reference['schema_version']}={internal_passed}/12")
++    print(f"internal_checks_schema_v5={legacy_internal_passed}/12")
+     print(f"validation_report={output_path}")
+     return 1 if failed else 0

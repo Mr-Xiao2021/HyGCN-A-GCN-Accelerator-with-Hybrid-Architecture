@@ -123,4 +123,4 @@
 - [x] 15.1 将 bank 请求改为 PRE/ACT/DATA 分阶段状态机，让同一 channel 的所有命令共享排他 command lane，并将 READ/WRITE completion 与下一 data issue 解耦
 - [x] 15.2 增加同 row 两个 READ 的 `tCCD` 反例和跨 bank PRE/READ 冲突反例，保存命令计数、校验和及小运行完整 trace
 - [x] 15.3 修正 revision audit 的 `8 -> 16` channel 差异并由 git/config diff 生成 no-retuning 证据，同时并列报告 schema v6 `12/12` 与原 schema v5 结果
-- [ ] 15.4 在不调整论文目标或校准参数的前提下执行 clean Release、CTest、legacy、14+12、partition/model sensitivity 和严格 OpenSpec，固化并推送完整证据
+- [x] 15.4 在不调整论文目标或校准参数的前提下执行 clean Release、CTest、legacy、14+12、partition/model sensitivity 和严格 OpenSpec，固化并推送完整证据

@@ -1,0 +1,197 @@
+{
+  "citeseer": {
+    "coordination_baseline": {
+      "checksums": [
+        "79444431c7b7fd7f"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 2828835,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "mapping_only": {
+      "checksums": [
+        "d8a284cc08846a68"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 3337085,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "optimized": {
+      "checksums": [
+        "3bbe8649ee6a6afe"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 3164969,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "pipeline_baseline": {
+      "checksums": [
+        "13e29d1f9dd03ef3"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 4785791,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "priority_only": {
+      "checksums": [
+        "9da87fb5c0ea28e9"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 2828875,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "sparsity_baseline": {
+      "checksums": [
+        "810aebf3494beb39"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 8212019,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "sparsity_optimized": {
+      "checksums": [
+        "4e43f6e9fa1dc043"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 3083659,
+      "sample_policy": "full small run or first/last 32 events"
+    }
+  },
+  "cora": {
+    "coordination_baseline": {
+      "checksums": [
+        "a5beb7f3f445252f"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 760208,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "mapping_only": {
+      "checksums": [
+        "acea61e0590d090d"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 837386,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "optimized": {
+      "checksums": [
+        "950cab976a836cfb"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 771050,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "pipeline_baseline": {
+      "checksums": [
+        "8c970e35e786d7f2"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 1284544,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "priority_only": {
+      "checksums": [
+        "0c747b5eda8e8428"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 760224,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "sparsity_baseline": {
+      "checksums": [
+        "91eb01f8a7813f93"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 781020,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "sparsity_optimized": {
+      "checksums": [
+        "73e25120bd850bc1"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 729994,
+      "sample_policy": "full small run or first/last 32 events"
+    }
+  },
+  "pubmed": {
+    "coordination_baseline": {
+      "checksums": [
+        "d19807c04737678f"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 4937064,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "mapping_only": {
+      "checksums": [
+        "acbbf91289f2a085"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 5612206,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "optimized": {
+      "checksums": [
+        "72e1091c1719e9d7"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 5026662,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "pipeline_baseline": {
+      "checksums": [
+        "2e7e84d501215361"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 6338176,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "priority_only": {
+      "checksums": [
+        "214233b8fe219bd0"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 4937390,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "sparsity_baseline": {
+      "checksums": [
+        "5f0828b7769da9f9"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 5403790,
+      "sample_policy": "full small run or first/last 32 events"
+    },
+    "sparsity_optimized": {
+      "checksums": [
+        "7efb13ccfb32ece5"
+      ],
+      "command_issue_interval_cycles": 2,
+      "command_lane_violations": 0,
+      "event_count": 4824790,
+      "sample_policy": "full small run or first/last 32 events"
+    }
+  }
+}

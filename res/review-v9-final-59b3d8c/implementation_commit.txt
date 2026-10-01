@@ -1,0 +1,18 @@
+d672c7d fix review v8 command scheduling
+ configs/paper_workloads.json                       |  11 +-
+ hygcn/paper_sim.cpp                                | 484 +++++++++++++++------
+ hygcn/paper_sim.h                                  |  24 +
+ hygcn_test/unit.cpp                                | 200 +++++++--
+ .../reproduce-hygcn-paper-performance/design.md    |   2 +-
+ .../specs/paper-performance-validation/spec.md     |  19 +-
+ .../reproduce-hygcn-paper-performance/tasks.md     |   7 +
+ tools/paper_benchmark.py                           |  61 +++
+ tools/revision_audit.py                            | 201 +++++++++
+ tools/test_metric_validator.py                     |   6 +
+ tools/test_paper_benchmark.py                      |  40 +-
+ tools/validate_paper_metrics.py                    |  35 ++
+ 12 files changed, 918 insertions(+), 172 deletions(-)
+59b3d8c enforce monotonic memory event time
+ hygcn/paper_sim.cpp | 19 +++++++++++++++----
+ hygcn_test/unit.cpp | 25 +++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+), 4 deletions(-)
