@@ -1,0 +1,11 @@
+raw_files=21/21
+admission_events=16412982
+admitted_blocks=64675995
+read_blocks=61999387
+write_blocks=2676608
+max_blocks_per_cycle=4
+admission_unique_checksums=21
+command_events=70813185
+command_lane_violations=0
+command_unique_checksums=21
+independent_cpp_replay=PASS

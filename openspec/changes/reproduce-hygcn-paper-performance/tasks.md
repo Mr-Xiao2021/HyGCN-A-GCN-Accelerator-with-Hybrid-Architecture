@@ -132,4 +132,4 @@
 - [x] 16.3 将 command evidence 升级为完整可逆 delta-varint/base64 分块，独立 validator 重算 count、type totals、checksum、channel lane、row state 和 recovery timing
 - [x] 16.4 增加删除 event、修改中间 cycle、清空 edge samples 和伪造 checksum 的 mutation tests，四类篡改均必须失败
 - [x] 16.5 扩展 revision audit 到完整 workload policy tree、调度源码 diff 和修正前后 metric delta；调度政策变化时不得输出无限定的 no-retuning 声明
-- [ ] 16.6 执行 clean Release、CTest、legacy、cap-free 14+12、FIFO window 全扫描、partition/model sensitivity 和严格 OpenSpec，固化结果并推送远端
+- [x] 16.6 执行 clean Release、CTest、legacy、cap-free 14+12、FIFO window 全扫描、partition/model sensitivity 和严格 OpenSpec，固化结果并推送远端

@@ -1,0 +1,6 @@
+raw_manifest=21/21 PASS
+paper_metrics=12/14
+internal_checks_schema_v6=8/12
+fig17_cap_free=FAIL_DISCLOSED
+revision_no_target_parameter_retuning=false
+complete_trace_reconstruction=PASS

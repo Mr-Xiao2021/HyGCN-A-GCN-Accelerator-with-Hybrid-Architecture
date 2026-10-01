@@ -1,0 +1,4 @@
+capacity_mib,all_required_pass,mean_relative_error,selection_role
+4,FAIL,0.11869136123168515,sensitivity_only
+5,PASS,0.08482090970632182,calibrated_fit_selected
+6,FAIL,0.11320139835620673,sensitivity_only

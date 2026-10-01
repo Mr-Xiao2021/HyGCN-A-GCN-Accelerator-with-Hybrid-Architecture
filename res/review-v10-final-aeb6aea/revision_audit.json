@@ -1,0 +1,486 @@
+{
+  "base_ref": "f8a31defa030c96b82bc1065f76734de4f86f5f5",
+  "calibration_differences": [
+    {
+      "after": "0",
+      "before": null,
+      "parameter": "model.coordinator_fifo_active_windows"
+    }
+  ],
+  "calibration_keys": [
+    "model.aggregation_shard_capacity_bytes",
+    "model.batch_launch_interval_cycles",
+    "model.neighbor_index_ready_cycles",
+    "model.coordinator_fifo_active_windows",
+    "model.row_first_bank_interleave"
+  ],
+  "implementation_ref": "aeb6aea9942b207aa5bc5cdf5a9dc2bee3cc081d",
+  "metric_delta": [
+    {
+      "after": 1.1502065231010559,
+      "before": 4.733432056893878,
+      "delta": -3.583225533792822,
+      "metric": "aggregate.coordination_active_bandwidth_gain",
+      "relative_delta": -0.7570036900760266
+    },
+    {
+      "after": 1.127634774121,
+      "before": 4.208020114189668,
+      "delta": -3.080385340068668,
+      "metric": "aggregate.coordination_bandwidth_gain",
+      "relative_delta": -0.7320272376268936
+    },
+    {
+      "after": 1.127634774121,
+      "before": 4.208020114189669,
+      "delta": -3.080385340068669,
+      "metric": "aggregate.coordination_speedup",
+      "relative_delta": -0.7320272376268937
+    },
+    {
+      "after": 1.1188914828238592,
+      "before": 4.049283837398504,
+      "delta": -2.930392354574645,
+      "metric": "aggregate.mapping_bandwidth_gain",
+      "relative_delta": -0.7236816366168344
+    },
+    {
+      "after": 1.1188914828238592,
+      "before": 4.049283837398504,
+      "delta": -2.930392354574645,
+      "metric": "aggregate.mapping_speedup",
+      "relative_delta": -0.7236816366168344
+    },
+    {
+      "after": 1.0006345699466845,
+      "before": 3.7346374777049074,
+      "delta": -2.7340029077582226,
+      "metric": "aggregate.priority_bandwidth_gain",
+      "relative_delta": -0.7320664787625875
+    },
+    {
+      "after": 1.0078132030958893,
+      "before": 1.03780199908443,
+      "delta": -0.029988795988540762,
+      "metric": "aggregate.priority_incremental_bandwidth_gain",
+      "relative_delta": -0.02889645232423669
+    },
+    {
+      "after": 1.0078132030958893,
+      "before": 1.03780199908443,
+      "delta": -0.029988795988540762,
+      "metric": "aggregate.priority_incremental_bandwidth_gain_aggregate",
+      "relative_delta": -0.02889645232423669
+    },
+    {
+      "after": 1.030872335658977,
+      "before": 1.0527164229589256,
+      "delta": -0.021844087299948578,
+      "metric": "aggregate.priority_incremental_row_hit_ratio",
+      "relative_delta": -0.020750210430412256
+    },
+    {
+      "after": 1.030872335658977,
+      "before": 1.0527164229589256,
+      "delta": -0.021844087299948578,
+      "metric": "aggregate.priority_incremental_row_hit_ratio_aggregate",
+      "relative_delta": -0.020750210430412256
+    },
+    {
+      "after": 1.0078132030958893,
+      "before": 1.0378019990844303,
+      "delta": -0.029988795988540984,
+      "metric": "aggregate.priority_incremental_speedup",
+      "relative_delta": -0.028896452324236897
+    },
+    {
+      "after": 1.0078132030958893,
+      "before": 1.0378019990844303,
+      "delta": -0.029988795988540984,
+      "metric": "aggregate.priority_incremental_speedup_aggregate",
+      "relative_delta": -0.028896452324236897
+    },
+    {
+      "after": 1.0006345699466845,
+      "before": 3.734637477704908,
+      "delta": -2.7340029077582235,
+      "metric": "aggregate.priority_speedup",
+      "relative_delta": -0.7320664787625876
+    },
+    {
+      "after": 1.2898238507061814,
+      "before": 4.730502092855567,
+      "delta": -3.440678242149386,
+      "metric": "per_dataset.citeseer.coordination_active_bandwidth_gain",
+      "relative_delta": -0.7273389113062247
+    },
+    {
+      "after": 1.2531597671015318,
+      "before": 4.333263711537914,
+      "delta": -3.080103944436382,
+      "metric": "per_dataset.citeseer.coordination_bandwidth_gain",
+      "relative_delta": -0.7108046381380342
+    },
+    {
+      "after": 1.2531597671015315,
+      "before": 4.333263711537914,
+      "delta": -3.080103944436382,
+      "metric": "per_dataset.citeseer.coordination_speedup",
+      "relative_delta": -0.7108046381380342
+    },
+    {
+      "after": 1.2409908306661634,
+      "before": 4.162819574048933,
+      "delta": -2.921828743382769,
+      "metric": "per_dataset.citeseer.mapping_bandwidth_gain",
+      "relative_delta": -0.7018869521988137
+    },
+    {
+      "after": 1.2409908306661634,
+      "before": 4.162819574048933,
+      "delta": -2.921828743382769,
+      "metric": "per_dataset.citeseer.mapping_speedup",
+      "relative_delta": -0.7018869521988137
+    },
+    {
+      "after": 1.0437941774202477,
+      "before": 3.609304695275353,
+      "delta": -2.565510517855105,
+      "metric": "per_dataset.citeseer.priority_bandwidth_gain",
+      "relative_delta": -0.7108046381380342
+    },
+    {
+      "after": 1.0098058230042166,
+      "before": 1.0409443970503867,
+      "delta": -0.031138574046170042,
+      "metric": "per_dataset.citeseer.priority_incremental_bandwidth_gain",
+      "relative_delta": -0.029913772661060576
+    },
+    {
+      "after": 1.0098058230042166,
+      "before": 1.0409443970503867,
+      "delta": -0.031138574046170042,
+      "metric": "per_dataset.citeseer.priority_incremental_bandwidth_gain_aggregate",
+      "relative_delta": -0.029913772661060576
+    },
+    {
+      "after": 1.0285452414542067,
+      "before": 1.0371310966138552,
+      "delta": -0.008585855159648492,
+      "metric": "per_dataset.citeseer.priority_incremental_row_hit_ratio",
+      "relative_delta": -0.008278466615918257
+    },
+    {
+      "after": 1.0285452414542067,
+      "before": 1.0371310966138552,
+      "delta": -0.008585855159648492,
+      "metric": "per_dataset.citeseer.priority_incremental_row_hit_ratio_aggregate",
+      "relative_delta": -0.008278466615918257
+    },
+    {
+      "after": 1.0098058230042166,
+      "before": 1.0409443970503867,
+      "delta": -0.031138574046170042,
+      "metric": "per_dataset.citeseer.priority_incremental_speedup",
+      "relative_delta": -0.029913772661060576
+    },
+    {
+      "after": 1.0098058230042166,
+      "before": 1.0409443970503867,
+      "delta": -0.031138574046170042,
+      "metric": "per_dataset.citeseer.priority_incremental_speedup_aggregate",
+      "relative_delta": -0.029913772661060576
+    },
+    {
+      "after": 1.0437941774202477,
+      "before": 3.609304695275353,
+      "delta": -2.565510517855105,
+      "metric": "per_dataset.citeseer.priority_speedup",
+      "relative_delta": -0.7108046381380342
+    },
+    {
+      "after": 1.057261074782165,
+      "before": 4.738098803640659,
+      "delta": -3.680837728858494,
+      "metric": "per_dataset.cora.coordination_active_bandwidth_gain",
+      "relative_delta": -0.7768596395732004
+    },
+    {
+      "after": 1.030097887109931,
+      "before": 3.61767246205275,
+      "delta": -2.5875745749428187,
+      "metric": "per_dataset.cora.coordination_bandwidth_gain",
+      "relative_delta": -0.7152594940766334
+    },
+    {
+      "after": 1.030097887109931,
+      "before": 3.61767246205275,
+      "delta": -2.5875745749428187,
+      "metric": "per_dataset.cora.coordination_speedup",
+      "relative_delta": -0.7152594940766334
+    },
+    {
+      "after": 1.018478909768045,
+      "before": 3.555863868789573,
+      "delta": -2.5373849590215283,
+      "metric": "per_dataset.cora.mapping_bandwidth_gain",
+      "relative_delta": -0.713577643197365
+    },
+    {
+      "after": 1.0184789097680451,
+      "before": 3.5558638687895736,
+      "delta": -2.5373849590215283,
+      "metric": "per_dataset.cora.mapping_speedup",
+      "relative_delta": -0.713577643197365
+    },
+    {
+      "after": 0.9850904363121868,
+      "before": 3.459607663186876,
+      "delta": -2.4745172268746893,
+      "metric": "per_dataset.cora.priority_bandwidth_gain",
+      "relative_delta": -0.7152594940766335
+    },
+    {
+      "after": 1.0114081668559365,
+      "before": 1.0173821595943764,
+      "delta": -0.005973992738439904,
+      "metric": "per_dataset.cora.priority_incremental_bandwidth_gain",
+      "relative_delta": -0.005871925983862048
+    },
+    {
+      "after": 1.0114081668559365,
+      "before": 1.0173821595943764,
+      "delta": -0.005973992738439904,
+      "metric": "per_dataset.cora.priority_incremental_bandwidth_gain_aggregate",
+      "relative_delta": -0.005871925983862048
+    },
+    {
+      "after": 1.040704700120842,
+      "before": 1.0507095484024842,
+      "delta": -0.010004848281642165,
+      "metric": "per_dataset.cora.priority_incremental_row_hit_ratio",
+      "relative_delta": -0.009521992349697115
+    },
+    {
+      "after": 1.040704700120842,
+      "before": 1.0507095484024842,
+      "delta": -0.010004848281642165,
+      "metric": "per_dataset.cora.priority_incremental_row_hit_ratio_aggregate",
+      "relative_delta": -0.009521992349697115
+    },
+    {
+      "after": 1.0114081668559365,
+      "before": 1.0173821595943764,
+      "delta": -0.005973992738439904,
+      "metric": "per_dataset.cora.priority_incremental_speedup",
+      "relative_delta": -0.005871925983862048
+    },
+    {
+      "after": 1.0114081668559365,
+      "before": 1.0173821595943764,
+      "delta": -0.005973992738439904,
+      "metric": "per_dataset.cora.priority_incremental_speedup_aggregate",
+      "relative_delta": -0.005871925983862048
+    },
+    {
+      "after": 0.985090436312187,
+      "before": 3.459607663186876,
+      "delta": -2.4745172268746893,
+      "metric": "per_dataset.cora.priority_speedup",
+      "relative_delta": -0.7152594940766335
+    },
+    {
+      "after": 1.103534643814822,
+      "before": 4.731695274185405,
+      "delta": -3.6281606303705836,
+      "metric": "per_dataset.pubmed.coordination_active_bandwidth_gain",
+      "relative_delta": -0.7667781672595552
+    },
+    {
+      "after": 1.0996466681515378,
+      "before": 4.67312416897834,
+      "delta": -3.5734775008268027,
+      "metric": "per_dataset.pubmed.coordination_bandwidth_gain",
+      "relative_delta": -0.7646870426745054
+    },
+    {
+      "after": 1.0996466681515378,
+      "before": 4.673124168978341,
+      "delta": -3.5734775008268036,
+      "metric": "per_dataset.pubmed.coordination_speedup",
+      "relative_delta": -0.7646870426745055
+    },
+    {
+      "after": 1.0972047080373692,
+      "before": 4.429168069357006,
+      "delta": -3.331963361319637,
+      "metric": "per_dataset.pubmed.mapping_bandwidth_gain",
+      "relative_delta": -0.7522774726865008
+    },
+    {
+      "after": 1.0972047080373692,
+      "before": 4.429168069357007,
+      "delta": -3.3319633613196378,
+      "metric": "per_dataset.pubmed.mapping_speedup",
+      "relative_delta": -0.7522774726865009
+    },
+    {
+      "after": 0.9730190961076189,
+      "before": 4.135000074652492,
+      "delta": -3.161980978544873,
+      "metric": "per_dataset.pubmed.priority_bandwidth_gain",
+      "relative_delta": -0.7646870426745054
+    },
+    {
+      "after": 1.0022256194275145,
+      "before": 1.055079440608527,
+      "delta": -0.05285382118101256,
+      "metric": "per_dataset.pubmed.priority_incremental_bandwidth_gain",
+      "relative_delta": -0.050094636618574065
+    },
+    {
+      "after": 1.0022256194275145,
+      "before": 1.055079440608527,
+      "delta": -0.05285382118101256,
+      "metric": "per_dataset.pubmed.priority_incremental_bandwidth_gain_aggregate",
+      "relative_delta": -0.050094636618574065
+    },
+    {
+      "after": 1.0233670654018825,
+      "before": 1.0703086238604373,
+      "delta": -0.046941558458554855,
+      "metric": "per_dataset.pubmed.priority_incremental_row_hit_ratio",
+      "relative_delta": -0.04385796527476713
+    },
+    {
+      "after": 1.0233670654018825,
+      "before": 1.0703086238604373,
+      "delta": -0.046941558458554855,
+      "metric": "per_dataset.pubmed.priority_incremental_row_hit_ratio_aggregate",
+      "relative_delta": -0.04385796527476713
+    },
+    {
+      "after": 1.0022256194275148,
+      "before": 1.0550794406085273,
+      "delta": -0.05285382118101256,
+      "metric": "per_dataset.pubmed.priority_incremental_speedup",
+      "relative_delta": -0.05009463661857405
+    },
+    {
+      "after": 1.0022256194275148,
+      "before": 1.0550794406085273,
+      "delta": -0.05285382118101256,
+      "metric": "per_dataset.pubmed.priority_incremental_speedup_aggregate",
+      "relative_delta": -0.05009463661857405
+    },
+    {
+      "after": 0.973019096107619,
+      "before": 4.135000074652493,
+      "delta": -3.161980978544874,
+      "metric": "per_dataset.pubmed.priority_speedup",
+      "relative_delta": -0.7646870426745054
+    }
+  ],
+  "no_target_parameter_retuning": false,
+  "no_target_parameter_retuning_derivation": "Computed from the complete versioned figures, graph_partition, and memory_ablation policy trees plus declared profile calibration keys. Source policy file hashes are part of the boolean. Any scheduler policy or source implementation change, including FIFO window count/size/release, makes this boolean false instead of being hidden by an allowlist.",
+  "profile_differences": [
+    {
+      "after": "0",
+      "before": null,
+      "parameter": "model.coordinator_fifo_active_windows"
+    }
+  ],
+  "profile_path": "configs/HYGCN_PAPER.ini",
+  "schema_version": 1,
+  "source_policy_files": [
+    {
+      "after_sha256": "4e974d06379a355502d0344f301c2a9ee5a7c670d95df85387e5600aa4c40554",
+      "before_sha256": "5657153490773971684061b94e18a39248f16ff845d78b0dc1b9e3cfa5673254",
+      "changed": true,
+      "changed_diff_lines": 64,
+      "path": "hygcn/paper_sim.cpp",
+      "unified_diff": "diff --git a/hygcn/paper_sim.cpp b/hygcn/paper_sim.cpp\nindex 7e987fa..ce58d41 100644\n--- a/hygcn/paper_sim.cpp\n+++ b/hygcn/paper_sim.cpp\n@@ -28,0 +29 @@ constexpr int kIndexBytes = 4;\n+constexpr std::size_t kCommandTraceChunkEvents = 4096;\n@@ -206 +207,2 @@ json ArchitectureJson(const ArchitectureConfig& architecture) {\n-        {\"coordinator_fifo_active_windows\", kCoordinatorPorts},\n+        {\"coordinator_fifo_active_windows\",\n+         architecture.coordinator_fifo_active_windows},\n@@ -311,0 +314 @@ json LayerJson(const LayerMetrics& layer) {\n+            {\"row\", trace.row},\n@@ -314,0 +318,7 @@ json LayerJson(const LayerMetrics& layer) {\n+    json command_chunks = json::array();\n+    for (const auto& chunk : layer.command_trace_chunks) {\n+        command_chunks.push_back({\n+            {\"event_count\", chunk.event_count},\n+            {\"payload_base64\", Base64Encode(chunk.payload)},\n+        });\n+    }\n@@ -316 +326,5 @@ json LayerJson(const LayerMetrics& layer) {\n-        {\"representation\", \"full_for_small_runs_first_last_32_for_large_runs_v1\"},\n+        {\"representation\", \"command_delta_varint_base64_v2\"},\n+        {\"fields\", {\"cycle_delta\", \"sequence\", \"block_offset\", \"channel\",\n+                    \"bank\", \"row\", \"command\"}},\n+        {\"chunk_event_limit\", kCommandTraceChunkEvents},\n+        {\"trace_chunks\", command_chunks},\n@@ -726,0 +741,2 @@ ArchitectureConfig ArchitectureConfig::Load(const std::string& path) {\n+    config.coordinator_fifo_active_windows = reader.GetInteger(\n+        \"model\", \"coordinator_fifo_active_windows\", -1);\n@@ -844,0 +861,2 @@ void ArchitectureConfig::Validate() const {\n+    require_positive(coordinator_fifo_active_windows >= 0,\n+                     \"coordinator_fifo_active_windows\");\n@@ -1344,0 +1363 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(\n+    uint64_t command_chunk_previous_cycle = 0;\n@@ -1348 +1367,2 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(\n-                              uint64_t cycle) {\n+                              uint64_t cycle,\n+                              uint64_t row) {\n@@ -1368,0 +1389 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(\n+            row,\n@@ -1374,0 +1396 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(\n+                 trace.row,\n@@ -1379,0 +1402,18 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(\n+        if (result.command_trace_chunks.empty() ||\n+            result.command_trace_chunks.back().event_count >=\n+                kCommandTraceChunkEvents) {\n+            result.command_trace_chunks.push_back({});\n+            command_chunk_previous_cycle = 0;\n+        }\n+        auto& chunk = result.command_trace_chunks.back();\n+        AppendVarint(chunk.payload, chunk.event_count == 0\n+            ? trace.cycle : trace.cycle - command_chunk_previous_cycle);\n+        command_chunk_previous_cycle = trace.cycle;\n+        for (const uint64_t value : {\n+                 trace.sequence, trace.block_offset,\n+                 static_cast<uint64_t>(trace.channel),\n+                 static_cast<uint64_t>(trace.bank), trace.row,\n+                 static_cast<uint64_t>(trace.command)}) {\n+            AppendVarint(chunk.payload, value);\n+        }\n+        ++chunk.event_count;\n@@ -1610,2 +1650,4 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(\n-            if (fifo_active_windows.count(window_key) == 0 &&\n-                fifo_active_windows.size() >= kCoordinatorPorts) {\n+            if (architecture.coordinator_fifo_active_windows > 0 &&\n+                fifo_active_windows.count(window_key) == 0 &&\n+                fifo_active_windows.size() >= static_cast<std::size_t>(\n+                    architecture.coordinator_fifo_active_windows)) {\n@@ -1670 +1712,2 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(\n-            if (priority == MemoryPriorityMode::FIFO) {\n+            if (priority == MemoryPriorityMode::FIFO &&\n+                architecture.coordinator_fifo_active_windows > 0) {\n@@ -1962 +2005,4 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(\n-        record_command(selected, selected_choice.command, command_cycle);\n+        const uint64_t command_row =\n+            selected_choice.command == MemoryCommandType::PRECHARGE\n+                ? bank_state.open_row : selected.row;\n+        record_command(selected, selected_choice.command, command_cycle, command_row);\n@@ -2119 +2165,2 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(\n-        if (priority == MemoryPriorityMode::FIFO) {\n+        if (priority == MemoryPriorityMode::FIFO &&\n+            architecture.coordinator_fifo_active_windows > 0) {\n@@ -2861,0 +2909 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,\n+        metrics.command_trace_chunks = memory_timing.command_trace_chunks;\n"
+    },
+    {
+      "after_sha256": "872ba395c66c2cabda5838057d019dda96ef9e0d14107c11c5d83d697135e2bb",
+      "before_sha256": "67977bd81eb74d1f9ec1d6a2ed5178af482542cf1d6bb15cb1f8e064eda1612e",
+      "changed": true,
+      "changed_diff_lines": 9,
+      "path": "hygcn/paper_sim.h",
+      "unified_diff": "diff --git a/hygcn/paper_sim.h b/hygcn/paper_sim.h\nindex 9f817a5..79fb766 100644\n--- a/hygcn/paper_sim.h\n+++ b/hygcn/paper_sim.h\n@@ -95,0 +96 @@ struct ArchitectureConfig {\n+    int coordinator_fifo_active_windows = 0;\n@@ -190,0 +192 @@ struct MemoryCommandTrace {\n+    uint64_t row = 0;\n@@ -193,0 +196,5 @@ struct MemoryCommandTrace {\n+struct EncodedCommandTraceChunk {\n+    uint64_t event_count = 0;\n+    std::string payload;\n+};\n+\n@@ -252,0 +260 @@ struct MemoryTimingResult {\n+    std::vector<EncodedCommandTraceChunk> command_trace_chunks;\n@@ -409,0 +418 @@ struct LayerMetrics {\n+    std::vector<EncodedCommandTraceChunk> command_trace_chunks;\n"
+    }
+  ],
+  "target_files": [
+    {
+      "after_sha256": "30ba145017b0c9f028c6a11b2bc747e402d0d83bdbc7aab3724c9117e3e8291a",
+      "before_sha256": "30ba145017b0c9f028c6a11b2bc747e402d0d83bdbc7aab3724c9117e3e8291a",
+      "changed": false,
+      "changed_paths": [],
+      "path": "configs/paper_metrics.json",
+      "target_parameters_after_sha256": "3431fb583c6814d533e649a8418e9ba9f002249db6b17e4a45b36c6e0ac857eb",
+      "target_parameters_before_sha256": "3431fb583c6814d533e649a8418e9ba9f002249db6b17e4a45b36c6e0ac857eb",
+      "target_parameters_changed": false
+    },
+    {
+      "after_sha256": "53fd5dd6385ead37b14b49b8c2ea2429163e0310c7fd2547eff58f6d33b13a9f",
+      "before_sha256": "6f9dd8c460d1e90f7076ef9f18b5139ecb00a4269d590e2a39e395de754b5348",
+      "changed": true,
+      "changed_paths": [
+        {
+          "after": {
+            "policy": "every PRE, ACT, READ, and WRITE event is stored in a reversible chunked stream; the validator independently reconstructs event and command totals, checksum, edge samples, channel-lane spacing, tCCD/turnaround, and bank recovery",
+            "representation": "command_delta_varint_base64_v2"
+          },
+          "before": null,
+          "path": "memory_ablation.command_trace"
+        },
+        {
+          "after": "The required FIFO baseline has no active-window resource cap: each admission cycle selects one ready Edge/Input/Weight/Output port and admits up to four consecutive blocks subject only to the same transaction and command queue capacities used by batch-class. Positive fifo_active_windows values are diagnostic counterfactuals, not paper evidence. Batch-class changes only request ordering and assembles batch-local Edge > Input > Weight > Output streams with same batch/class open-row continuation.",
+          "before": "FIFO selects one Edge/Input/Weight/Output port per admission cycle, admits up to four consecutive blocks, and bounds the uncoordinated in-flight row windows to the four Figure 9 request sources; batch-class assembles batch-local Edge > Input > Weight > Output streams with same batch/class open-row continuation",
+          "path": "memory_ablation.coordinator_input_policy"
+        },
+        {
+          "after": "HyGCN HPCA 2020 Figure 9 identifies four Edge, Input, Weight, and Output request sources; it does not specify four unfinished 2 KiB windows. Section 4.5.2 attributes the optimization to priority-based request reordering and low-bit channel/bank mapping.",
+          "before": "HyGCN HPCA 2020 Figure 9 shows four concurrent Edge, Input, Weight, and Output request sources; Section 4.5.2 says the uncoordinated requests are handled sequentially and the coordinator assembles them into continuous batch-local streams before low-bit remapping",
+          "path": "memory_ablation.coordinator_input_source"
+        },
+        {
+          "after": 0,
+          "before": 4,
+          "path": "memory_ablation.fifo_active_windows"
+        },
+        {
+          "after": "diagnostic-only when fifo_active_windows is positive; the required profile is unbounded",
+          "before": "last admitted block data-command issue",
+          "path": "memory_ablation.fifo_window_release"
+        },
+        {
+          "after": [
+            0,
+            1,
+            2,
+            4,
+            8,
+            512
+          ],
+          "before": null,
+          "path": "memory_ablation.fifo_window_sensitivity"
+        },
+        {
+          "after": 6,
+          "before": 5,
+          "path": "schema_version"
+        },
+        {
+          "after": "hygcn-hpca2020-table5-gcn-v6-cap-free-full-command-trace",
+          "before": "hygcn-hpca2020-table5-gcn-v5-command-lane-fifo-windows",
+          "path": "workload_version"
+        }
+      ],
+      "path": "configs/paper_workloads.json",
+      "target_parameters_after_sha256": "c66bb350738f99e461411dc70d1697dfa269fdc88fc5ce8435ce02de85cd2955",
+      "target_parameters_before_sha256": "e3da691fd090c22bc2514ea28ba1fa97c8b61a7981df7b8ac33b9252802e7b68",
+      "target_parameters_changed": true
+    }
+  ]
+}
