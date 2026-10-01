@@ -26,6 +26,7 @@ using json = nlohmann::json;
 constexpr uint64_t kGiB = 1024ULL * 1024ULL * 1024ULL;
 constexpr int kDataBytes = 4;
 constexpr int kIndexBytes = 4;
+constexpr std::size_t kCommandTraceChunkEvents = 4096;
 
 uint64_t CeilDiv(uint64_t value, uint64_t divisor) {
     if (divisor == 0) {
@@ -203,7 +204,8 @@ json ArchitectureJson(const ArchitectureConfig& architecture) {
          architecture.hbm_command_queue_entries_per_bank},
         {"coordinator_issue_blocks_per_cycle",
          CoordinatorIssueBlocksPerCycle(architecture)},
-        {"coordinator_fifo_active_windows", kCoordinatorPorts},
+        {"coordinator_fifo_active_windows",
+         architecture.coordinator_fifo_active_windows},
         {"coordinator_fifo_window_blocks",
          architecture.hbm_row_bytes / architecture.block_size},
         {"hbm_read_row_hit_cycles", architecture.hbm_read_row_hit_cycles},
@@ -309,11 +311,23 @@ json LayerJson(const LayerMetrics& layer) {
             {"block_offset", trace.block_offset},
             {"channel", trace.channel},
             {"bank", trace.bank},
+            {"row", trace.row},
             {"command", MemoryCommandName(trace.command)},
         });
     }
+    json command_chunks = json::array();
+    for (const auto& chunk : layer.command_trace_chunks) {
+        command_chunks.push_back({
+            {"event_count", chunk.event_count},
+            {"payload_base64", Base64Encode(chunk.payload)},
+        });
+    }
     json command_trace = {
-        {"representation", "full_for_small_runs_first_last_32_for_large_runs_v1"},
+        {"representation", "command_delta_varint_base64_v2"},
+        {"fields", {"cycle_delta", "sequence", "block_offset", "channel",
+                    "bank", "row", "command"}},
+        {"chunk_event_limit", kCommandTraceChunkEvents},
+        {"trace_chunks", command_chunks},
         {"event_count", layer.command_trace_event_count},
         {"checksum_fnv1a64", Hex64(layer.command_trace_checksum)},
         {"command_lane_violations", layer.command_lane_violations},
@@ -724,6 +738,8 @@ ArchitectureConfig ArchitectureConfig::Load(const std::string& path) {
         "model", "batch_launch_interval_cycles", -1);
     config.neighbor_index_ready_cycles = reader.GetInteger(
         "model", "neighbor_index_ready_cycles", -1);
+    config.coordinator_fifo_active_windows = reader.GetInteger(
+        "model", "coordinator_fifo_active_windows", -1);
     config.row_first_bank_interleave = reader.GetInteger(
         "model", "row_first_bank_interleave", -1);
     config.sequential_spill_alignment = reader.Get(
@@ -842,6 +858,8 @@ void ArchitectureConfig::Validate() const {
                      "batch_launch_interval_cycles");
     require_positive(neighbor_index_ready_cycles >= 0,
                      "neighbor_index_ready_cycles");
+    require_positive(coordinator_fifo_active_windows >= 0,
+                     "coordinator_fifo_active_windows");
     require_positive(row_first_bank_interleave > 0 &&
                          row_first_bank_interleave <= hbm_banks_per_channel &&
                          hbm_banks_per_channel % row_first_bank_interleave == 0,
@@ -1342,10 +1360,12 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     std::vector<MemoryCommandTrace> first_command_samples;
     std::deque<MemoryCommandTrace> last_command_samples;
     constexpr std::size_t kCommandEdgeSamples = 32;
+    uint64_t command_chunk_previous_cycle = 0;
     result.command_trace_checksum = 1469598103934665603ULL;
     auto record_command = [&](const Candidate& candidate,
                               MemoryCommandType command,
-                              uint64_t cycle) {
+                              uint64_t cycle,
+                              uint64_t row) {
         if (saw_command && cycle < last_command_cycle) {
             throw std::runtime_error("memory command trace is not time ordered");
         }
@@ -1366,17 +1386,37 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             candidate.block_offset,
             candidate.channel,
             candidate.bank,
+            row,
             command,
         };
         for (const uint64_t value : {
                  trace.cycle, trace.sequence, trace.block_offset,
                  static_cast<uint64_t>(trace.channel),
                  static_cast<uint64_t>(trace.bank),
+                 trace.row,
                  static_cast<uint64_t>(trace.command)}) {
             result.command_trace_checksum ^= value;
             result.command_trace_checksum *= 1099511628211ULL;
         }
         ++result.command_trace_event_count;
+        if (result.command_trace_chunks.empty() ||
+            result.command_trace_chunks.back().event_count >=
+                kCommandTraceChunkEvents) {
+            result.command_trace_chunks.push_back({});
+            command_chunk_previous_cycle = 0;
+        }
+        auto& chunk = result.command_trace_chunks.back();
+        AppendVarint(chunk.payload, chunk.event_count == 0
+            ? trace.cycle : trace.cycle - command_chunk_previous_cycle);
+        command_chunk_previous_cycle = trace.cycle;
+        for (const uint64_t value : {
+                 trace.sequence, trace.block_offset,
+                 static_cast<uint64_t>(trace.channel),
+                 static_cast<uint64_t>(trace.bank), trace.row,
+                 static_cast<uint64_t>(trace.command)}) {
+            AppendVarint(chunk.payload, value);
+        }
+        ++chunk.event_count;
         if (first_command_samples.size() < kCommandEdgeSamples) {
             first_command_samples.push_back(trace);
         } else {
@@ -1607,8 +1647,10 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             const auto iterator = pending_fifo_ports[port].begin();
             const uint64_t logical_window = iterator->block / blocks_per_row;
             const auto window_key = std::make_pair(port, logical_window);
-            if (fifo_active_windows.count(window_key) == 0 &&
-                fifo_active_windows.size() >= kCoordinatorPorts) {
+            if (architecture.coordinator_fifo_active_windows > 0 &&
+                fifo_active_windows.count(window_key) == 0 &&
+                fifo_active_windows.size() >= static_cast<std::size_t>(
+                    architecture.coordinator_fifo_active_windows)) {
                 continue;
             }
             if (!transaction_queue_has_capacity(*iterator)) {
@@ -1667,7 +1709,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                 pending_fifo_ports[choice.port].erase(choice.iterator);
             }
             Candidate candidate = choice.candidate;
-            if (priority == MemoryPriorityMode::FIFO) {
+            if (priority == MemoryPriorityMode::FIFO &&
+                architecture.coordinator_fifo_active_windows > 0) {
                 const uint64_t logical_window = candidate.block / blocks_per_row;
                 ++fifo_active_windows[{choice.port, logical_window}];
             }
@@ -1959,7 +2002,10 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         auto& channel_state = channels[selected.channel];
         const uint64_t command_cycle = selected_choice.issue_cycle;
         simulation_cycle = command_cycle;
-        record_command(selected, selected_choice.command, command_cycle);
+        const uint64_t command_row =
+            selected_choice.command == MemoryCommandType::PRECHARGE
+                ? bank_state.open_row : selected.row;
+        record_command(selected, selected_choice.command, command_cycle, command_row);
         channel_state.next_command_cycle = command_cycle +
             architecture.hbm_command_issue_interval_cycles;
 
@@ -2116,7 +2162,8 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         selected_queue.active_stage = BankQueue::ActiveStage::NONE;
         state.completion = std::max(state.completion, completion);
         ++state.issued_blocks;
-        if (priority == MemoryPriorityMode::FIFO) {
+        if (priority == MemoryPriorityMode::FIFO &&
+            architecture.coordinator_fifo_active_windows > 0) {
             const std::size_t port = CoordinatorPort(state.request.request_class);
             const auto window_key = std::make_pair(
                 port, selected.block / blocks_per_row);
@@ -2859,6 +2906,7 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
         metrics.bank_blocks = memory_timing.bank_blocks;
         metrics.memory_request_traces = memory_timing.request_traces;
         metrics.command_trace_samples = memory_timing.command_trace_samples;
+        metrics.command_trace_chunks = memory_timing.command_trace_chunks;
         metrics.transaction_admission_traces = memory_timing.admission_traces;
         metrics.max_channel_read_queue_occupancy =
             memory_timing.max_channel_read_queue_occupancy;

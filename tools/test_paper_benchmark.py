@@ -1,9 +1,71 @@
 #!/usr/bin/env python3
+import base64
+import copy
 import importlib.util
 import json
 import math
 import sys
 from pathlib import Path
+
+
+def encode_varint(value):
+    payload = bytearray()
+    while True:
+        byte = value & 0x7F
+        value >>= 7
+        if value:
+            byte |= 0x80
+        payload.append(byte)
+        if not value:
+            return bytes(payload)
+
+
+def command_trace_summary(events):
+    command_ids = {"PRE": 0, "ACT": 1, "READ": 2, "WRITE": 3}
+    payload = bytearray()
+    previous_cycle = 0
+    checksum = 1469598103934665603
+    samples = []
+    for index, event in enumerate(events):
+        values = (
+            event["cycle"] if index == 0 else event["cycle"] - previous_cycle,
+            event["sequence"], event["block_offset"], event["channel"],
+            event["bank"], event["row"], command_ids[event["command"]],
+        )
+        previous_cycle = event["cycle"]
+        for value in values:
+            payload.extend(encode_varint(value))
+        for value in (
+                event["cycle"], event["sequence"], event["block_offset"],
+                event["channel"], event["bank"], event["row"],
+                command_ids[event["command"]]):
+            checksum ^= value
+            checksum = (checksum * 1099511628211) & 0xFFFFFFFFFFFFFFFF
+        samples.append(dict(event))
+    return {
+        "representation": "command_delta_varint_base64_v2",
+        "fields": list((
+            "cycle_delta", "sequence", "block_offset", "channel", "bank",
+            "row", "command",
+        )),
+        "chunk_event_limit": 4096,
+        "trace_chunks": [{
+            "event_count": len(events),
+            "payload_base64": base64.b64encode(payload).decode("ascii"),
+        }],
+        "event_count": len(events),
+        "checksum_fnv1a64": f"{checksum:016x}",
+        "command_lane_violations": 0,
+        "samples": samples,
+    }
+
+
+def expect_value_error(callback, label):
+    try:
+        callback()
+    except ValueError:
+        return
+    raise RuntimeError(f"mutation unexpectedly passed: {label}")
 
 
 def load_benchmark_module(root):
@@ -50,14 +112,15 @@ def main():
         raise RuntimeError("batch-class ordering must retain its paper provenance")
     if workloads["memory_ablation"]["command_queue_entries_per_bank"] != 8:
         raise RuntimeError("command queue depth must retain its DRAMSim3 provenance")
-    if workloads.get("schema_version") != 5 or \
+    if workloads.get("schema_version") != 6 or \
             workloads["memory_ablation"]["hbm_stacks"] != 2 or \
             workloads["memory_ablation"]["channels_per_stack"] != 8 or \
             workloads["memory_ablation"]["physical_channels"] != 16:
         raise RuntimeError("workload manifest must version the two-stack HBM topology")
-    if workloads["memory_ablation"]["fifo_active_windows"] != 4 or \
-            "Figure 9" not in workloads["memory_ablation"]["coordinator_input_source"]:
-        raise RuntimeError("FIFO active-window bound must derive from four paper sources")
+    if workloads["memory_ablation"]["fifo_active_windows"] != 0 or \
+            workloads["memory_ablation"]["fifo_window_sensitivity"] != \
+            [0, 1, 2, 4, 8, 512]:
+        raise RuntimeError("required FIFO must be cap-free with explicit diagnostics")
     if workloads["graph_partition"]["calibrated_fit_datasets"] != [
             "cora", "citeseer", "pubmed"] or \
             workloads["graph_partition"]["independent_holdout_datasets"] != []:
@@ -178,7 +241,7 @@ def main():
         "hbm_command_issue_interval_cycles": 2,
         "hbm_channels": 16,
         "coordinator_issue_blocks_per_cycle": 4,
-        "coordinator_fifo_active_windows": 4,
+        "coordinator_fifo_active_windows": 0,
         "coordinator_fifo_window_blocks": 32,
         "input_ping_pong_regions": 2,
         "neighbor_index_ready_cycles": 2,
@@ -198,12 +261,13 @@ def main():
     )
     if channel_change["before"] != "8" or channel_change["after"] != "16":
         raise RuntimeError("review v8 audit must reconstruct hbm_channels 8 -> 16")
-    current_revision = revision_audit.build_audit(root, "e3a4f13", "WORKTREE")
-    if not current_revision["no_target_parameter_retuning"] or \
-            current_revision["calibration_differences"] or \
-            any(item["target_parameters_changed"]
-                for item in current_revision["target_files"]):
-        raise RuntimeError("current review no-retuning audit must be derived from git inputs")
+    current_revision = revision_audit.build_audit(root, "f8a31de", "WORKTREE")
+    if current_revision["no_target_parameter_retuning"] or \
+            not any(item["target_parameters_changed"]
+                    for item in current_revision["target_files"]) or \
+            not any(item["changed"]
+                    for item in current_revision["source_policy_files"]):
+        raise RuntimeError("current review must disclose scheduler-policy changes")
     workload_audit = next(
         item for item in current_revision["target_files"]
         if item["path"] == "configs/paper_workloads.json"
@@ -212,6 +276,119 @@ def main():
             difference["path"] == "memory_ablation.fifo_active_windows"
             for difference in workload_audit["changed_paths"]):
         raise RuntimeError("revision audit must disclose the FIFO mechanism policy change")
+    if not all(item["changed_diff_lines"] > 0 and item["unified_diff"]
+               for item in current_revision["source_policy_files"]):
+        raise RuntimeError("revision audit must preserve source-policy diffs")
+    before_metrics = {
+        "aggregate": {"coordination_speedup": 4.2},
+        "per_dataset": {"cora": {"metrics": {"coordination_speedup": 4.0}}},
+    }
+    after_metrics = {
+        "aggregate": {"coordination_speedup": 1.1},
+        "per_dataset": {"cora": {"metrics": {"coordination_speedup": 1.0}}},
+    }
+    metric_delta = revision_audit.metric_differences(
+        before_metrics, after_metrics)
+    if metric_delta != [
+        {
+            "metric": "aggregate.coordination_speedup",
+            "before": 4.2,
+            "after": 1.1,
+            "delta": 1.1 - 4.2,
+            "relative_delta": (1.1 - 4.2) / 4.2,
+        },
+        {
+            "metric": "per_dataset.cora.coordination_speedup",
+            "before": 4.0,
+            "after": 1.0,
+            "delta": -3.0,
+            "relative_delta": -0.75,
+        },
+    ]:
+        raise RuntimeError("revision audit metric delta is not reproducible")
+
+    command_events = [
+        {"cycle": 0, "sequence": 0, "block_offset": 0, "channel": 0,
+         "bank": 0, "row": 0, "command": "ACT"},
+        {"cycle": 14, "sequence": 0, "block_offset": 0, "channel": 0,
+         "bank": 0, "row": 0, "command": "READ"},
+        {"cycle": 18, "sequence": 0, "block_offset": 1, "channel": 0,
+         "bank": 0, "row": 0, "command": "READ"},
+        {"cycle": 34, "sequence": 1, "block_offset": 0, "channel": 0,
+         "bank": 0, "row": 0, "command": "PRE"},
+        {"cycle": 48, "sequence": 1, "block_offset": 0, "channel": 0,
+         "bank": 0, "row": 1, "command": "ACT"},
+        {"cycle": 62, "sequence": 1, "block_offset": 0, "channel": 0,
+         "bank": 0, "row": 1, "command": "WRITE"},
+    ]
+    command_run = {
+        "architecture": {
+            "hbm_command_issue_interval_cycles": 2,
+            "hbm_channels": 1,
+            "hbm_banks_per_channel": 1,
+            "hbm_precharge_to_activate_cycles": 14,
+            "hbm_activate_to_read_cycles": 14,
+            "hbm_activate_to_write_cycles": 14,
+            "hbm_activate_to_precharge_cycles": 34,
+            "hbm_activate_to_activate_cycles": 48,
+            "hbm_read_to_read_cycles": 4,
+            "hbm_write_to_write_cycles": 4,
+            "hbm_read_to_write_cycles": 18,
+            "hbm_write_to_read_cycles": 16,
+            "hbm_read_to_precharge_cycles": 10,
+            "hbm_write_to_precharge_cycles": 24,
+        },
+        "layers": [{
+            "precharge_commands": 1,
+            "activate_commands": 2,
+            "read_commands": 2,
+            "write_commands": 1,
+            "command_trace": command_trace_summary(command_events),
+        }],
+    }
+    benchmark.validate_command_trace("synthetic", "valid", command_run)
+    read_only_run = copy.deepcopy(command_run)
+    read_only_events = command_events[:3]
+    read_only_run["layers"][0].update({
+        "precharge_commands": 0,
+        "activate_commands": 1,
+        "read_commands": 2,
+        "write_commands": 0,
+        "command_trace": command_trace_summary(read_only_events),
+    })
+    benchmark.validate_command_trace("synthetic", "read-only", read_only_run)
+    deleted = copy.deepcopy(command_run)
+    deleted["layers"][0]["command_trace"] = command_trace_summary(
+        command_events[:-1])
+    deleted["layers"][0]["command_trace"]["event_count"] = len(command_events)
+    expect_value_error(
+        lambda: benchmark.validate_command_trace("synthetic", "deleted", deleted),
+        "deleted event",
+    )
+    changed_cycle = copy.deepcopy(command_run)
+    changed_events = copy.deepcopy(command_events)
+    changed_events[2]["cycle"] = 15
+    changed_cycle["layers"][0]["command_trace"] = command_trace_summary(
+        changed_events)
+    expect_value_error(
+        lambda: benchmark.validate_command_trace(
+            "synthetic", "changed-cycle", changed_cycle),
+        "changed middle cycle",
+    )
+    empty_samples = copy.deepcopy(command_run)
+    empty_samples["layers"][0]["command_trace"]["samples"] = []
+    expect_value_error(
+        lambda: benchmark.validate_command_trace(
+            "synthetic", "empty-samples", empty_samples),
+        "empty samples",
+    )
+    fake_checksum = copy.deepcopy(command_run)
+    fake_checksum["layers"][0]["command_trace"]["checksum_fnv1a64"] = "0" * 16
+    expect_value_error(
+        lambda: benchmark.validate_command_trace(
+            "synthetic", "fake-checksum", fake_checksum),
+        "fake checksum",
+    )
     external_binary = Path("/tmp/hygcn-external-build/hygcntest")
     if partition.display_path(root, external_binary) != str(external_binary):
         raise RuntimeError("external absolute binary paths must remain printable")

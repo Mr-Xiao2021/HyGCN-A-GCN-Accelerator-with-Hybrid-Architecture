@@ -93,6 +93,7 @@ struct ArchitectureConfig {
     uint64_t aggregation_shard_capacity_bytes = 0;
     int batch_launch_interval_cycles = 0;
     int neighbor_index_ready_cycles = 0;
+    int coordinator_fifo_active_windows = 0;
     int row_first_bank_interleave = 0;
     std::string sequential_spill_alignment;
 
@@ -188,7 +189,13 @@ struct MemoryCommandTrace {
     uint64_t block_offset = 0;
     std::size_t channel = 0;
     std::size_t bank = 0;
+    uint64_t row = 0;
     MemoryCommandType command = MemoryCommandType::READ;
+};
+
+struct EncodedCommandTraceChunk {
+    uint64_t event_count = 0;
+    std::string payload;
 };
 
 inline constexpr std::size_t kMaxTraceHbmChannels = 16;
@@ -250,6 +257,7 @@ struct MemoryTimingResult {
     std::map<int, std::array<uint64_t, kRequestClassCount>> batch_completion_cycles;
     std::vector<MemoryRequestTrace> request_traces;
     std::vector<MemoryCommandTrace> command_trace_samples;
+    std::vector<EncodedCommandTraceChunk> command_trace_chunks;
     std::vector<TransactionAdmissionTrace> admission_traces;
     std::vector<uint64_t> max_channel_read_queue_occupancy;
     std::vector<uint64_t> max_channel_write_buffer_occupancy;
@@ -407,6 +415,7 @@ struct LayerMetrics {
     std::vector<MemoryRequestTrace> memory_request_traces;
     std::vector<MemoryRequestTrace> producer_request_traces;
     std::vector<MemoryCommandTrace> command_trace_samples;
+    std::vector<EncodedCommandTraceChunk> command_trace_chunks;
     std::vector<TransactionAdmissionTrace> transaction_admission_traces;
     std::vector<uint64_t> max_channel_read_queue_occupancy;
     std::vector<uint64_t> max_channel_write_buffer_occupancy;

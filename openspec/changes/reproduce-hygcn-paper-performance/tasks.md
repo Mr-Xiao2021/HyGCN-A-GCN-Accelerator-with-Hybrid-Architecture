@@ -124,3 +124,12 @@
 - [x] 15.2 增加同 row 两个 READ 的 `tCCD` 反例和跨 bank PRE/READ 冲突反例，保存命令计数、校验和及小运行完整 trace
 - [x] 15.3 修正 revision audit 的 `8 -> 16` channel 差异并由 git/config diff 生成 no-retuning 证据，同时并列报告 schema v6 `12/12` 与原 schema v5 结果
 - [x] 15.4 在不调整论文目标或校准参数的前提下执行 clean Release、CTest、legacy、14+12、partition/model sensitivity 和严格 OpenSpec，固化并推送完整证据
+
+## 16. Review v9 cap-free baseline、完整 command trace 与审计整改
+
+- [x] 16.1 将 required FIFO 的 `coordinator_fifo_active_windows` 设为 0，删除 Figure 9 四个 request source 等同于四个未完成 row window 的错误解释，并保留 1/2/4/8/queue-capacity 诊断扫描
+- [x] 16.2 保证 FIFO 与 batch-class 共享相同 admission bandwidth、directional transaction queue 和 bank command queue capacity，required 对比只保留 priority/reordering 与 address mapping 差异
+- [x] 16.3 将 command evidence 升级为完整可逆 delta-varint/base64 分块，独立 validator 重算 count、type totals、checksum、channel lane、row state 和 recovery timing
+- [x] 16.4 增加删除 event、修改中间 cycle、清空 edge samples 和伪造 checksum 的 mutation tests，四类篡改均必须失败
+- [x] 16.5 扩展 revision audit 到完整 workload policy tree、调度源码 diff 和修正前后 metric delta；调度政策变化时不得输出无限定的 no-retuning 声明
+- [ ] 16.6 执行 clean Release、CTest、legacy、cap-free 14+12、FIFO window 全扫描、partition/model sensitivity 和严格 OpenSpec，固化结果并推送远端

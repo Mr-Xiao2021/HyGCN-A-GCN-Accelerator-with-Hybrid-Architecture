@@ -84,11 +84,11 @@
 
 FIFO 与 batch-class MUST 共享全局 transaction admission 带宽。四个 buffer port 每个模型周期合计进入所有 channel controller 的 block 数 MUST 不超过由论文 HBM 接口宽度派生的 4。bundled DRAMSim3 为 `unified_queue=False`，因此每 channel read queue 与 write buffer MUST 分别受 `trans_queue_size=32` 约束，每 bank command queue MUST 受 `cmd_queue_size=8` 约束。read 与 write MUST 分别使用 `CL/tRCDRD` 和 `CWL/tRCDWR` 派生的 data command timing，并施加 DRAMSim3 read/write command switching 约束。换行 MUST 显式执行 PRE→ACT，且 PRE/ACT/data issue 分别受 `tRTP`、`tWR`、`tRAS`、`tRP`、`tRC`、`tRCDRD`、`tRCDWR` 和 `tCCD_L` 约束。同一 channel 的 PRE/ACT/READ/WRITE MUST 共享排他的 command lane；READ/WRITE completion latency MUST 与下一 data-command issue 解耦，请求 completion 不得直接释放 bank command recovery。
 
-未协调 FIFO MUST 每个 admission 周期只选择一个可用 buffer port，并从该 port 的统一 block 流按地址/sequence 顺序放行最多 4 个 block；端口 MUST 仅在下一个 admission 周期轮转。FIFO 同时 active 的连续 block window 总数 MUST 不超过论文 Figure 9 的四个 buffer request source。window MUST 由 `(port, block address / bundled HBM row blocks)` 定义，在已 admission block 全部发出 data command 后释放，不得依赖上层请求边界。batch-class 路径 MAY 在同一周期从同一 batch/class/row 的候选中组装最多 4 个 block，但 MUST 使用与 FIFO 相同的全局 admission 带宽和 controller queue capacity。
+未协调 FIFO MUST 每个 admission 周期只选择一个可用 buffer port，并从该 port 的统一 block 流按地址/sequence 顺序放行最多 4 个 block；端口 MUST 仅在下一个 admission 周期轮转。required FIFO 的 active-window limit MUST 为 0（unbounded），不得把 Figure 9 的四个 request source 解释成四个未完成 row window。1/2/4/8/queue-capacity 等有限值 MAY 作为诊断扫描，但 MUST 标记为 calibrated policy，且不得替换 required cap-free 结果。batch-class 路径 MAY 在同一周期从同一 batch/class/row 的候选中组装最多 4 个 block，但 MUST 使用与 FIFO 相同的全局 admission 带宽和 controller queue capacity。
 
 论文 256 GB/s HBM1 MUST 建模为两份 bundled 8-channel、128 GB/s HBM1 stack 的复制，共 16 个物理 channel。每个物理 channel MUST 保留 bundled DRAMSim3 的 `tCK/tCCD`、方向队列和 command queue 约束；实现不得通过缩短单 channel data-command spacing 来补足总带宽。
 
-admission 证据 MUST 保存可逆的完整压缩 trace，或明确降级为 summary/sample。正式 benchmark 使用完整 trace 时，每次 admission MUST 保存逐 channel read/write occupancy before/after，并保存 terminal zero snapshot，使 validator 能从零推导 admission、intervening dispatch、逐 channel peak 和 capacity violation，再重算方向 histogram、weighted total、actual maximum 与 checksum；edge sample 不得被声明为 raw trace。
+admission 与 command 证据 MUST 保存可逆的完整压缩 trace，或明确降级为 summary/sample。正式 benchmark 使用完整 trace 时，每次 admission MUST 保存逐 channel read/write occupancy before/after，并保存 terminal zero snapshot，使 validator 能从零推导 admission、intervening dispatch、逐 channel peak 和 capacity violation，再重算方向 histogram、weighted total、actual maximum 与 checksum。每条 command event MUST 保存 cycle、sequence、block offset、channel、bank、row 和 PRE/ACT/READ/WRITE 类型，使 validator 能从零重算 event count、command totals、checksum、channel lane 排他、row state 与 recovery timing；edge sample 不得被声明为 raw trace。
 
 #### Scenario: 请求切分反例
 - **WHEN** 同一 128 个连续 block 分别封装为一个请求和 128 个请求
@@ -114,7 +114,7 @@ admission 证据 MUST 保存可逆的完整压缩 trace，或明确降级为 sum
 - **GIVEN** Edge、Input、Weight、Output 四个 buffer port 各有四个连续 64B block 且 controller queue 有容量
 - **WHEN** 未协调 FIFO 以 4 block/cycle admission 带宽运行
 - **THEN** 每个 admission 周期只包含一个 buffer port 的 block，四个 port 的首次 admission 分别发生在连续四个周期
-- **AND** 第五个 row-sized window 不早于前四个 active window 中至少一个的最后 data command issue
+- **AND** 第五个 row-sized window 可在 controller queue 有容量时继续 admission，不等待前四个 window 的 data command issue
 - **AND** 将任一 port 的相同 block 流拆成多个上层请求不改变完成周期或事务序列
 
 #### Scenario: 跨 bank command lane 排他
@@ -124,6 +124,11 @@ admission 证据 MUST 保存可逆的完整压缩 trace，或明确降级为 sum
 #### Scenario: Admission 完整证据
 - **WHEN** benchmark 读取一层 transaction admission 证据
 - **THEN** validator 从压缩分块恢复逐 channel occupancy before/after 和 terminal zero snapshot，从零推导 dispatch totals、peak/capacity，再独立重算 histogram、weighted totals、actual maxima、edge samples 与 FNV-1a checksum
+
+#### Scenario: Command 完整证据与 mutation 防护
+- **WHEN** benchmark 读取一层 command 证据
+- **THEN** validator 从压缩分块恢复全部 PRE/ACT/READ/WRITE 事件，独立重算 count、type totals、checksum、channel lane、row state 和 recovery timing
+- **AND** 删除任一 event、修改中间 cycle、清空 edge samples 或伪造 checksum 均导致验证失败
 
 ### Requirement: 自检与回归
 构建系统 SHALL 注册单元测试、集成 smoke 测试和论文指标验收测试。默认快速测试 MUST 在合理时间内运行且不依赖缺失的大型数据集；完整论文验收 MUST 可单独触发并输出汇总报告。

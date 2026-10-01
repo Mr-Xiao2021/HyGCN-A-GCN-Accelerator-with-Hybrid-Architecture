@@ -1,0 +1,726 @@
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <deque>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <limits>
+#include <map>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+#include "json.hpp"
+
+namespace {
+
+using json = nlohmann::json;
+
+constexpr uint64_t kFnvOffset = 1469598103934665603ULL;
+constexpr uint64_t kFnvPrime = 1099511628211ULL;
+constexpr std::array<const char*, 4> kCommandNames{
+    "PRE", "ACT", "READ", "WRITE",
+};
+
+[[noreturn]] void Fail(const std::string& message) {
+    throw std::runtime_error(message);
+}
+
+std::string Hex64(uint64_t value) {
+    std::ostringstream output;
+    output << std::hex << std::setfill('0') << std::setw(16) << value;
+    return output.str();
+}
+
+void UpdateFnv(uint64_t& hash, uint64_t value) {
+    hash ^= value;
+    hash *= kFnvPrime;
+}
+
+std::vector<uint8_t> DecodeBase64(const std::string& input) {
+    static const std::array<int8_t, 256> table = [] {
+        std::array<int8_t, 256> result{};
+        result.fill(-1);
+        const std::string alphabet =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        for (std::size_t index = 0; index < alphabet.size(); ++index) {
+            result[static_cast<uint8_t>(alphabet[index])] =
+                static_cast<int8_t>(index);
+        }
+        return result;
+    }();
+    if (input.size() % 4 != 0) {
+        Fail("base64 payload length is invalid");
+    }
+    std::vector<uint8_t> output;
+    output.reserve(input.size() / 4 * 3);
+    for (std::size_t offset = 0; offset < input.size(); offset += 4) {
+        uint32_t value = 0;
+        int padding = 0;
+        for (std::size_t index = 0; index < 4; ++index) {
+            const uint8_t byte = static_cast<uint8_t>(input[offset + index]);
+            if (byte == '=') {
+                if (index < 2) {
+                    Fail("base64 padding is invalid");
+                }
+                ++padding;
+                value <<= 6U;
+            } else {
+                if (padding != 0 || table[byte] < 0) {
+                    Fail("base64 payload contains an invalid character");
+                }
+                value = (value << 6U) | static_cast<uint8_t>(table[byte]);
+            }
+        }
+        output.push_back(static_cast<uint8_t>((value >> 16U) & 0xffU));
+        if (padding < 2) {
+            output.push_back(static_cast<uint8_t>((value >> 8U) & 0xffU));
+        }
+        if (padding == 0) {
+            output.push_back(static_cast<uint8_t>(value & 0xffU));
+        }
+    }
+    return output;
+}
+
+uint64_t DecodeVarint(const std::vector<uint8_t>& payload, std::size_t& offset) {
+    uint64_t value = 0;
+    unsigned shift = 0;
+    while (offset < payload.size()) {
+        const uint8_t byte = payload[offset++];
+        value |= static_cast<uint64_t>(byte & 0x7fU) << shift;
+        if ((byte & 0x80U) == 0) {
+            return value;
+        }
+        shift += 7;
+        if (shift >= 70) {
+            Fail("trace contains an oversized varint");
+        }
+    }
+    Fail("trace ends inside a varint");
+}
+
+void RequireFields(const json& summary, const std::vector<std::string>& expected) {
+    if (!summary.contains("fields") ||
+        summary.at("fields").get<std::vector<std::string>>() != expected) {
+        Fail("trace field schema differs");
+    }
+}
+
+json AdmissionEventJson(
+        uint64_t cycle,
+        bool terminal,
+        uint64_t admitted,
+        uint64_t admitted_reads,
+        uint64_t admitted_writes,
+        const std::vector<uint64_t>& read_before,
+        const std::vector<uint64_t>& read_after,
+        const std::vector<uint64_t>& write_before,
+        const std::vector<uint64_t>& write_after) {
+    return {
+        {"cycle", cycle},
+        {"terminal_snapshot", terminal},
+        {"admitted_blocks", admitted},
+        {"admitted_read_blocks", admitted_reads},
+        {"admitted_write_blocks", admitted_writes},
+        {"channel_read_occupancy_before", read_before},
+        {"channel_read_occupancy_after", read_after},
+        {"channel_write_occupancy_before", write_before},
+        {"channel_write_occupancy_after", write_after},
+    };
+}
+
+json ValidateAdmission(const json& run) {
+    const auto& architecture = run.at("architecture");
+    const uint64_t issue_limit = architecture.at(
+        "coordinator_issue_blocks_per_cycle").get<uint64_t>();
+    const uint64_t read_capacity = architecture.at(
+        "hbm_read_queue_entries_per_channel").get<uint64_t>();
+    const uint64_t write_capacity = architecture.at(
+        "hbm_write_buffer_entries_per_channel").get<uint64_t>();
+    const std::size_t channels = architecture.at("hbm_channels").get<std::size_t>();
+    const uint64_t block_size = architecture.at("block_size").get<uint64_t>();
+    uint64_t admitted_total = 0;
+    uint64_t admitted_read_total = 0;
+    uint64_t admitted_write_total = 0;
+    uint64_t expected_total = 0;
+    uint64_t expected_read_total = 0;
+    uint64_t expected_write_total = 0;
+    uint64_t admission_cycles = 0;
+    uint64_t max_total_read = 0;
+    uint64_t max_total_write = 0;
+    uint64_t max_blocks_per_cycle = 0;
+    std::vector<std::string> checksums;
+    const std::vector<std::string> expected_fields{
+        "cycle_delta", "terminal_snapshot", "admitted_blocks",
+        "admitted_read_blocks", "admitted_write_blocks",
+        "channel_read_occupancy_before[]",
+        "channel_read_occupancy_after[]",
+        "channel_write_occupancy_before[]",
+        "channel_write_occupancy_after[]",
+    };
+
+    for (const auto& layer : run.at("layers")) {
+        const auto& summary = layer.at("transaction_admission_trace");
+        if (summary.at("representation") !=
+            "directional_occupancy_delta_varint_base64_v2") {
+            Fail("admission trace representation differs");
+        }
+        RequireFields(summary, expected_fields);
+        if (summary.at("channel_count").get<std::size_t>() != channels) {
+            Fail("admission trace channel count differs");
+        }
+        std::vector<uint64_t> previous_read(channels, 0);
+        std::vector<uint64_t> previous_write(channels, 0);
+        std::vector<uint64_t> read_peaks(channels, 0);
+        std::vector<uint64_t> write_peaks(channels, 0);
+        uint64_t previous_cycle = 0;
+        bool have_previous_cycle = false;
+        bool saw_terminal = false;
+        uint64_t event_count = 0;
+        uint64_t admission_event_count = 0;
+        uint64_t first_cycle = 0;
+        uint64_t last_cycle = 0;
+        uint64_t checksum = kFnvOffset;
+        std::map<std::string, uint64_t> weighted;
+        std::map<std::string, std::map<uint64_t, uint64_t>> histograms;
+        std::map<std::string, uint64_t> actual_max;
+        std::vector<json> first_samples;
+        std::vector<json> small_samples;
+        std::deque<json> last_samples;
+
+        for (const auto& chunk : summary.at("trace_chunks")) {
+            const uint64_t count = chunk.at("event_count").get<uint64_t>();
+            if (count == 0) {
+                Fail("admission trace chunk has no events");
+            }
+            const auto payload = DecodeBase64(
+                chunk.at("payload_base64").get<std::string>());
+            std::size_t offset = 0;
+            uint64_t chunk_previous_cycle = 0;
+            for (uint64_t index = 0; index < count; ++index) {
+                const uint64_t cycle_delta = DecodeVarint(payload, offset);
+                const uint64_t cycle = index == 0
+                    ? cycle_delta : chunk_previous_cycle + cycle_delta;
+                chunk_previous_cycle = cycle;
+                const bool terminal = DecodeVarint(payload, offset) != 0;
+                const uint64_t admitted = DecodeVarint(payload, offset);
+                const uint64_t admitted_reads = DecodeVarint(payload, offset);
+                const uint64_t admitted_writes = DecodeVarint(payload, offset);
+                std::array<std::vector<uint64_t>, 4> arrays;
+                for (auto& values : arrays) {
+                    values.resize(channels);
+                    for (std::size_t channel = 0; channel < channels; ++channel) {
+                        values[channel] = DecodeVarint(payload, offset);
+                    }
+                }
+                const auto& read_before = arrays[0];
+                const auto& read_after = arrays[1];
+                const auto& write_before = arrays[2];
+                const auto& write_after = arrays[3];
+                if (have_previous_cycle && cycle <= previous_cycle) {
+                    Fail("admission cycles are not strictly increasing");
+                }
+                if (saw_terminal) {
+                    Fail("admission event follows terminal snapshot");
+                }
+                if (terminal) {
+                    saw_terminal = true;
+                    if (admitted != 0) {
+                        Fail("terminal snapshot admits blocks");
+                    }
+                } else if (admitted == 0 || admitted > issue_limit) {
+                    Fail("admission issue width is invalid");
+                }
+                uint64_t inferred_read_dispatch = 0;
+                uint64_t inferred_write_dispatch = 0;
+                uint64_t derived_read_admission = 0;
+                uint64_t derived_write_admission = 0;
+                uint64_t total_read_before = 0;
+                uint64_t total_read_after = 0;
+                uint64_t total_write_before = 0;
+                uint64_t total_write_after = 0;
+                uint64_t max_channel_read_after = 0;
+                uint64_t max_channel_write_after = 0;
+                for (std::size_t channel = 0; channel < channels; ++channel) {
+                    if (read_before[channel] > previous_read[channel] ||
+                        write_before[channel] > previous_write[channel] ||
+                        read_after[channel] < read_before[channel] ||
+                        write_after[channel] < write_before[channel]) {
+                        Fail("admission occupancy transition is invalid");
+                    }
+                    if (read_after[channel] > read_capacity ||
+                        write_after[channel] > write_capacity) {
+                        Fail("directional transaction queue capacity exceeded");
+                    }
+                    inferred_read_dispatch += previous_read[channel] - read_before[channel];
+                    inferred_write_dispatch += previous_write[channel] - write_before[channel];
+                    derived_read_admission += read_after[channel] - read_before[channel];
+                    derived_write_admission += write_after[channel] - write_before[channel];
+                    total_read_before += read_before[channel];
+                    total_read_after += read_after[channel];
+                    total_write_before += write_before[channel];
+                    total_write_after += write_after[channel];
+                    max_channel_read_after = std::max(
+                        max_channel_read_after, read_after[channel]);
+                    max_channel_write_after = std::max(
+                        max_channel_write_after, write_after[channel]);
+                    read_peaks[channel] = std::max(read_peaks[channel], read_after[channel]);
+                    write_peaks[channel] = std::max(write_peaks[channel], write_after[channel]);
+                }
+                if (derived_read_admission != admitted_reads ||
+                    derived_write_admission != admitted_writes ||
+                    admitted != admitted_reads + admitted_writes) {
+                    Fail("admission directional delta differs");
+                }
+                if (terminal && (total_read_before != 0 || total_read_after != 0 ||
+                                 total_write_before != 0 || total_write_after != 0)) {
+                    Fail("terminal occupancy is not zero");
+                }
+                const std::map<std::string, uint64_t> scalar_values{
+                    {"admitted_blocks", admitted},
+                    {"admitted_read_blocks", admitted_reads},
+                    {"admitted_write_blocks", admitted_writes},
+                    {"total_read_occupancy_after", total_read_after},
+                    {"total_write_occupancy_after", total_write_after},
+                    {"max_channel_read_occupancy_after", max_channel_read_after},
+                    {"max_channel_write_occupancy_after", max_channel_write_after},
+                };
+                for (const auto& [name, value] : scalar_values) {
+                    ++histograms[name][value];
+                }
+                weighted["admitted_blocks"] += admitted;
+                weighted["admitted_read_blocks"] += admitted_reads;
+                weighted["admitted_write_blocks"] += admitted_writes;
+                weighted["inferred_dispatched_read_blocks"] += inferred_read_dispatch;
+                weighted["inferred_dispatched_write_blocks"] += inferred_write_dispatch;
+                weighted["total_read_occupancy_before"] += total_read_before;
+                weighted["total_read_occupancy_after"] += total_read_after;
+                weighted["total_write_occupancy_before"] += total_write_before;
+                weighted["total_write_occupancy_after"] += total_write_after;
+                actual_max["blocks_admitted_per_cycle"] = std::max(
+                    actual_max["blocks_admitted_per_cycle"], admitted);
+                actual_max["total_read_occupancy"] = std::max(
+                    actual_max["total_read_occupancy"], total_read_after);
+                actual_max["total_write_occupancy"] = std::max(
+                    actual_max["total_write_occupancy"], total_write_after);
+                actual_max["channel_read_occupancy"] = std::max(
+                    actual_max["channel_read_occupancy"], max_channel_read_after);
+                actual_max["channel_write_occupancy"] = std::max(
+                    actual_max["channel_write_occupancy"], max_channel_write_after);
+                for (const uint64_t value : {
+                         cycle, static_cast<uint64_t>(terminal), admitted,
+                         admitted_reads, admitted_writes}) {
+                    UpdateFnv(checksum, value);
+                }
+                for (std::size_t channel = 0; channel < channels; ++channel) {
+                    for (const uint64_t value : {
+                             read_before[channel], read_after[channel],
+                             write_before[channel], write_after[channel]}) {
+                        UpdateFnv(checksum, value);
+                    }
+                }
+                const json sample = AdmissionEventJson(
+                    cycle, terminal, admitted, admitted_reads, admitted_writes,
+                    read_before, read_after, write_before, write_after);
+                if (event_count < 16) {
+                    first_samples.push_back(sample);
+                }
+                if (event_count < 33) {
+                    small_samples.push_back(sample);
+                }
+                if (last_samples.size() == 16) {
+                    last_samples.pop_front();
+                }
+                last_samples.push_back(sample);
+                previous_read = read_after;
+                previous_write = write_after;
+                first_cycle = event_count == 0 ? cycle : first_cycle;
+                last_cycle = cycle;
+                previous_cycle = cycle;
+                have_previous_cycle = true;
+                ++event_count;
+                admission_event_count += terminal ? 0 : 1;
+            }
+            if (offset != payload.size()) {
+                Fail("admission trace chunk has trailing bytes");
+            }
+        }
+        if (!saw_terminal || std::any_of(previous_read.begin(), previous_read.end(),
+                                         [](uint64_t value) { return value != 0; }) ||
+            std::any_of(previous_write.begin(), previous_write.end(),
+                        [](uint64_t value) { return value != 0; })) {
+            Fail("admission trace lacks a zero terminal snapshot");
+        }
+        if (weighted["inferred_dispatched_read_blocks"] !=
+                weighted["admitted_read_blocks"] ||
+            weighted["inferred_dispatched_write_blocks"] !=
+                weighted["admitted_write_blocks"]) {
+            Fail("inferred directional dispatch totals differ");
+        }
+        if (event_count != summary.at("event_count").get<uint64_t>() ||
+            admission_event_count !=
+                summary.at("admission_event_count").get<uint64_t>() ||
+            first_cycle != summary.at("first_cycle").get<uint64_t>() ||
+            last_cycle != summary.at("last_cycle").get<uint64_t>()) {
+            Fail("admission trace bounds differ");
+        }
+        std::vector<json> expected_samples;
+        if (event_count <= 32) {
+            expected_samples = small_samples;
+        } else {
+            expected_samples = first_samples;
+            expected_samples.insert(
+                expected_samples.end(), last_samples.begin(), last_samples.end());
+        }
+        if (json(expected_samples) != summary.at("edge_samples")) {
+            Fail("admission edge samples differ");
+        }
+        json weighted_json = json::object();
+        for (const auto& [name, value] : weighted) {
+            weighted_json[name] = value;
+        }
+        if (weighted_json != summary.at("weighted_totals")) {
+            Fail("admission weighted totals differ");
+        }
+        json histograms_json = json::object();
+        for (const auto& [name, values] : histograms) {
+            for (const auto& [value, count] : values) {
+                histograms_json[name][std::to_string(value)] = count;
+            }
+        }
+        if (histograms_json != summary.at("histograms")) {
+            Fail("admission histograms differ");
+        }
+        json actual_max_json = json::object();
+        for (const auto& [name, value] : actual_max) {
+            actual_max_json[name] = value;
+        }
+        if (actual_max_json != summary.at("actual_max")) {
+            Fail("admission actual maxima differ");
+        }
+        if (Hex64(checksum) != summary.at("trace_checksum_fnv1a64")) {
+            Fail("admission checksum differs");
+        }
+        if (read_peaks != summary.at(
+                "max_channel_read_queue_occupancy").get<std::vector<uint64_t>>() ||
+            write_peaks != summary.at(
+                "max_channel_write_buffer_occupancy").get<std::vector<uint64_t>>()) {
+            Fail("admission peak vectors differ");
+        }
+        admitted_total += weighted["admitted_blocks"];
+        admitted_read_total += weighted["admitted_read_blocks"];
+        admitted_write_total += weighted["admitted_write_blocks"];
+        admission_cycles += admission_event_count;
+        max_total_read = std::max(
+            max_total_read, actual_max["total_read_occupancy"]);
+        max_total_write = std::max(
+            max_total_write, actual_max["total_write_occupancy"]);
+        max_blocks_per_cycle = std::max(
+            max_blocks_per_cycle, actual_max["blocks_admitted_per_cycle"]);
+        checksums.push_back(Hex64(checksum));
+
+        for (const auto& request : layer.at("memory_requests")) {
+            const uint64_t bytes = request.at("bytes").get<uint64_t>();
+            const uint64_t blocks = (bytes + block_size - 1) / block_size;
+            expected_total += blocks;
+            const std::string request_class = request.at("request_class");
+            if (request_class == "output" || request_class == "intermediate_write") {
+                expected_write_total += blocks;
+            } else {
+                expected_read_total += blocks;
+            }
+            if (request.at("first_admission_cycle").get<uint64_t>() <
+                    request.at("enqueue_cycle").get<uint64_t>() ||
+                request.at("last_admission_cycle").get<uint64_t>() <
+                    request.at("first_admission_cycle").get<uint64_t>() ||
+                request.at("first_issue_cycle").get<uint64_t>() <
+                    request.at("first_admission_cycle").get<uint64_t>()) {
+                Fail("request admission violates causality");
+            }
+        }
+    }
+    if (admitted_total != expected_total ||
+        admitted_read_total != expected_read_total ||
+        admitted_write_total != expected_write_total) {
+        Fail("admission trace does not cover all request blocks");
+    }
+    return {
+        {"admitted_blocks", admitted_total},
+        {"admitted_read_blocks", admitted_read_total},
+        {"admitted_write_blocks", admitted_write_total},
+        {"admission_cycles", admission_cycles},
+        {"max_blocks_admitted_per_cycle", max_blocks_per_cycle},
+        {"issue_limit_blocks_per_cycle", issue_limit},
+        {"max_total_read_queue_occupancy", max_total_read},
+        {"max_total_write_buffer_occupancy", max_total_write},
+        {"total_read_queue_capacity", channels * read_capacity},
+        {"total_write_buffer_capacity", channels * write_capacity},
+        {"trace_checksums", checksums},
+        {"occupancy_reconstruction",
+         "per-channel before/after admission snapshots"},
+        {"validator", "independent-cpp-v1"},
+    };
+}
+
+struct ChannelTiming {
+    uint64_t last_command = 0;
+    bool saw_command = false;
+    uint64_t next_read = 0;
+    uint64_t next_write = 0;
+};
+
+struct BankTiming {
+    uint64_t open_row = 0;
+    bool row_open = false;
+    uint64_t next_precharge = 0;
+    uint64_t next_activate = 0;
+    uint64_t next_read = 0;
+    uint64_t next_write = 0;
+};
+
+json CommandEventJson(uint64_t cycle, uint64_t sequence, uint64_t block_offset,
+                      uint64_t channel, uint64_t bank, uint64_t row,
+                      uint64_t command) {
+    return {
+        {"cycle", cycle},
+        {"sequence", sequence},
+        {"block_offset", block_offset},
+        {"channel", channel},
+        {"bank", bank},
+        {"row", row},
+        {"command", kCommandNames.at(command)},
+    };
+}
+
+json ValidateCommands(const json& run) {
+    const auto& architecture = run.at("architecture");
+    const uint64_t interval = architecture.at(
+        "hbm_command_issue_interval_cycles").get<uint64_t>();
+    const std::size_t channels = architecture.at("hbm_channels").get<std::size_t>();
+    const std::size_t banks_per_channel = architecture.at(
+        "hbm_banks_per_channel").get<std::size_t>();
+    const std::vector<std::string> expected_fields{
+        "cycle_delta", "sequence", "block_offset", "channel", "bank",
+        "row", "command",
+    };
+    uint64_t total_events = 0;
+    std::vector<std::string> checksums;
+    for (const auto& layer : run.at("layers")) {
+        const auto& summary = layer.at("command_trace");
+        if (summary.at("representation") != "command_delta_varint_base64_v2") {
+            Fail("command trace representation differs");
+        }
+        RequireFields(summary, expected_fields);
+        std::vector<ChannelTiming> channel_state(channels);
+        std::vector<BankTiming> bank_state(channels * banks_per_channel);
+        std::array<uint64_t, 4> counts{};
+        uint64_t checksum = kFnvOffset;
+        uint64_t decoded = 0;
+        uint64_t previous_cycle = 0;
+        bool have_previous_cycle = false;
+        std::vector<json> first_samples;
+        std::deque<json> last_samples;
+        for (const auto& chunk : summary.at("trace_chunks")) {
+            const uint64_t count = chunk.at("event_count").get<uint64_t>();
+            if (count == 0) {
+                Fail("command trace chunk has no events");
+            }
+            const auto payload = DecodeBase64(
+                chunk.at("payload_base64").get<std::string>());
+            std::size_t offset = 0;
+            uint64_t chunk_previous_cycle = 0;
+            for (uint64_t index = 0; index < count; ++index) {
+                std::array<uint64_t, 7> values{};
+                for (uint64_t& value : values) {
+                    value = DecodeVarint(payload, offset);
+                }
+                const uint64_t cycle = index == 0
+                    ? values[0] : chunk_previous_cycle + values[0];
+                chunk_previous_cycle = cycle;
+                const uint64_t sequence = values[1];
+                const uint64_t block_offset = values[2];
+                const uint64_t channel = values[3];
+                const uint64_t bank = values[4];
+                const uint64_t row = values[5];
+                const uint64_t command = values[6];
+                if (command >= kCommandNames.size() || channel >= channels ||
+                    bank >= banks_per_channel) {
+                    Fail("command trace event is out of range");
+                }
+                if (have_previous_cycle && cycle < previous_cycle) {
+                    Fail("command trace is not time ordered");
+                }
+                previous_cycle = cycle;
+                have_previous_cycle = true;
+                auto& channel_timing = channel_state[channel];
+                if (channel_timing.saw_command &&
+                    cycle < channel_timing.last_command + interval) {
+                    Fail("commands overlap on a channel lane");
+                }
+                channel_timing.saw_command = true;
+                channel_timing.last_command = cycle;
+                auto& timing = bank_state[
+                    channel * banks_per_channel + bank];
+                switch (command) {
+                    case 0:
+                        if (!timing.row_open || timing.open_row != row ||
+                            cycle < timing.next_precharge) {
+                            Fail("PRE violates row recovery");
+                        }
+                        timing.row_open = false;
+                        timing.next_activate = std::max(
+                            timing.next_activate,
+                            cycle + architecture.at(
+                                "hbm_precharge_to_activate_cycles").get<uint64_t>());
+                        break;
+                    case 1:
+                        if (timing.row_open || cycle < timing.next_activate) {
+                            Fail("ACT violates bank recovery");
+                        }
+                        timing.row_open = true;
+                        timing.open_row = row;
+                        timing.next_read = std::max(
+                            timing.next_read,
+                            cycle + architecture.at(
+                                "hbm_activate_to_read_cycles").get<uint64_t>());
+                        timing.next_write = std::max(
+                            timing.next_write,
+                            cycle + architecture.at(
+                                "hbm_activate_to_write_cycles").get<uint64_t>());
+                        timing.next_precharge = std::max(
+                            timing.next_precharge,
+                            cycle + architecture.at(
+                                "hbm_activate_to_precharge_cycles").get<uint64_t>());
+                        timing.next_activate = std::max(
+                            timing.next_activate,
+                            cycle + architecture.at(
+                                "hbm_activate_to_activate_cycles").get<uint64_t>());
+                        break;
+                    case 2:
+                        if (!timing.row_open || timing.open_row != row ||
+                            cycle < timing.next_read ||
+                            cycle < channel_timing.next_read) {
+                            Fail("READ violates tRCD/tCCD/turnaround");
+                        }
+                        channel_timing.next_read = std::max(
+                            channel_timing.next_read,
+                            cycle + architecture.at(
+                                "hbm_read_to_read_cycles").get<uint64_t>());
+                        channel_timing.next_write = std::max(
+                            channel_timing.next_write,
+                            cycle + architecture.at(
+                                "hbm_read_to_write_cycles").get<uint64_t>());
+                        timing.next_precharge = std::max(
+                            timing.next_precharge,
+                            cycle + architecture.at(
+                                "hbm_read_to_precharge_cycles").get<uint64_t>());
+                        break;
+                    case 3:
+                        if (!timing.row_open || timing.open_row != row ||
+                            cycle < timing.next_write ||
+                            cycle < channel_timing.next_write) {
+                            Fail("WRITE violates tRCD/tCCD/turnaround");
+                        }
+                        channel_timing.next_write = std::max(
+                            channel_timing.next_write,
+                            cycle + architecture.at(
+                                "hbm_write_to_write_cycles").get<uint64_t>());
+                        channel_timing.next_read = std::max(
+                            channel_timing.next_read,
+                            cycle + architecture.at(
+                                "hbm_write_to_read_cycles").get<uint64_t>());
+                        timing.next_precharge = std::max(
+                            timing.next_precharge,
+                            cycle + architecture.at(
+                                "hbm_write_to_precharge_cycles").get<uint64_t>());
+                        break;
+                    default:
+                        Fail("unknown command");
+                }
+                ++counts[command];
+                for (const uint64_t value : {
+                         cycle, sequence, block_offset, channel, bank, row, command}) {
+                    UpdateFnv(checksum, value);
+                }
+                const json sample = CommandEventJson(
+                    cycle, sequence, block_offset, channel, bank, row, command);
+                if (decoded < 32) {
+                    first_samples.push_back(sample);
+                } else {
+                    if (last_samples.size() == 32) {
+                        last_samples.pop_front();
+                    }
+                    last_samples.push_back(sample);
+                }
+                ++decoded;
+            }
+            if (offset != payload.size()) {
+                Fail("command trace chunk has trailing bytes");
+            }
+        }
+        const std::array<uint64_t, 4> expected_counts{
+            layer.at("precharge_commands").get<uint64_t>(),
+            layer.at("activate_commands").get<uint64_t>(),
+            layer.at("read_commands").get<uint64_t>(),
+            layer.at("write_commands").get<uint64_t>(),
+        };
+        if (counts != expected_counts ||
+            decoded != summary.at("event_count").get<uint64_t>()) {
+            Fail("command event or type totals differ");
+        }
+        std::vector<json> samples = first_samples;
+        samples.insert(samples.end(), last_samples.begin(), last_samples.end());
+        if (json(samples) != summary.at("samples")) {
+            Fail("command samples differ from the full trace");
+        }
+        if (Hex64(checksum) != summary.at("checksum_fnv1a64")) {
+            Fail("command checksum differs");
+        }
+        if (summary.at("command_lane_violations").get<uint64_t>() != 0) {
+            Fail("simulator reports a command-lane violation");
+        }
+        total_events += decoded;
+        checksums.push_back(Hex64(checksum));
+    }
+    return {
+        {"event_count", total_events},
+        {"checksums", checksums},
+        {"command_issue_interval_cycles", interval},
+        {"command_lane_violations", 0},
+        {"trace_representation", "command_delta_varint_base64_v2"},
+        {"independently_reconstructed", true},
+        {"validator", "independent-cpp-v1"},
+    };
+}
+
+json ValidateFile(const std::string& path) {
+    std::ifstream stream(path);
+    if (!stream) {
+        Fail("cannot open input: " + path);
+    }
+    json run;
+    stream >> run;
+    return {
+        {"transaction_admission_oracle", ValidateAdmission(run)},
+        {"command_trace_oracle", ValidateCommands(run)},
+    };
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+    if (argc != 2) {
+        std::cerr << "usage: hygcn_trace_validator RESULT.json\n";
+        return 2;
+    }
+    try {
+        std::cout << ValidateFile(argv[1]).dump() << '\n';
+        return 0;
+    } catch (const std::exception& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 1;
+    }
+}

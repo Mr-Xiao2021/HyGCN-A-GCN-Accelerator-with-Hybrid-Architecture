@@ -591,8 +591,30 @@ void TestTransactionAdmissionBandwidth() {
     std::cout << "]}\n";
     Check(first_window_issues.size() == 4 &&
               windowed.request_traces.size() == 1 &&
-              final_admission >= final_first_window_issue,
-          "FIFO bounds active row-sized windows by the four source buffers");
+              final_admission < final_first_window_issue,
+          "paper FIFO admits without an unsupported active-window throttle");
+
+    config.coordinator_fifo_active_windows = 1;
+    config.Validate();
+    const auto diagnostic_limit = MemoryCoordinatorModel::Simulate(
+        {
+            {0, RequestClass::INPUT, 64, 0, 0, 0},
+            {0, RequestClass::INPUT, 64, config.hbm_row_bytes, 0, 1},
+        },
+        config, MemoryPriorityMode::FIFO, AddressMappingMode::ROW_FIRST);
+    const auto first_request = std::find_if(
+        diagnostic_limit.request_traces.begin(),
+        diagnostic_limit.request_traces.end(),
+        [](const auto& trace) { return trace.sequence == 0; });
+    const auto second_request = std::find_if(
+        diagnostic_limit.request_traces.begin(),
+        diagnostic_limit.request_traces.end(),
+        [](const auto& trace) { return trace.sequence == 1; });
+    Check(first_request != diagnostic_limit.request_traces.end() &&
+              second_request != diagnostic_limit.request_traces.end() &&
+              second_request->first_admission_cycle >=
+                  first_request->first_issue_cycle,
+          "finite FIFO windows remain an explicit diagnostic throttle only");
 }
 
 void TestDirectionalHbmQueuesAndTiming() {

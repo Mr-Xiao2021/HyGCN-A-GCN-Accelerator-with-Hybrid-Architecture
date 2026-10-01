@@ -113,6 +113,7 @@ def parse_args():
         "--parameter-baseline", default="configs/paper_parameter_baseline.json"
     )
     parser.add_argument("--profile-path")
+    parser.add_argument("--trace-validator")
     parser.add_argument("--output-dir", default="res/paper")
     parser.add_argument("--datasets", nargs="*")
     parser.add_argument("--jobs", type=int, default=4)
@@ -159,6 +160,31 @@ def sha256_digest(path):
 def load_json(path):
     with path.open(encoding="utf-8") as stream:
         return json.load(stream)
+
+
+def run_compiled_trace_validator(validator, result_path):
+    completed = subprocess.run(
+        [str(validator), str(result_path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        evidence = json.loads(completed.stdout)
+    except json.JSONDecodeError as error:
+        raise ValueError(
+            f"trace validator returned invalid JSON for {result_path}: {error}"
+        ) from error
+    if set(evidence) != {
+            "transaction_admission_oracle", "command_trace_oracle"}:
+        raise ValueError(f"trace validator result schema differs for {result_path}")
+    return evidence
+
+
+def strip_complete_trace_payloads(result):
+    for layer in result.get("layers", ()):
+        layer.get("transaction_admission_trace", {}).pop("trace_chunks", None)
+        layer.get("command_trace", {}).pop("trace_chunks", None)
 
 
 def derive_dramsim3_timing(root, profile_path, workloads):
@@ -442,7 +468,8 @@ def validate_graph_partition(result, workload_manifest, dataset):
 
 
 def run_variant(
-    root, binary, output_dir, dataset, variant, force, profile_path, workload_manifest
+    root, binary, output_dir, dataset, variant, force, profile_path,
+    workload_manifest, trace_validator=None,
 ):
     result_path = output_dir / result_name(dataset, variant)
     result = None
@@ -482,6 +509,10 @@ def run_variant(
         result, root, dataset, workload_manifest["figures"][VARIANTS[variant]["figure"]]
     )
     validate_graph_partition(result, workload_manifest, dataset)
+    if trace_validator is not None:
+        result["_trace_oracles"] = run_compiled_trace_validator(
+            trace_validator, result_path)
+    strip_complete_trace_payloads(result)
     return result
 
 
@@ -656,6 +687,17 @@ ADMISSION_TRACE_FIELDS = (
     "channel_write_occupancy_after[]",
 )
 
+COMMAND_TRACE_FIELDS = (
+    "cycle_delta",
+    "sequence",
+    "block_offset",
+    "channel",
+    "bank",
+    "row",
+    "command",
+)
+COMMAND_NAMES = ("PRE", "ACT", "READ", "WRITE")
+
 
 def decode_varint(payload, offset):
     value = 0
@@ -712,6 +754,45 @@ def iter_admission_trace(summary):
             }
         if offset != len(payload):
             raise ValueError("admission trace chunk has trailing bytes")
+
+
+def iter_command_trace(summary):
+    if summary.get("representation") != "command_delta_varint_base64_v2":
+        raise ValueError("command evidence is not a reconstructable full trace")
+    if tuple(summary.get("fields", ())) != COMMAND_TRACE_FIELDS:
+        raise ValueError("command trace field schema does not match the decoder")
+    chunks = summary.get("trace_chunks")
+    if not isinstance(chunks, list) or not chunks:
+        raise ValueError("command trace does not contain complete event chunks")
+    for chunk in chunks:
+        payload = base64.b64decode(chunk["payload_base64"], validate=True)
+        offset = 0
+        previous_cycle = 0
+        count = chunk["event_count"]
+        if not isinstance(count, int) or count <= 0:
+            raise ValueError("command trace chunk has an invalid event count")
+        for index in range(count):
+            values = []
+            for _ in COMMAND_TRACE_FIELDS:
+                value, offset = decode_varint(payload, offset)
+                values.append(value)
+            cycle = values[0] if index == 0 else previous_cycle + values[0]
+            previous_cycle = cycle
+            command = values[6]
+            if command >= len(COMMAND_NAMES):
+                raise ValueError("command trace contains an unknown command")
+            yield {
+                "cycle": cycle,
+                "sequence": values[1],
+                "block_offset": values[2],
+                "channel": values[3],
+                "bank": values[4],
+                "row": values[5],
+                "command": COMMAND_NAMES[command],
+                "command_id": command,
+            }
+        if offset != len(payload):
+            raise ValueError("command trace chunk has trailing bytes")
 
 
 def normalized_histogram(counter):
@@ -968,49 +1049,171 @@ def validate_transaction_admission(dataset, variant, run):
 
 
 def validate_command_trace(dataset, variant, run):
-    interval = run["architecture"]["hbm_command_issue_interval_cycles"]
+    architecture = run["architecture"]
+    interval = architecture["hbm_command_issue_interval_cycles"]
+    channels = architecture["hbm_channels"]
+    banks_per_channel = architecture["hbm_banks_per_channel"]
     event_count = 0
     checksums = []
     for layer in run["layers"]:
-        trace = layer["command_trace"]
+        summary = layer["command_trace"]
         expected = (
             layer["precharge_commands"] + layer["activate_commands"]
             + layer["read_commands"] + layer["write_commands"]
         )
-        if trace.get("event_count") != expected:
-            raise ValueError(
-                f"{dataset} {variant} command trace count differs from command totals"
-            )
-        if trace.get("command_lane_violations") != 0:
-            raise ValueError(f"{dataset} {variant} reports a command-lane violation")
-        checksum = trace.get("checksum_fnv1a64")
-        if not isinstance(checksum, str) or len(checksum) != 16:
-            raise ValueError(f"{dataset} {variant} command checksum is invalid")
-        last_cycle = {}
+        channel_state = [
+            {"last_command": None, "next_read": 0, "next_write": 0}
+            for _ in range(channels)
+        ]
+        bank_state = [
+            {
+                "open_row": None,
+                "next_precharge": 0,
+                "next_activate": 0,
+                "next_read": 0,
+                "next_write": 0,
+            }
+            for _ in range(channels * banks_per_channel)
+        ]
+        counts = collections.Counter()
+        checksum = 1469598103934665603
+        first = []
+        last = collections.deque(maxlen=32)
         previous_cycle = None
-        for sample in trace.get("samples", ()):
-            channel = sample["channel"]
-            cycle = sample["cycle"]
-            if sample["command"] not in {"PRE", "ACT", "READ", "WRITE"}:
-                raise ValueError(f"{dataset} {variant} has an invalid command sample")
+        decoded = 0
+        for event in iter_command_trace(summary):
+            cycle = event["cycle"]
+            channel = event["channel"]
+            bank = event["bank"]
+            row = event["row"]
+            command = event["command"]
+            if channel >= channels or bank >= banks_per_channel:
+                raise ValueError(f"{dataset} {variant} command address is out of range")
             if previous_cycle is not None and cycle < previous_cycle:
-                raise ValueError(
-                    f"{dataset} {variant} command samples are not time ordered"
-                )
-            if channel in last_cycle and cycle < last_cycle[channel] + interval:
-                raise ValueError(
-                    f"{dataset} {variant} sampled commands overlap on channel {channel}"
-                )
-            last_cycle[channel] = cycle
+                raise ValueError(f"{dataset} {variant} command trace is not time ordered")
             previous_cycle = cycle
-        event_count += expected
-        checksums.append(checksum)
+            channel_timing = channel_state[channel]
+            last_command = channel_timing["last_command"]
+            if last_command is not None and cycle < last_command + interval:
+                raise ValueError(
+                    f"{dataset} {variant} commands overlap on channel {channel}"
+                )
+            channel_timing["last_command"] = cycle
+            timing = bank_state[channel * banks_per_channel + bank]
+            if command == "PRE":
+                if timing["open_row"] != row or cycle < timing["next_precharge"]:
+                    raise ValueError(
+                        f"{dataset} {variant} PRE violates row recovery on "
+                        f"channel {channel} bank {bank}"
+                    )
+                timing["open_row"] = None
+                timing["next_activate"] = max(
+                    timing["next_activate"],
+                    cycle + architecture["hbm_precharge_to_activate_cycles"],
+                )
+            elif command == "ACT":
+                if timing["open_row"] is not None or cycle < timing["next_activate"]:
+                    raise ValueError(
+                        f"{dataset} {variant} ACT violates bank recovery on "
+                        f"channel {channel} bank {bank}"
+                    )
+                timing["open_row"] = row
+                timing["next_read"] = max(
+                    timing["next_read"],
+                    cycle + architecture["hbm_activate_to_read_cycles"],
+                )
+                timing["next_write"] = max(
+                    timing["next_write"],
+                    cycle + architecture["hbm_activate_to_write_cycles"],
+                )
+                timing["next_precharge"] = max(
+                    timing["next_precharge"],
+                    cycle + architecture["hbm_activate_to_precharge_cycles"],
+                )
+                timing["next_activate"] = max(
+                    timing["next_activate"],
+                    cycle + architecture["hbm_activate_to_activate_cycles"],
+                )
+            elif command == "READ":
+                if timing["open_row"] != row or cycle < timing["next_read"] or \
+                        cycle < channel_timing["next_read"]:
+                    raise ValueError(
+                        f"{dataset} {variant} READ violates tRCD/tCCD/turnaround on "
+                        f"channel {channel} bank {bank}"
+                    )
+                channel_timing["next_read"] = max(
+                    channel_timing["next_read"],
+                    cycle + architecture["hbm_read_to_read_cycles"],
+                )
+                channel_timing["next_write"] = max(
+                    channel_timing["next_write"],
+                    cycle + architecture["hbm_read_to_write_cycles"],
+                )
+                timing["next_precharge"] = max(
+                    timing["next_precharge"],
+                    cycle + architecture["hbm_read_to_precharge_cycles"],
+                )
+            elif command == "WRITE":
+                if timing["open_row"] != row or cycle < timing["next_write"] or \
+                        cycle < channel_timing["next_write"]:
+                    raise ValueError(
+                        f"{dataset} {variant} WRITE violates tRCD/tCCD/turnaround on "
+                        f"channel {channel} bank {bank}"
+                    )
+                channel_timing["next_write"] = max(
+                    channel_timing["next_write"],
+                    cycle + architecture["hbm_write_to_write_cycles"],
+                )
+                channel_timing["next_read"] = max(
+                    channel_timing["next_read"],
+                    cycle + architecture["hbm_write_to_read_cycles"],
+                )
+                timing["next_precharge"] = max(
+                    timing["next_precharge"],
+                    cycle + architecture["hbm_write_to_precharge_cycles"],
+                )
+            counts[command] += 1
+            for value in (
+                    cycle, event["sequence"], event["block_offset"], channel,
+                    bank, row, event["command_id"]):
+                checksum ^= value
+                checksum = (checksum * 1099511628211) & 0xFFFFFFFFFFFFFFFF
+            sample = {key: value for key, value in event.items()
+                      if key != "command_id"}
+            if decoded < 32:
+                first.append(sample)
+            else:
+                last.append(sample)
+            decoded += 1
+        if decoded != expected or decoded != summary.get("event_count"):
+            raise ValueError(f"{dataset} {variant} command event count differs")
+        expected_counts = {
+            "PRE": layer["precharge_commands"],
+            "ACT": layer["activate_commands"],
+            "READ": layer["read_commands"],
+            "WRITE": layer["write_commands"],
+        }
+        if any(counts[name] != expected_counts[name]
+               for name in COMMAND_NAMES):
+            raise ValueError(f"{dataset} {variant} command type totals differ")
+        expected_samples = first + list(last)
+        if expected_samples != summary.get("samples"):
+            raise ValueError(
+                f"{dataset} {variant} command samples differ from complete trace"
+            )
+        if f"{checksum:016x}" != summary.get("checksum_fnv1a64"):
+            raise ValueError(f"{dataset} {variant} command checksum differs")
+        if summary.get("command_lane_violations") != 0:
+            raise ValueError(f"{dataset} {variant} reports a command-lane violation")
+        event_count += decoded
+        checksums.append(summary["checksum_fnv1a64"])
     return {
         "event_count": event_count,
         "checksums": checksums,
         "command_issue_interval_cycles": interval,
         "command_lane_violations": 0,
-        "sample_policy": "full small run or first/last 32 events",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "independently_reconstructed": True,
     }
 
 def directional_memory_evidence(run):
@@ -1247,6 +1450,16 @@ def main():
     binary = Path(args.binary)
     if not binary.is_absolute():
         binary = root / binary
+    trace_validator = (
+        Path(args.trace_validator) if args.trace_validator
+        else binary.with_name("hygcn_trace_validator")
+    )
+    if not trace_validator.is_absolute():
+        trace_validator = root / trace_validator
+    if not trace_validator.is_file():
+        raise ValueError(
+            f"compiled trace validator is missing: {trace_validator}"
+        )
     reference_path = Path(args.reference)
     workload_path = Path(args.workloads)
     baseline_path = Path(args.parameter_baseline)
@@ -1279,6 +1492,7 @@ def main():
                 args.force,
                 profile_path,
                 workloads,
+                trace_validator,
             )
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
@@ -1292,11 +1506,11 @@ def main():
             )
         architecture = runs["optimized"]["architecture"]
         admission_oracles = {
-            name: validate_transaction_admission(dataset, name, result)
+            name: result["_trace_oracles"]["transaction_admission_oracle"]
             for name, result in runs.items()
         }
         command_oracles = {
-            name: validate_command_trace(dataset, name, result)
+            name: result["_trace_oracles"]["command_trace_oracle"]
             for name, result in runs.items()
         }
         summaries = {name: summarize_result(result) for name, result in runs.items()}
@@ -1356,6 +1570,11 @@ def main():
             "graph_partition": workloads["graph_partition"],
         },
         "parameter_baseline_file": str(baseline_path.relative_to(root)),
+        "trace_validator": {
+            "path": str(trace_validator),
+            "sha256": sha256_digest(trace_validator),
+            "implementation": "standalone independent C++ replay",
+        },
         "datasets": datasets,
         "aggregate": aggregate,
         "per_dataset": per_dataset,

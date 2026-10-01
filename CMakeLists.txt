@@ -40,6 +40,13 @@ set_target_properties(hygcn_unit_tests PROPERTIES
         CXX_EXTENSIONS NO
         )
 
+add_executable(hygcn_trace_validator tools/trace_validator.cpp)
+target_include_directories(hygcn_trace_validator PRIVATE dramsim3/ext/headers)
+set_target_properties(hygcn_trace_validator PROPERTIES
+        CXX_STANDARD_REQUIRED YES
+        CXX_EXTENSIONS NO
+        )
+
 add_test(NAME hygcn_unit COMMAND hygcn_unit_tests)
 set_tests_properties(hygcn_unit PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
@@ -69,6 +76,12 @@ if(Python3_Interpreter_FOUND)
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/test_paper_benchmark.py)
     set_tests_properties(paper_benchmark_scope PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
+    add_test(NAME trace_validator_mutations
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/test_trace_validator.py
+                    --binary $<TARGET_FILE:hygcntest>
+                    --validator $<TARGET_FILE:hygcn_trace_validator>)
+    set_tests_properties(trace_validator_mutations PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
     add_test(NAME legacy_snapshot_fixture
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/check_legacy_snapshot.py
                     --fixture-only)
@@ -95,12 +108,13 @@ if(Python3_Interpreter_FOUND)
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/validate_reference_metrics.py
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/paper_benchmark.py
                     --binary $<TARGET_FILE:hygcntest>
+                    --trace-validator $<TARGET_FILE:hygcn_trace_validator>
                     --output-dir ${CMAKE_SOURCE_DIR}/res/paper
                     --force
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/validate_paper_metrics.py
                     --report ${CMAKE_SOURCE_DIR}/res/paper/benchmark_report.json
                     --output ${CMAKE_SOURCE_DIR}/res/paper/validation_report.md
-            DEPENDS hygcntest
+            DEPENDS hygcntest hygcn_trace_validator
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
             USES_TERMINAL)
 endif()
