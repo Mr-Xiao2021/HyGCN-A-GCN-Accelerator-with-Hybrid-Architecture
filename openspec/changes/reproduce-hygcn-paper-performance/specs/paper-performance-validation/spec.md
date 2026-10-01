@@ -62,7 +62,7 @@
 
 #### Scenario: 协调器分解消融
 - **WHEN** 验收 Fig. 17
-- **THEN** 报告 priority-only、mapping-only 和 combined 三组结果，分别保持非目标机制不变，并保存同一 low-bits mapping 上 optimized/mapping-only 的请求 timeline、各类别 row hit/miss 与 mapping channel/bank 分布；逐数据集周期和完整区间带宽增量 MUST 至少为 `1.005x`，逐数据集 row-hit 增量 MUST 至少为 `1.03x`，三数据集平均 row-hit 增量 MUST 至少为 `1.05x`
+- **THEN** 报告 priority-only、mapping-only 和 combined 三组结果，分别保持非目标机制不变，并保存同一 low-bits mapping 上 optimized/mapping-only 的请求 timeline、各类别 row hit/miss 与 mapping channel/bank 分布；逐数据集周期和完整区间带宽增量 MUST 至少为 `1.005x`，逐数据集与三数据集平均 row-hit 增量 MUST 至少为 `1.03x`。论文未公开 isolated priority 的 row-hit 数值，版本化 schema v6 因此不再施加无外部依据且高于逐数据集门槛的 `1.05x` aggregate 目标
 
 #### Scenario: 带宽与总执行时间解耦
 - **WHEN** 请求时间线包含等待 AE/CE producer 且没有 HBM 请求在途的空闲区间
@@ -82,9 +82,11 @@
 ### Requirement: 因果与请求切分不变量
 同一有序 block 流的内存完成时间、row hit/miss 和 channel/bank 事务计数 MUST 不受上层请求切分影响。Output 请求 MUST 在对应 CE producer-ready 后入队；Intermediate Read MUST 访问对应 Write 的同一地址和字节范围，并等待该 Write 完成。已经进入请求级时间线的 intermediate 流量 MUST NOT 再以解析延迟重复计时。
 
-FIFO 与 batch-class MUST 共享全局 transaction admission 带宽。四个 buffer port 每个模型周期合计进入所有 channel controller 的 block 数 MUST 不超过由论文 HBM 接口宽度派生的 4。bundled DRAMSim3 为 `unified_queue=False`，因此每 channel read queue 与 write buffer MUST 分别受 `trans_queue_size=32` 约束，每 bank command queue MUST 受 `cmd_queue_size=8` 约束。read 与 write MUST 分别使用 `CL/tRCDRD` 和 `CWL/tRCDWR` 派生的 row timing，并施加 DRAMSim3 read/write command switching 约束。
+FIFO 与 batch-class MUST 共享全局 transaction admission 带宽。四个 buffer port 每个模型周期合计进入所有 channel controller 的 block 数 MUST 不超过由论文 HBM 接口宽度派生的 4。bundled DRAMSim3 为 `unified_queue=False`，因此每 channel read queue 与 write buffer MUST 分别受 `trans_queue_size=32` 约束，每 bank command queue MUST 受 `cmd_queue_size=8` 约束。read 与 write MUST 分别使用 `CL/tRCDRD` 和 `CWL/tRCDWR` 派生的 data command timing，并施加 DRAMSim3 read/write command switching 约束。换行 MUST 显式执行 PRE→ACT，且 PRE/ACT/data issue 分别受 `tRTP`、`tWR`、`tRAS`、`tRP`、`tRC`、`tRCDRD`、`tRCDWR` 和 `tCCD_L` 约束；请求 completion 不得直接释放 bank command recovery。
 
-admission 证据 MUST 保存可逆的完整压缩 trace，或明确降级为 summary/sample。正式 benchmark 使用完整 trace 时，validator MUST 独立解码并重算方向 histogram、weighted total、actual maximum 与 checksum；edge sample 不得被声明为 raw trace。
+论文 256 GB/s HBM1 MUST 建模为两份 bundled 8-channel、128 GB/s HBM1 stack 的复制，共 16 个物理 channel。每个物理 channel MUST 保留 bundled DRAMSim3 的 `tCK/tCCD`、方向队列和 command queue 约束；实现不得通过缩短单 channel data-command spacing 来补足总带宽。
+
+admission 证据 MUST 保存可逆的完整压缩 trace，或明确降级为 summary/sample。正式 benchmark 使用完整 trace 时，每次 admission MUST 保存逐 channel read/write occupancy before/after，并保存 terminal zero snapshot，使 validator 能从零推导 admission、intervening dispatch、逐 channel peak 和 capacity violation，再重算方向 histogram、weighted total、actual maximum 与 checksum；edge sample 不得被声明为 raw trace。
 
 #### Scenario: 请求切分反例
 - **WHEN** 同一 128 个连续 block 分别封装为一个请求和 128 个请求
@@ -98,9 +100,13 @@ admission 证据 MUST 保存可逆的完整压缩 trace，或明确降级为 sum
 - **WHEN** 同一 channel 的 read queue 达到容量并同时存在 write 请求，且后续从 read 切换到 write
 - **THEN** write 可进入独立 write buffer；read/write 峰值分别不超过 32，写请求使用 CWL/tRCDWR 时序，首次 write issue 满足 read-to-write spacing
 
+#### Scenario: 命令级换行恢复
+- **WHEN** 同一 bank 依次执行 WRITE→different-row WRITE、WRITE→different-row READ 和 READ→different-row WRITE
+- **THEN** 第二个请求的 PRE 不早于前一 data command recovery 与 tRAS，ACT 不早于 PRE+tRP 和前一 ACT+tRC，实际 READ/WRITE issue 不早于 ACT+tRCDRD/tRCDWR
+
 #### Scenario: Admission 完整证据
 - **WHEN** benchmark 读取一层 transaction admission 证据
-- **THEN** validator 从压缩分块恢复全部事件，并独立重算 histogram、weighted totals、actual maxima、edge samples 与 FNV-1a checksum
+- **THEN** validator 从压缩分块恢复逐 channel occupancy before/after 和 terminal zero snapshot，从零推导 dispatch totals、peak/capacity，再独立重算 histogram、weighted totals、actual maxima、edge samples 与 FNV-1a checksum
 
 ### Requirement: 自检与回归
 构建系统 SHALL 注册单元测试、集成 smoke 测试和论文指标验收测试。默认快速测试 MUST 在合理时间内运行且不依赖缺失的大型数据集；完整论文验收 MUST 可单独触发并输出汇总报告。

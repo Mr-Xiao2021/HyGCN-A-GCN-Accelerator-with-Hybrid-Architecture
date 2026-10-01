@@ -1,6 +1,6 @@
 {
-  "schema_version": 3,
-  "workload_version": "hygcn-hpca2020-table5-gcn-v3",
+  "schema_version": 4,
+  "workload_version": "hygcn-hpca2020-table5-gcn-v4-two-stack-hbm",
   "paper_source": "HyGCN HPCA 2020 Table 5 and Section 5.3",
   "figures": {
     "figure_15": {
@@ -40,6 +40,10 @@
     "candidate_capacities_mib": [4, 5, 6]
   },
   "memory_ablation": {
+    "hbm_stacks": 2,
+    "channels_per_stack": 8,
+    "physical_channels": 16,
+    "topology_source": "HyGCN reports 256 GB/s HBM1. The bundled DRAMSim3 HBM1_4Gb_x128 profile is one 8-channel 128 GB/s stack, so the paper profile replicates that timing and queue topology across two stacks rather than inventing a faster per-channel command rate.",
     "read_queue_entries_per_channel": 32,
     "write_buffer_entries_per_channel": 32,
     "transaction_queue_source": "configs/HBM1_4Gb_x128.ini sets unified_queue=False and trans_queue_size=32; DRAMSim3 therefore allocates an independent 32-entry read_queue and 32-entry write_buffer in every channel controller",
@@ -71,7 +75,19 @@
       "write_row_conflict_formula": "ceil((tRP + tRCDWR + CWL) * tCK / model_cycle_ns)",
       "read_to_write_formula": "ceil((RL + burst_cycle - WL + tRTRS) * tCK / model_cycle_ns)",
       "write_to_read_formula": "ceil((write_delay + tWTR_L) * tCK / model_cycle_ns)",
-      "transfer_note": "burst/block transfer is modeled separately by transfer_cycles, so BL is not duplicated in row access latency"
+      "read_to_precharge_formula": "ceil((AL + tRTP) * tCK / model_cycle_ns); bundled HBM config omits tRTP, so DRAMSim3 default tRTP=5 applies",
+      "write_to_precharge_formula": "ceil((WL + burst_cycle + tWR) * tCK / model_cycle_ns)",
+      "activate_to_precharge_formula": "ceil(tRAS * tCK / model_cycle_ns)",
+      "precharge_to_activate_formula": "ceil(tRP * tCK / model_cycle_ns)",
+      "activate_to_activate_formula": "ceil((tRAS + tRP) * tCK / model_cycle_ns)",
+      "command_issue_interval_formula": "ceil(tCK / model_cycle_ns); each physical channel issues row commands on its own replicated DRAMSim3 command lane",
+      "same_direction_formula": "ceil(max(burst_cycle, tCCD_L) * tCK / model_cycle_ns)",
+      "command_model": "request completion is measured from actual READ/WRITE issue; row conflicts explicitly schedule PRE then ACT before the data command, while tWR/tRTP/tRAS and PRE-to-ACT constrain recovery",
+      "transfer_note": "burst/block transfer is modeled separately by transfer_cycles, so BL is not duplicated in CL/CWL completion latency"
+    },
+    "occupancy_trace": {
+      "representation": "directional_occupancy_delta_varint_base64_v2",
+      "policy": "every admission records per-channel read/write occupancy before and after mutation; a terminal zero snapshot lets the validator infer all intervening dispatch counts from zero and independently recompute peaks, capacity violations, totals, histograms, edge samples, and checksum"
     }
   },
   "scope_limits": [

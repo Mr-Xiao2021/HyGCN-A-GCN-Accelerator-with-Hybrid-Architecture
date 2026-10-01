@@ -195,8 +195,22 @@ json ArchitectureJson(const ArchitectureConfig& architecture) {
         {"hbm_write_row_hit_cycles", architecture.hbm_write_row_hit_cycles},
         {"hbm_write_row_miss_cycles", architecture.hbm_write_row_miss_cycles},
         {"hbm_write_row_conflict_cycles", architecture.hbm_write_row_conflict_cycles},
+        {"hbm_activate_to_read_cycles", architecture.hbm_activate_to_read_cycles},
+        {"hbm_activate_to_write_cycles", architecture.hbm_activate_to_write_cycles},
+        {"hbm_read_to_read_cycles", architecture.hbm_read_to_read_cycles},
+        {"hbm_write_to_write_cycles", architecture.hbm_write_to_write_cycles},
         {"hbm_read_to_write_cycles", architecture.hbm_read_to_write_cycles},
         {"hbm_write_to_read_cycles", architecture.hbm_write_to_read_cycles},
+        {"hbm_read_to_precharge_cycles", architecture.hbm_read_to_precharge_cycles},
+        {"hbm_write_to_precharge_cycles", architecture.hbm_write_to_precharge_cycles},
+        {"hbm_activate_to_precharge_cycles",
+         architecture.hbm_activate_to_precharge_cycles},
+        {"hbm_precharge_to_activate_cycles",
+         architecture.hbm_precharge_to_activate_cycles},
+        {"hbm_activate_to_activate_cycles",
+         architecture.hbm_activate_to_activate_cycles},
+        {"hbm_command_issue_interval_cycles",
+         architecture.hbm_command_issue_interval_cycles},
         {"edram_latency_cycles", architecture.edram_latency_cycles},
         {"edram_transactions_per_cycle", architecture.edram_transactions_per_cycle},
         {"simd_efficiency", architecture.simd_efficiency},
@@ -236,6 +250,12 @@ json LayerJson(const LayerMetrics& layer) {
             {"last_admission_cycle", trace.last_admission_cycle},
             {"first_issue_cycle", trace.first_issue_cycle},
             {"completion_cycle", trace.completion_cycle},
+            {"precharge_commands", trace.precharge_commands},
+            {"activate_commands", trace.activate_commands},
+            {"first_precharge_cycle", trace.first_precharge_cycle},
+            {"last_precharge_cycle", trace.last_precharge_cycle},
+            {"first_activate_cycle", trace.first_activate_cycle},
+            {"last_activate_cycle", trace.last_activate_cycle},
             {"producer_sequence", trace.producer_sequence.has_value()
                 ? json(*trace.producer_sequence) : json(nullptr)},
         });
@@ -254,6 +274,12 @@ json LayerJson(const LayerMetrics& layer) {
             {"last_admission_cycle", trace.last_admission_cycle},
             {"first_issue_cycle", trace.first_issue_cycle},
             {"completion_cycle", trace.completion_cycle},
+            {"precharge_commands", trace.precharge_commands},
+            {"activate_commands", trace.activate_commands},
+            {"first_precharge_cycle", trace.first_precharge_cycle},
+            {"last_precharge_cycle", trace.last_precharge_cycle},
+            {"first_activate_cycle", trace.first_activate_cycle},
+            {"last_activate_cycle", trace.last_activate_cycle},
             {"producer_sequence", trace.producer_sequence.has_value()
                 ? json(*trace.producer_sequence) : json(nullptr)},
         });
@@ -271,6 +297,8 @@ json LayerJson(const LayerMetrics& layer) {
     uint64_t admitted_blocks = 0;
     uint64_t admitted_read_blocks = 0;
     uint64_t admitted_write_blocks = 0;
+    uint64_t inferred_dispatched_read_blocks = 0;
+    uint64_t inferred_dispatched_write_blocks = 0;
     uint64_t total_read_occupancy_before = 0;
     uint64_t total_read_occupancy_after = 0;
     uint64_t total_write_occupancy_before = 0;
@@ -281,8 +309,59 @@ json LayerJson(const LayerMetrics& layer) {
     uint64_t max_channel_read_occupancy = 0;
     uint64_t max_channel_write_occupancy = 0;
     uint64_t admission_checksum = 1469598103934665603ULL;
+    const std::size_t trace_channels =
+        layer.max_channel_read_queue_occupancy.size();
+    std::array<uint16_t, kMaxTraceHbmChannels> previous_read_occupancy{};
+    std::array<uint16_t, kMaxTraceHbmChannels> previous_write_occupancy{};
+    std::size_t admission_event_count = 0;
     for (std::size_t index = 0; index < layer.transaction_admission_traces.size(); ++index) {
         const auto& trace = layer.transaction_admission_traces[index];
+        uint64_t trace_read_before = 0;
+        uint64_t trace_read_after = 0;
+        uint64_t trace_write_before = 0;
+        uint64_t trace_write_after = 0;
+        uint64_t trace_max_read_after = 0;
+        uint64_t trace_max_write_after = 0;
+        uint64_t trace_admitted_read = 0;
+        uint64_t trace_admitted_write = 0;
+        json read_before = json::array();
+        json read_after = json::array();
+        json write_before = json::array();
+        json write_after = json::array();
+        for (std::size_t channel = 0; channel < trace_channels; ++channel) {
+            const uint64_t rb = trace.channel_read_occupancy_before[channel];
+            const uint64_t ra = trace.channel_read_occupancy_after[channel];
+            const uint64_t wb = trace.channel_write_occupancy_before[channel];
+            const uint64_t wa = trace.channel_write_occupancy_after[channel];
+            if (rb > previous_read_occupancy[channel] ||
+                wb > previous_write_occupancy[channel] || ra < rb || wa < wb) {
+                throw std::runtime_error("directional occupancy trace is inconsistent");
+            }
+            inferred_dispatched_read_blocks += previous_read_occupancy[channel] - rb;
+            inferred_dispatched_write_blocks += previous_write_occupancy[channel] - wb;
+            trace_admitted_read += ra - rb;
+            trace_admitted_write += wa - wb;
+            trace_read_before += rb;
+            trace_read_after += ra;
+            trace_write_before += wb;
+            trace_write_after += wa;
+            trace_max_read_after = std::max(trace_max_read_after, ra);
+            trace_max_write_after = std::max(trace_max_write_after, wa);
+            previous_read_occupancy[channel] = static_cast<uint16_t>(ra);
+            previous_write_occupancy[channel] = static_cast<uint16_t>(wa);
+            read_before.push_back(rb);
+            read_after.push_back(ra);
+            write_before.push_back(wb);
+            write_after.push_back(wa);
+        }
+        if (trace_admitted_read != trace.admitted_read_blocks ||
+            trace_admitted_write != trace.admitted_write_blocks ||
+            trace.admitted_blocks !=
+                trace.admitted_read_blocks + trace.admitted_write_blocks ||
+            (trace.terminal_snapshot && trace.admitted_blocks != 0)) {
+            throw std::runtime_error("directional admission trace delta differs");
+        }
+        admission_event_count += trace.terminal_snapshot ? 0 : 1;
         IncrementHistogram(admission_histograms["admitted_blocks"],
                            trace.admitted_blocks);
         IncrementHistogram(admission_histograms["admitted_read_blocks"],
@@ -290,58 +369,58 @@ json LayerJson(const LayerMetrics& layer) {
         IncrementHistogram(admission_histograms["admitted_write_blocks"],
                            trace.admitted_write_blocks);
         IncrementHistogram(admission_histograms["total_read_occupancy_after"],
-                           trace.total_read_occupancy_after);
+                           trace_read_after);
         IncrementHistogram(admission_histograms["total_write_occupancy_after"],
-                           trace.total_write_occupancy_after);
+                           trace_write_after);
         IncrementHistogram(admission_histograms["max_channel_read_occupancy_after"],
-                           trace.max_channel_read_occupancy_after);
+                           trace_max_read_after);
         IncrementHistogram(admission_histograms["max_channel_write_occupancy_after"],
-                           trace.max_channel_write_occupancy_after);
+                           trace_max_write_after);
         admitted_blocks += trace.admitted_blocks;
         admitted_read_blocks += trace.admitted_read_blocks;
         admitted_write_blocks += trace.admitted_write_blocks;
-        total_read_occupancy_before += trace.total_read_occupancy_before;
-        total_read_occupancy_after += trace.total_read_occupancy_after;
-        total_write_occupancy_before += trace.total_write_occupancy_before;
-        total_write_occupancy_after += trace.total_write_occupancy_after;
+        total_read_occupancy_before += trace_read_before;
+        total_read_occupancy_after += trace_read_after;
+        total_write_occupancy_before += trace_write_before;
+        total_write_occupancy_after += trace_write_after;
         max_blocks_admitted_per_cycle = std::max(
             max_blocks_admitted_per_cycle, trace.admitted_blocks);
         max_total_read_occupancy = std::max(
-            max_total_read_occupancy, trace.total_read_occupancy_after);
+            max_total_read_occupancy, trace_read_after);
         max_total_write_occupancy = std::max(
-            max_total_write_occupancy, trace.total_write_occupancy_after);
+            max_total_write_occupancy, trace_write_after);
         max_channel_read_occupancy = std::max(
-            max_channel_read_occupancy, trace.max_channel_read_occupancy_after);
+            max_channel_read_occupancy, trace_max_read_after);
         max_channel_write_occupancy = std::max(
-            max_channel_write_occupancy, trace.max_channel_write_occupancy_after);
-        for (const uint64_t value : {
-                 trace.cycle,
-                 trace.admitted_blocks,
-                 trace.admitted_read_blocks,
-                 trace.admitted_write_blocks,
-                 trace.total_read_occupancy_before,
-                 trace.total_read_occupancy_after,
-                 trace.total_write_occupancy_before,
-                 trace.total_write_occupancy_after,
-                 trace.max_channel_read_occupancy_after,
-                 trace.max_channel_write_occupancy_after}) {
+            max_channel_write_occupancy, trace_max_write_after);
+        for (const uint64_t value : {trace.cycle,
+                 static_cast<uint64_t>(trace.terminal_snapshot),
+                 trace.admitted_blocks, trace.admitted_read_blocks,
+                 trace.admitted_write_blocks}) {
             admission_checksum ^= value;
             admission_checksum *= 1099511628211ULL;
+        }
+        for (std::size_t channel = 0; channel < trace_channels; ++channel) {
+            for (const uint64_t value : {
+                     static_cast<uint64_t>(trace.channel_read_occupancy_before[channel]),
+                     static_cast<uint64_t>(trace.channel_read_occupancy_after[channel]),
+                     static_cast<uint64_t>(trace.channel_write_occupancy_before[channel]),
+                     static_cast<uint64_t>(trace.channel_write_occupancy_after[channel])}) {
+                admission_checksum ^= value;
+                admission_checksum *= 1099511628211ULL;
+            }
         }
         if (index < 16 || index + 16 >= layer.transaction_admission_traces.size()) {
             admission_edge_samples.push_back({
                 {"cycle", trace.cycle},
+                {"terminal_snapshot", trace.terminal_snapshot},
                 {"admitted_blocks", trace.admitted_blocks},
                 {"admitted_read_blocks", trace.admitted_read_blocks},
                 {"admitted_write_blocks", trace.admitted_write_blocks},
-                {"total_read_occupancy_before", trace.total_read_occupancy_before},
-                {"total_read_occupancy_after", trace.total_read_occupancy_after},
-                {"total_write_occupancy_before", trace.total_write_occupancy_before},
-                {"total_write_occupancy_after", trace.total_write_occupancy_after},
-                {"max_channel_read_occupancy_after",
-                 trace.max_channel_read_occupancy_after},
-                {"max_channel_write_occupancy_after",
-                 trace.max_channel_write_occupancy_after},
+                {"channel_read_occupancy_before", read_before},
+                {"channel_read_occupancy_after", read_after},
+                {"channel_write_occupancy_before", write_before},
+                {"channel_write_occupancy_after", write_after},
             });
         }
     }
@@ -354,7 +433,7 @@ json LayerJson(const LayerMetrics& layer) {
             offset + kAdmissionChunkEvents,
             layer.transaction_admission_traces.size());
         std::string payload;
-        payload.reserve((end - offset) * 20);
+        payload.reserve((end - offset) * (8 + 4 * trace_channels));
         uint64_t previous_cycle = 0;
         for (std::size_t index = offset; index < end; ++index) {
             const auto& trace = layer.transaction_admission_traces[index];
@@ -362,16 +441,19 @@ json LayerJson(const LayerMetrics& layer) {
                 ? trace.cycle : trace.cycle - previous_cycle);
             previous_cycle = trace.cycle;
             for (const uint64_t value : {
-                     trace.admitted_blocks,
-                     trace.admitted_read_blocks,
-                     trace.admitted_write_blocks,
-                     trace.total_read_occupancy_before,
-                     trace.total_read_occupancy_after,
-                     trace.total_write_occupancy_before,
-                     trace.total_write_occupancy_after,
-                     trace.max_channel_read_occupancy_after,
-                     trace.max_channel_write_occupancy_after}) {
+                     static_cast<uint64_t>(trace.terminal_snapshot),
+                     trace.admitted_blocks, trace.admitted_read_blocks,
+                     trace.admitted_write_blocks}) {
                 AppendVarint(payload, value);
+            }
+            for (const auto* values : {
+                     &trace.channel_read_occupancy_before,
+                     &trace.channel_read_occupancy_after,
+                     &trace.channel_write_occupancy_before,
+                     &trace.channel_write_occupancy_after}) {
+                for (std::size_t channel = 0; channel < trace_channels; ++channel) {
+                    AppendVarint(payload, (*values)[channel]);
+                }
             }
         }
         admission_chunks.push_back({
@@ -380,16 +462,18 @@ json LayerJson(const LayerMetrics& layer) {
         });
     }
     json admission_summary = {
-        {"representation", "complete_delta_varint_base64_v1"},
-        {"fields", {"cycle_delta", "admitted_blocks", "admitted_read_blocks",
-                    "admitted_write_blocks", "total_read_occupancy_before",
-                    "total_read_occupancy_after", "total_write_occupancy_before",
-                    "total_write_occupancy_after",
-                    "max_channel_read_occupancy_after",
-                    "max_channel_write_occupancy_after"}},
+        {"representation", "directional_occupancy_delta_varint_base64_v2"},
+        {"fields", {"cycle_delta", "terminal_snapshot", "admitted_blocks",
+                    "admitted_read_blocks", "admitted_write_blocks",
+                    "channel_read_occupancy_before[]",
+                    "channel_read_occupancy_after[]",
+                    "channel_write_occupancy_before[]",
+                    "channel_write_occupancy_after[]"}},
+        {"channel_count", trace_channels},
         {"chunk_event_limit", kAdmissionChunkEvents},
         {"trace_chunks", admission_chunks},
-        {"cycle_count", layer.transaction_admission_traces.size()},
+        {"event_count", layer.transaction_admission_traces.size()},
+        {"admission_event_count", admission_event_count},
         {"first_cycle", layer.transaction_admission_traces.empty()
             ? 0 : layer.transaction_admission_traces.front().cycle},
         {"last_cycle", layer.transaction_admission_traces.empty()
@@ -398,6 +482,8 @@ json LayerJson(const LayerMetrics& layer) {
             {"admitted_blocks", admitted_blocks},
             {"admitted_read_blocks", admitted_read_blocks},
             {"admitted_write_blocks", admitted_write_blocks},
+            {"inferred_dispatched_read_blocks", inferred_dispatched_read_blocks},
+            {"inferred_dispatched_write_blocks", inferred_dispatched_write_blocks},
             {"total_read_occupancy_before", total_read_occupancy_before},
             {"total_read_occupancy_after", total_read_occupancy_after},
             {"total_write_occupancy_before", total_write_occupancy_before},
@@ -465,6 +551,10 @@ json LayerJson(const LayerMetrics& layer) {
         {"read_to_write_switches", layer.read_to_write_switches},
         {"write_to_read_switches", layer.write_to_read_switches},
         {"direction_switch_stall_cycles", layer.direction_switch_stall_cycles},
+        {"precharge_commands", layer.precharge_commands},
+        {"activate_commands", layer.activate_commands},
+        {"read_commands", layer.read_commands},
+        {"write_commands", layer.write_commands},
         {"ae_finish_cycle", layer.ae_finish_cycle},
         {"ce_start_cycle", layer.ce_start_cycle},
         {"ce_finish_cycle", layer.ce_finish_cycle},
@@ -555,10 +645,30 @@ ArchitectureConfig ArchitectureConfig::Load(const std::string& path) {
         "memory", "hbm_write_row_miss_cycles", -1);
     config.hbm_write_row_conflict_cycles = reader.GetInteger(
         "memory", "hbm_write_row_conflict_cycles", -1);
+    config.hbm_activate_to_read_cycles = reader.GetInteger(
+        "memory", "hbm_activate_to_read_cycles", -1);
+    config.hbm_activate_to_write_cycles = reader.GetInteger(
+        "memory", "hbm_activate_to_write_cycles", -1);
+    config.hbm_read_to_read_cycles = reader.GetInteger(
+        "memory", "hbm_read_to_read_cycles", -1);
+    config.hbm_write_to_write_cycles = reader.GetInteger(
+        "memory", "hbm_write_to_write_cycles", -1);
     config.hbm_read_to_write_cycles = reader.GetInteger(
         "memory", "hbm_read_to_write_cycles", -1);
     config.hbm_write_to_read_cycles = reader.GetInteger(
         "memory", "hbm_write_to_read_cycles", -1);
+    config.hbm_read_to_precharge_cycles = reader.GetInteger(
+        "memory", "hbm_read_to_precharge_cycles", -1);
+    config.hbm_write_to_precharge_cycles = reader.GetInteger(
+        "memory", "hbm_write_to_precharge_cycles", -1);
+    config.hbm_activate_to_precharge_cycles = reader.GetInteger(
+        "memory", "hbm_activate_to_precharge_cycles", -1);
+    config.hbm_precharge_to_activate_cycles = reader.GetInteger(
+        "memory", "hbm_precharge_to_activate_cycles", -1);
+    config.hbm_activate_to_activate_cycles = reader.GetInteger(
+        "memory", "hbm_activate_to_activate_cycles", -1);
+    config.hbm_command_issue_interval_cycles = reader.GetInteger(
+        "memory", "hbm_command_issue_interval_cycles", -1);
     config.edram_latency_cycles = reader.GetInteger("memory", "edram_latency_cycles", -1);
     config.edram_transactions_per_cycle = reader.GetInteger("memory", "edram_transactions_per_cycle", -1);
 
@@ -646,8 +756,44 @@ void ArchitectureConfig::Validate() const {
                      "hbm_write_row_miss_cycles");
     require_positive(hbm_write_row_conflict_cycles > hbm_write_row_miss_cycles,
                      "hbm_write_row_conflict_cycles");
+    require_positive(hbm_activate_to_read_cycles > 0,
+                     "hbm_activate_to_read_cycles");
+    require_positive(hbm_activate_to_write_cycles > 0,
+                     "hbm_activate_to_write_cycles");
+    require_positive(hbm_read_to_read_cycles > 0, "hbm_read_to_read_cycles");
+    require_positive(hbm_write_to_write_cycles > 0, "hbm_write_to_write_cycles");
     require_positive(hbm_read_to_write_cycles > 0, "hbm_read_to_write_cycles");
     require_positive(hbm_write_to_read_cycles > 0, "hbm_write_to_read_cycles");
+    require_positive(hbm_read_to_precharge_cycles > 0,
+                     "hbm_read_to_precharge_cycles");
+    require_positive(hbm_write_to_precharge_cycles > 0,
+                     "hbm_write_to_precharge_cycles");
+    require_positive(hbm_activate_to_precharge_cycles > 0,
+                     "hbm_activate_to_precharge_cycles");
+    require_positive(hbm_precharge_to_activate_cycles > 0,
+                     "hbm_precharge_to_activate_cycles");
+    require_positive(hbm_activate_to_activate_cycles >=
+                         hbm_activate_to_precharge_cycles +
+                         hbm_precharge_to_activate_cycles,
+                     "hbm_activate_to_activate_cycles");
+    require_positive(hbm_command_issue_interval_cycles > 0,
+                     "hbm_command_issue_interval_cycles");
+    require_positive(hbm_read_row_miss_cycles ==
+                         hbm_activate_to_read_cycles + hbm_read_row_hit_cycles,
+                     "hbm_read_row_miss_cycles command decomposition");
+    require_positive(hbm_read_row_conflict_cycles ==
+                         hbm_precharge_to_activate_cycles +
+                         hbm_activate_to_read_cycles + hbm_read_row_hit_cycles,
+                     "hbm_read_row_conflict_cycles command decomposition");
+    require_positive(hbm_write_row_miss_cycles ==
+                         hbm_activate_to_write_cycles + hbm_write_row_hit_cycles,
+                     "hbm_write_row_miss_cycles command decomposition");
+    require_positive(hbm_write_row_conflict_cycles ==
+                         hbm_precharge_to_activate_cycles +
+                         hbm_activate_to_write_cycles + hbm_write_row_hit_cycles,
+                     "hbm_write_row_conflict_cycles command decomposition");
+    require_positive(hbm_channels <= static_cast<int>(kMaxTraceHbmChannels),
+                     "hbm_channels trace capacity");
     require_positive(edram_latency_cycles >= 0, "edram_latency_cycles");
     require_positive(edram_transactions_per_cycle > 0, "edram_transactions_per_cycle");
     require_positive(simd_efficiency > 0.0 && simd_efficiency <= 1.0, "simd_efficiency");
@@ -840,7 +986,9 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     }
 
     struct BankState {
-        uint64_t ready_cycle = 0;
+        uint64_t next_activate_cycle = 0;
+        uint64_t next_precharge_cycle = 0;
+        uint64_t next_data_cycle = 0;
         uint64_t open_row = 0;
         bool row_open = false;
     };
@@ -848,6 +996,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     struct ChannelState {
         uint64_t next_read_cycle = 0;
         uint64_t next_write_cycle = 0;
+        uint64_t next_row_command_cycle = 0;
         uint64_t last_issue_cycle = 0;
         int last_direction = -1;
     };
@@ -864,6 +1013,12 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         uint64_t completion = 0;
         uint64_t effective_producer_ready = 0;
         uint64_t effective_enqueue = 0;
+        uint64_t precharge_commands = 0;
+        uint64_t activate_commands = 0;
+        uint64_t first_precharge = std::numeric_limits<uint64_t>::max();
+        uint64_t last_precharge = 0;
+        uint64_t first_activate = std::numeric_limits<uint64_t>::max();
+        uint64_t last_activate = 0;
     };
 
     struct Candidate {
@@ -876,6 +1031,9 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         uint64_t admission_order = std::numeric_limits<uint64_t>::max();
         uint64_t block = 0;
         uint64_t block_offset = 0;
+        uint64_t command_ready_cycle = 0;
+        uint64_t precharge_cycle = std::numeric_limits<uint64_t>::max();
+        uint64_t activate_cycle = std::numeric_limits<uint64_t>::max();
         std::size_t channel = 0;
         std::size_t bank = 0;
         uint64_t row = 0;
@@ -1016,13 +1174,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         candidate.is_write = IsWriteRequest(state.request.request_class);
         candidate.producer_ready_cycle = producer_ready;
         candidate.enqueue_cycle = enqueue;
-        const auto& bank_state = banks[
-            candidate.channel * architecture.hbm_banks_per_channel + candidate.bank];
-        const auto& channel_state = channels[candidate.channel];
-        const uint64_t direction_ready = candidate.is_write
-            ? channel_state.next_write_cycle : channel_state.next_read_cycle;
-        candidate.start_cycle = std::max(
-            {enqueue, direction_ready, bank_state.ready_cycle});
+        candidate.start_cycle = enqueue;
         return candidate;
     };
     struct BankQueue {
@@ -1133,15 +1285,46 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     std::vector<std::size_t> write_drain_remaining(architecture.hbm_channels, 0);
     std::vector<uint64_t> next_controller_dispatch_cycle(architecture.hbm_channels, 0);
     std::vector<std::size_t> command_queue_occupancy(total_banks, 0);
+    std::vector<std::pair<uint64_t, uint64_t>> block_active_intervals;
+    block_active_intervals.reserve(static_cast<std::size_t>(remaining_blocks));
     std::size_t fifo_next_port = 0;
     uint64_t next_admission_order = 0;
-
-    auto resource_ready = [&](std::size_t flat_bank, bool is_write) {
-        const std::size_t channel =
-            flat_bank / architecture.hbm_banks_per_channel;
-        const uint64_t direction_ready = is_write
-            ? channels[channel].next_write_cycle : channels[channel].next_read_cycle;
-        return std::max(direction_ready, banks[flat_bank].ready_cycle);
+    auto plan_candidate = [&](Candidate candidate) {
+        const std::size_t flat_bank =
+            candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
+        const auto& bank_state = banks[flat_bank];
+        const auto& channel_state = channels[candidate.channel];
+        const bool row_hit = bank_state.row_open && bank_state.open_row == candidate.row;
+        const bool row_conflict = bank_state.row_open && !row_hit;
+        const uint64_t dispatch_cycle = candidate.controller_dispatch_cycle;
+        const uint64_t activate_to_data = candidate.is_write
+            ? architecture.hbm_activate_to_write_cycles
+            : architecture.hbm_activate_to_read_cycles;
+        if (row_conflict) {
+            candidate.precharge_cycle = std::max(
+                {dispatch_cycle, bank_state.next_precharge_cycle,
+                 channel_state.next_row_command_cycle});
+            candidate.activate_cycle = std::max(
+                candidate.precharge_cycle +
+                    architecture.hbm_precharge_to_activate_cycles,
+                bank_state.next_activate_cycle);
+            candidate.command_ready_cycle =
+                candidate.activate_cycle + activate_to_data;
+        } else if (!row_hit) {
+            candidate.activate_cycle = std::max(
+                {dispatch_cycle, bank_state.next_activate_cycle,
+                 channel_state.next_row_command_cycle});
+            candidate.command_ready_cycle =
+                candidate.activate_cycle + activate_to_data;
+        } else {
+            candidate.command_ready_cycle = dispatch_cycle;
+        }
+        const uint64_t direction_ready = candidate.is_write
+            ? channel_state.next_write_cycle : channel_state.next_read_cycle;
+        candidate.start_cycle = std::max(
+            {candidate.command_ready_cycle, direction_ready,
+             bank_state.next_data_cycle});
+        return candidate;
     };
     auto push_available = [&](BankQueue& queue, const Candidate& candidate) {
         queue.available.insert(candidate);
@@ -1157,31 +1340,15 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     auto enqueue_bank_candidate = [&](Candidate candidate) {
         const std::size_t flat_bank =
             candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
-        if (candidate.controller_dispatch_cycle <=
-            resource_ready(flat_bank, candidate.is_write)) {
-            push_available(bank_queues[flat_bank], candidate);
-        } else {
-            bank_queues[flat_bank].Future(candidate.is_write).push(candidate);
-        }
+        push_available(bank_queues[flat_bank], candidate);
         active_fifo.push(candidate);
     };
     auto peek_bank = [&](std::size_t flat_bank) {
         auto& queue = bank_queues[flat_bank];
-        for (const bool is_write : {false, true}) {
-            auto& future = queue.Future(is_write);
-            while (!future.empty() &&
-                   future.top().controller_dispatch_cycle <=
-                       resource_ready(flat_bank, is_write)) {
-                push_available(queue, future.top());
-                future.pop();
-            }
-        }
         BankChoice choice;
         choice.flat_bank = flat_bank;
         if (!queue.available.empty()) {
-            choice.candidate = *queue.available.begin();
-            choice.candidate.start_cycle = resource_ready(
-                flat_bank, choice.candidate.is_write);
+            choice.candidate = plan_candidate(*queue.available.begin());
             choice.source = 1;
             choice.valid = true;
             if (priority == MemoryPriorityMode::BATCH_CLASS &&
@@ -1196,9 +1363,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                             states[row_queue.begin()->request_index].request;
                         if (primary_request.batch_id == row_request.batch_id &&
                             primary_request.request_class == row_request.request_class) {
-                            choice.candidate = *row_queue.begin();
-                            choice.candidate.start_cycle = resource_ready(
-                                flat_bank, choice.candidate.is_write);
+                            choice.candidate = plan_candidate(*row_queue.begin());
                             choice.source = 2;
                         }
                     }
@@ -1210,10 +1375,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             if (future.empty()) {
                 continue;
             }
-            Candidate candidate = future.top();
-            candidate.start_cycle = std::max(
-                candidate.controller_dispatch_cycle,
-                resource_ready(flat_bank, is_write));
+            Candidate candidate = plan_candidate(future.top());
             if (!choice.valid || candidate.start_cycle < choice.candidate.start_cycle ||
                 (candidate.start_cycle == choice.candidate.start_cycle &&
                  priority_less(candidate, choice.candidate))) {
@@ -1363,12 +1525,15 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
     auto admit_transaction_blocks = [&](uint64_t cycle,
                                         std::vector<bool>& affected_channels) {
         promote_pending(cycle);
-        const std::size_t read_occupancy_before = std::accumulate(
-            outstanding_read_blocks.begin(), outstanding_read_blocks.end(),
-            std::size_t{0});
-        const std::size_t write_occupancy_before = std::accumulate(
-            outstanding_write_blocks.begin(), outstanding_write_blocks.end(),
-            std::size_t{0});
+        TransactionAdmissionTrace trace;
+        trace.cycle = cycle;
+        for (std::size_t channel = 0;
+             channel < outstanding_read_blocks.size(); ++channel) {
+            trace.channel_read_occupancy_before[channel] = static_cast<uint16_t>(
+                outstanding_read_blocks[channel]);
+            trace.channel_write_occupancy_before[channel] = static_cast<uint16_t>(
+                outstanding_write_blocks[channel]);
+        }
         std::size_t admitted = 0;
         std::size_t admitted_reads = 0;
         std::size_t admitted_writes = 0;
@@ -1409,23 +1574,9 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             }
         }
         if (admitted != 0) {
-            TransactionAdmissionTrace trace;
-            trace.cycle = cycle;
             trace.admitted_blocks = admitted;
             trace.admitted_read_blocks = admitted_reads;
             trace.admitted_write_blocks = admitted_writes;
-            trace.total_read_occupancy_before = read_occupancy_before;
-            trace.total_read_occupancy_after = std::accumulate(
-                outstanding_read_blocks.begin(), outstanding_read_blocks.end(),
-                uint64_t{0});
-            trace.total_write_occupancy_before = write_occupancy_before;
-            trace.total_write_occupancy_after = std::accumulate(
-                outstanding_write_blocks.begin(), outstanding_write_blocks.end(),
-                uint64_t{0});
-            trace.max_channel_read_occupancy_after = *std::max_element(
-                outstanding_read_blocks.begin(), outstanding_read_blocks.end());
-            trace.max_channel_write_occupancy_after = *std::max_element(
-                outstanding_write_blocks.begin(), outstanding_write_blocks.end());
             for (std::size_t channel = 0;
                  channel < outstanding_read_blocks.size(); ++channel) {
                 if (outstanding_read_blocks[channel] > read_queue_capacity) {
@@ -1434,6 +1585,10 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                 if (outstanding_write_blocks[channel] > write_buffer_capacity) {
                     throw std::runtime_error("write buffer capacity exceeded");
                 }
+                trace.channel_read_occupancy_after[channel] = static_cast<uint16_t>(
+                    outstanding_read_blocks[channel]);
+                trace.channel_write_occupancy_after[channel] = static_cast<uint16_t>(
+                    outstanding_write_blocks[channel]);
                 result.max_channel_read_queue_occupancy[channel] = std::max<uint64_t>(
                     result.max_channel_read_queue_occupancy[channel],
                     outstanding_read_blocks[channel]);
@@ -1479,18 +1634,14 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         selected.is_write = write_drain_remaining[channel] != 0;
         const auto& queue = selected.is_write
             ? controller_write_queues[channel] : controller_read_queues[channel];
-        for (std::size_t index = 0; index < queue.size(); ++index) {
-            const auto& candidate = queue[index];
-            if (candidate.admission_cycle > cycle) {
-                continue;
-            }
-            const std::size_t flat_bank =
-                candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
-            if (command_queue_occupancy[flat_bank] < command_queue_capacity) {
-                selected.index = index;
-                selected.valid = true;
-                break;
-            }
+        if (queue.empty() || queue.front().admission_cycle > cycle) {
+            return selected;
+        }
+        const auto& candidate = queue.front();
+        const std::size_t flat_bank =
+            candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
+        if (command_queue_occupancy[flat_bank] < command_queue_capacity) {
+            selected.valid = true;
         }
         return selected;
     };
@@ -1505,18 +1656,15 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             if (queue.empty()) {
                 continue;
             }
-            uint64_t cycle = next_controller_dispatch_cycle[channel];
-            bool dispatchable = false;
-            for (const auto& candidate : queue) {
-                cycle = std::max(cycle, candidate.admission_cycle);
-                const std::size_t flat_bank =
-                    candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
-                if (command_queue_occupancy[flat_bank] < command_queue_capacity) {
-                    dispatchable = true;
-                    break;
-                }
+            const auto& candidate = queue.front();
+            const std::size_t flat_bank =
+                candidate.channel * architecture.hbm_banks_per_channel + candidate.bank;
+            if (command_queue_occupancy[flat_bank] >= command_queue_capacity) {
+                continue;
             }
-            if (dispatchable && (!earliest.has_value() || cycle < *earliest)) {
+            const uint64_t cycle = std::max(
+                next_controller_dispatch_cycle[channel], candidate.admission_cycle);
+            if (!earliest.has_value() || cycle < *earliest) {
                 earliest = cycle;
             }
         }
@@ -1644,7 +1792,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
                 std::to_string(bank_future) + " valid_channels=" +
                 std::to_string(valid_channels));
         }
-        const Candidate selected = selected_choice.candidate;
+        const Candidate selected = plan_candidate(selected_choice.candidate);
         auto& selected_queue = bank_queues[selected_choice.flat_bank];
         if (selected_choice.source == 1 || selected_choice.source == 2) {
             selected_queue.available.erase(selected);
@@ -1683,6 +1831,7 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             }
         }
         auto& bank_state = banks[selected_choice.flat_bank];
+        auto& channel_state = channels[selected.channel];
         state.effective_producer_ready = std::max(
             state.effective_producer_ready, selected.producer_ready_cycle);
         state.effective_enqueue = std::max(
@@ -1690,13 +1839,6 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
         state.first_issue = std::min(state.first_issue, selected.start_cycle);
         const bool row_hit = bank_state.row_open && bank_state.open_row == selected.row;
         const bool row_conflict = bank_state.row_open && !row_hit;
-        const uint64_t access_cycles = selected.is_write
-            ? (row_hit ? architecture.hbm_write_row_hit_cycles
-                       : row_conflict ? architecture.hbm_write_row_conflict_cycles
-                                      : architecture.hbm_write_row_miss_cycles)
-            : (row_hit ? architecture.hbm_read_row_hit_cycles
-                       : row_conflict ? architecture.hbm_read_row_conflict_cycles
-                                      : architecture.hbm_read_row_miss_cycles);
         if (row_hit) {
             ++result.row_buffer_hits;
             ++result.row_buffer_hits_by_class[static_cast<std::size_t>(
@@ -1706,14 +1848,47 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             ++result.row_buffer_misses_by_class[static_cast<std::size_t>(
                 state.request.request_class)];
         }
-        const uint64_t completion = selected.start_cycle + access_cycles + transfer_cycles;
-        auto& channel_state = channels[selected.channel];
+        if (row_conflict) {
+            if (selected.precharge_cycle == std::numeric_limits<uint64_t>::max()) {
+                throw std::runtime_error("row conflict lacks a PRE command");
+            }
+            ++result.precharge_commands;
+            ++state.precharge_commands;
+            state.first_precharge = std::min(
+                state.first_precharge, selected.precharge_cycle);
+            state.last_precharge = std::max(
+                state.last_precharge, selected.precharge_cycle);
+        }
+        if (!row_hit) {
+            if (selected.activate_cycle == std::numeric_limits<uint64_t>::max()) {
+                throw std::runtime_error("closed row lacks an ACT command");
+            }
+            ++result.activate_commands;
+            ++state.activate_commands;
+            state.first_activate = std::min(
+                state.first_activate, selected.activate_cycle);
+            state.last_activate = std::max(
+                state.last_activate, selected.activate_cycle);
+            bank_state.next_precharge_cycle = std::max(
+                bank_state.next_precharge_cycle,
+                selected.activate_cycle + architecture.hbm_activate_to_precharge_cycles);
+            bank_state.next_activate_cycle = std::max(
+                bank_state.next_activate_cycle,
+                selected.activate_cycle + architecture.hbm_activate_to_activate_cycles);
+            channel_state.next_row_command_cycle = selected.activate_cycle +
+                architecture.hbm_command_issue_interval_cycles;
+        }
+        const uint64_t data_latency = selected.is_write
+            ? architecture.hbm_write_row_hit_cycles
+            : architecture.hbm_read_row_hit_cycles;
+        const uint64_t completion = selected.start_cycle + data_latency + transfer_cycles;
+        bank_state.next_data_cycle = completion;
+        block_active_intervals.push_back({selected.start_cycle, completion});
         if (channel_state.last_direction != -1 &&
             channel_state.last_direction != static_cast<int>(selected.is_write)) {
-            const uint64_t base_ready = std::max(
-                selected.controller_dispatch_cycle, bank_state.ready_cycle);
-            if (selected.start_cycle > base_ready) {
-                result.direction_switch_stall_cycles += selected.start_cycle - base_ready;
+            if (selected.start_cycle > selected.command_ready_cycle) {
+                result.direction_switch_stall_cycles +=
+                    selected.start_cycle - selected.command_ready_cycle;
             }
             if (selected.is_write) {
                 ++result.read_to_write_switches;
@@ -1722,21 +1897,30 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             }
         }
         if (selected.is_write) {
+            ++result.write_commands;
             channel_state.next_write_cycle = std::max(
-                channel_state.next_write_cycle, selected.start_cycle + transfer_cycles);
+                channel_state.next_write_cycle,
+                selected.start_cycle + architecture.hbm_write_to_write_cycles);
             channel_state.next_read_cycle = std::max(
                 channel_state.next_read_cycle,
                 selected.start_cycle + architecture.hbm_write_to_read_cycles);
+            bank_state.next_precharge_cycle = std::max(
+                bank_state.next_precharge_cycle,
+                selected.start_cycle + architecture.hbm_write_to_precharge_cycles);
         } else {
+            ++result.read_commands;
             channel_state.next_read_cycle = std::max(
-                channel_state.next_read_cycle, selected.start_cycle + transfer_cycles);
+                channel_state.next_read_cycle,
+                selected.start_cycle + architecture.hbm_read_to_read_cycles);
             channel_state.next_write_cycle = std::max(
                 channel_state.next_write_cycle,
                 selected.start_cycle + architecture.hbm_read_to_write_cycles);
+            bank_state.next_precharge_cycle = std::max(
+                bank_state.next_precharge_cycle,
+                selected.start_cycle + architecture.hbm_read_to_precharge_cycles);
         }
         channel_state.last_issue_cycle = selected.start_cycle;
         channel_state.last_direction = static_cast<int>(selected.is_write);
-        bank_state.ready_cycle = completion;
         bank_state.open_row = selected.row;
         bank_state.row_open = true;
         state.completion = std::max(state.completion, completion);
@@ -1785,23 +1969,31 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
             state.last_admission,
             state.first_issue,
             state.completion,
+            state.precharge_commands,
+            state.activate_commands,
+            state.precharge_commands == 0 ? 0 : state.first_precharge,
+            state.last_precharge,
+            state.activate_commands == 0 ? 0 : state.first_activate,
+            state.last_activate,
             request.sequence,
             request.producer_sequence,
         });
         result.cycles = std::max(result.cycles, state.completion);
     }
+    if (!result.admission_traces.empty()) {
+        TransactionAdmissionTrace terminal;
+        terminal.cycle = std::max(
+            result.cycles, result.admission_traces.back().cycle + 1);
+        terminal.terminal_snapshot = true;
+        result.admission_traces.push_back(std::move(terminal));
+    }
     std::stable_sort(result.request_traces.begin(), result.request_traces.end(),
         [](const auto& lhs, const auto& rhs) { return lhs.sequence < rhs.sequence; });
-    std::vector<std::pair<uint64_t, uint64_t>> active_intervals;
-    active_intervals.reserve(result.request_traces.size());
-    for (const auto& trace : result.request_traces) {
-        active_intervals.push_back({trace.first_issue_cycle, trace.completion_cycle});
-    }
-    std::sort(active_intervals.begin(), active_intervals.end());
-    uint64_t active_start = active_intervals.front().first;
-    uint64_t active_end = active_intervals.front().second;
-    for (std::size_t index = 1; index < active_intervals.size(); ++index) {
-        const auto& interval = active_intervals[index];
+    std::sort(block_active_intervals.begin(), block_active_intervals.end());
+    uint64_t active_start = block_active_intervals.front().first;
+    uint64_t active_end = block_active_intervals.front().second;
+    for (std::size_t index = 1; index < block_active_intervals.size(); ++index) {
+        const auto& interval = block_active_intervals[index];
         if (interval.first <= active_end) {
             active_end = std::max(active_end, interval.second);
             continue;
@@ -2438,6 +2630,10 @@ LayerMetrics PaperSimulator::RunLayer(const Graph& graph,
         metrics.read_to_write_switches = memory_timing.read_to_write_switches;
         metrics.write_to_read_switches = memory_timing.write_to_read_switches;
         metrics.direction_switch_stall_cycles = memory_timing.direction_switch_stall_cycles;
+        metrics.precharge_commands = memory_timing.precharge_commands;
+        metrics.activate_commands = memory_timing.activate_commands;
+        metrics.read_commands = memory_timing.read_commands;
+        metrics.write_commands = memory_timing.write_commands;
         metrics.request_counts = memory_timing.request_counts;
         metrics.request_bytes = memory_timing.request_bytes;
         metrics.request_wait_cycles = memory_timing.request_wait_cycles;

@@ -68,8 +68,18 @@ struct ArchitectureConfig {
     int hbm_write_row_hit_cycles = 0;
     int hbm_write_row_miss_cycles = 0;
     int hbm_write_row_conflict_cycles = 0;
+    int hbm_activate_to_read_cycles = 0;
+    int hbm_activate_to_write_cycles = 0;
+    int hbm_read_to_read_cycles = 0;
+    int hbm_write_to_write_cycles = 0;
     int hbm_read_to_write_cycles = 0;
     int hbm_write_to_read_cycles = 0;
+    int hbm_read_to_precharge_cycles = 0;
+    int hbm_write_to_precharge_cycles = 0;
+    int hbm_activate_to_precharge_cycles = 0;
+    int hbm_precharge_to_activate_cycles = 0;
+    int hbm_activate_to_activate_cycles = 0;
+    int hbm_command_issue_interval_cycles = 0;
     int edram_latency_cycles = 0;
     int edram_transactions_per_cycle = 0;
 
@@ -155,21 +165,28 @@ struct MemoryRequestTrace {
     uint64_t last_admission_cycle = 0;
     uint64_t first_issue_cycle = 0;
     uint64_t completion_cycle = 0;
+    uint64_t precharge_commands = 0;
+    uint64_t activate_commands = 0;
+    uint64_t first_precharge_cycle = 0;
+    uint64_t last_precharge_cycle = 0;
+    uint64_t first_activate_cycle = 0;
+    uint64_t last_activate_cycle = 0;
     uint64_t sequence = 0;
     std::optional<uint64_t> producer_sequence;
 };
 
+inline constexpr std::size_t kMaxTraceHbmChannels = 16;
+
 struct TransactionAdmissionTrace {
     uint64_t cycle = 0;
+    bool terminal_snapshot = false;
     uint64_t admitted_blocks = 0;
     uint64_t admitted_read_blocks = 0;
     uint64_t admitted_write_blocks = 0;
-    uint64_t total_read_occupancy_before = 0;
-    uint64_t total_read_occupancy_after = 0;
-    uint64_t total_write_occupancy_before = 0;
-    uint64_t total_write_occupancy_after = 0;
-    uint64_t max_channel_read_occupancy_after = 0;
-    uint64_t max_channel_write_occupancy_after = 0;
+    std::array<uint16_t, kMaxTraceHbmChannels> channel_read_occupancy_before{};
+    std::array<uint16_t, kMaxTraceHbmChannels> channel_read_occupancy_after{};
+    std::array<uint16_t, kMaxTraceHbmChannels> channel_write_occupancy_before{};
+    std::array<uint16_t, kMaxTraceHbmChannels> channel_write_occupancy_after{};
 };
 
 struct InputWindowTrace {
@@ -201,6 +218,10 @@ struct MemoryTimingResult {
     uint64_t read_to_write_switches = 0;
     uint64_t write_to_read_switches = 0;
     uint64_t direction_switch_stall_cycles = 0;
+    uint64_t precharge_commands = 0;
+    uint64_t activate_commands = 0;
+    uint64_t read_commands = 0;
+    uint64_t write_commands = 0;
     std::array<uint64_t, kRequestClassCount> request_counts{};
     std::array<uint64_t, kRequestClassCount> request_bytes{};
     std::array<uint64_t, kRequestClassCount> request_wait_cycles{};
@@ -326,6 +347,10 @@ struct LayerMetrics {
     uint64_t read_to_write_switches = 0;
     uint64_t write_to_read_switches = 0;
     uint64_t direction_switch_stall_cycles = 0;
+    uint64_t precharge_commands = 0;
+    uint64_t activate_commands = 0;
+    uint64_t read_commands = 0;
+    uint64_t write_commands = 0;
     uint64_t ae_finish_cycle = 0;
     uint64_t ce_start_cycle = 0;
     uint64_t ce_finish_cycle = 0;
@@ -431,11 +456,11 @@ public:
         CombinationMode mode);
 
     static HbmLayout BuildHbmLayout(uint64_t input_bytes,
-                                    uint64_t output_bytes,
-                                    uint64_t weight_bytes,
-                                    uint64_t edge_bytes,
-                                    uint64_t intermediate_bytes,
-                                    uint64_t capacity_bytes);
+                                     uint64_t output_bytes,
+                                     uint64_t weight_bytes,
+                                     uint64_t edge_bytes,
+                                     uint64_t intermediate_bytes,
+                                     uint64_t capacity_bytes);
 
     static AddressDistribution MapAddressDistribution(
         const std::vector<MemoryRequest>& requests,

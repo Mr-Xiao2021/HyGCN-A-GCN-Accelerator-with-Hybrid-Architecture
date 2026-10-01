@@ -103,6 +103,14 @@ void TestConfig() {
         return static_cast<int>(std::ceil(
             dram_cycles * dram_config.tCK * paper.frequency_ghz));
     };
+    const double source_stack_bandwidth_gbps =
+        dram_config.channels * (dram_config.bus_width / 8.0) * dram_config.BL /
+        (dram_config.burst_cycle * dram_config.tCK);
+    Check(paper.hbm_channels == 2 * dram_config.channels &&
+              std::abs(source_stack_bandwidth_gbps - 128.0) < 1e-9 &&
+              std::abs(paper.hbm_bandwidth_gbps -
+                       2.0 * source_stack_bandwidth_gbps) < 1e-9,
+          "paper HBM profile replicates two complete 128 GB/s DRAMSim3 stacks");
     Check(paper.hbm_read_row_hit_cycles == paper_cycles(dram_config.CL) &&
               paper.hbm_read_row_miss_cycles ==
                   paper_cycles(dram_config.tRCDRD + dram_config.CL) &&
@@ -121,6 +129,22 @@ void TestConfig() {
               paper.hbm_write_to_read_cycles == paper_cycles(
                   dram_config.write_delay + dram_config.tWTR_L),
           "paper HBM direction switching follows DRAMSim3 command timing");
+    Check(paper.hbm_activate_to_read_cycles == paper_cycles(dram_config.tRCDRD) &&
+              paper.hbm_activate_to_write_cycles == paper_cycles(dram_config.tRCDWR) &&
+              paper.hbm_read_to_read_cycles == paper_cycles(std::max(
+                  dram_config.burst_cycle, dram_config.tCCD_L)) &&
+              paper.hbm_write_to_write_cycles == paper_cycles(std::max(
+                  dram_config.burst_cycle, dram_config.tCCD_L)) &&
+              paper.hbm_command_issue_interval_cycles == paper_cycles(1),
+          "paper HBM data-command spacing follows DRAMSim3");
+    Check(paper.hbm_read_to_precharge_cycles == paper_cycles(
+              dram_config.AL + dram_config.tRTP) &&
+              paper.hbm_write_to_precharge_cycles == paper_cycles(
+                  dram_config.WL + dram_config.burst_cycle + dram_config.tWR) &&
+              paper.hbm_activate_to_precharge_cycles == paper_cycles(dram_config.tRAS) &&
+              paper.hbm_precharge_to_activate_cycles == paper_cycles(dram_config.tRP) &&
+              paper.hbm_activate_to_activate_cycles == paper_cycles(dram_config.tRC),
+          "paper HBM row recovery follows DRAMSim3 PRE and ACT timing");
 
     auto invalid = paper;
     invalid.num_simd = 0;
@@ -468,14 +492,31 @@ void TestTransactionAdmissionBandwidth() {
         uint64_t previous_cycle = 0;
         bool first = true;
         for (const auto& trace : timing.admission_traces) {
+            if (trace.terminal_snapshot) {
+                Check(trace.admitted_blocks == 0,
+                      "terminal occupancy snapshot admits no transactions");
+                continue;
+            }
+            const auto read_after = std::accumulate(
+                trace.channel_read_occupancy_after.begin(),
+                trace.channel_read_occupancy_after.begin() + config.hbm_channels,
+                uint64_t{0});
+            const auto write_after = std::accumulate(
+                trace.channel_write_occupancy_after.begin(),
+                trace.channel_write_occupancy_after.begin() + config.hbm_channels,
+                uint64_t{0});
+            const auto max_read_after = *std::max_element(
+                trace.channel_read_occupancy_after.begin(),
+                trace.channel_read_occupancy_after.begin() + config.hbm_channels);
+            const auto max_write_after = *std::max_element(
+                trace.channel_write_occupancy_after.begin(),
+                trace.channel_write_occupancy_after.begin() + config.hbm_channels);
             Check(trace.admitted_blocks > 0 && trace.admitted_blocks <= 4,
                   "four coordinator ports admit at most four blocks per cycle");
             Check(first || trace.cycle > previous_cycle,
                   "transaction admission cycles are unique and increasing");
-            Check(trace.total_read_occupancy_after <= 8 &&
-                      trace.total_write_occupancy_after <= 8 &&
-                      trace.max_channel_read_occupancy_after <= 2 &&
-                      trace.max_channel_write_occupancy_after <= 2 &&
+            Check(read_after <= 8 && write_after <= 8 &&
+                      max_read_after <= 2 && max_write_after <= 2 &&
                       trace.admitted_blocks == trace.admitted_read_blocks +
                           trace.admitted_write_blocks,
                   "shared admission preserves independent read and write capacities");
@@ -522,8 +563,8 @@ void TestDirectionalHbmQueuesAndTiming() {
     Check(!timing.admission_traces.empty() &&
               timing.admission_traces.front().admitted_read_blocks == 2 &&
               timing.admission_traces.front().admitted_write_blocks == 1 &&
-              timing.admission_traces.front().max_channel_read_occupancy_after == 2 &&
-              timing.admission_traces.front().max_channel_write_occupancy_after == 1,
+              timing.admission_traces.front().channel_read_occupancy_after[0] == 2 &&
+              timing.admission_traces.front().channel_write_occupancy_after[0] == 1,
           "a full read queue does not consume the independent write-buffer capacity");
     const auto read = std::find_if(
         timing.request_traces.begin(), timing.request_traces.end(),
@@ -560,6 +601,135 @@ void TestDirectionalHbmQueuesAndTiming() {
               << "}\n";
 }
 
+void TestReconstructableDirectionalOccupancyTrace() {
+    auto config = ArchitectureConfig::Load("configs/HYGCN_PAPER.ini");
+    config.hbm_channels = 2;
+    config.hbm_banks_per_channel = 1;
+    config.hbm_read_queue_entries_per_channel = 2;
+    config.hbm_write_buffer_entries_per_channel = 2;
+    config.hbm_row_bytes = 64;
+    config.row_first_bank_interleave = 1;
+    config.Validate();
+    const std::vector<MemoryRequest> requests = {
+        {0, RequestClass::EDGE, 256, 0, 0, 0},
+        {0, RequestClass::OUTPUT, 256, 256, 0, 1},
+    };
+    const auto timing = MemoryCoordinatorModel::Simulate(
+        requests, config, MemoryPriorityMode::FIFO,
+        AddressMappingMode::LOW_BITS);
+    std::array<uint16_t, kMaxTraceHbmChannels> previous_read{};
+    std::array<uint16_t, kMaxTraceHbmChannels> previous_write{};
+    uint64_t admitted_read = 0;
+    uint64_t admitted_write = 0;
+    uint64_t inferred_dispatched_read = 0;
+    uint64_t inferred_dispatched_write = 0;
+    bool saw_terminal = false;
+    for (const auto& trace : timing.admission_traces) {
+        uint64_t trace_read_admission = 0;
+        uint64_t trace_write_admission = 0;
+        for (int channel = 0; channel < config.hbm_channels; ++channel) {
+            Check(trace.channel_read_occupancy_before[channel] <= previous_read[channel] &&
+                      trace.channel_write_occupancy_before[channel] <=
+                          previous_write[channel],
+                  "occupancy snapshots infer only controller dispatch between admissions");
+            inferred_dispatched_read += previous_read[channel] -
+                trace.channel_read_occupancy_before[channel];
+            inferred_dispatched_write += previous_write[channel] -
+                trace.channel_write_occupancy_before[channel];
+            trace_read_admission += trace.channel_read_occupancy_after[channel] -
+                trace.channel_read_occupancy_before[channel];
+            trace_write_admission += trace.channel_write_occupancy_after[channel] -
+                trace.channel_write_occupancy_before[channel];
+            previous_read[channel] = trace.channel_read_occupancy_after[channel];
+            previous_write[channel] = trace.channel_write_occupancy_after[channel];
+        }
+        Check(trace_read_admission == trace.admitted_read_blocks &&
+                  trace_write_admission == trace.admitted_write_blocks,
+              "per-channel occupancy deltas reconstruct directional admission");
+        admitted_read += trace.admitted_read_blocks;
+        admitted_write += trace.admitted_write_blocks;
+        if (trace.terminal_snapshot) {
+            saw_terminal = true;
+            Check(trace.admitted_blocks == 0 &&
+                      std::all_of(previous_read.begin(), previous_read.end(),
+                                  [](uint16_t value) { return value == 0; }) &&
+                      std::all_of(previous_write.begin(), previous_write.end(),
+                                  [](uint16_t value) { return value == 0; }),
+                  "terminal snapshot proves all directional queues drained");
+        }
+    }
+    Check(saw_terminal && inferred_dispatched_read == admitted_read &&
+              inferred_dispatched_write == admitted_write,
+          "complete snapshots independently reconstruct dispatch totals and final occupancy");
+    std::cout << "occupancy_reconstruction_evidence={\"admitted_read\":"
+              << admitted_read << ",\"admitted_write\":" << admitted_write
+              << ",\"dispatched_read\":" << inferred_dispatched_read
+              << ",\"dispatched_write\":" << inferred_dispatched_write << "}\n";
+}
+
+void TestCommandLevelRowRecovery() {
+    auto config = ArchitectureConfig::Load("configs/HYGCN_PAPER.ini");
+    config.hbm_channels = 1;
+    config.hbm_banks_per_channel = 1;
+    config.hbm_row_bytes = 64;
+    config.row_first_bank_interleave = 1;
+    config.Validate();
+    auto request_trace = [](const MemoryTimingResult& timing, uint64_t sequence) {
+        const auto iterator = std::find_if(
+            timing.request_traces.begin(), timing.request_traces.end(),
+            [sequence](const auto& trace) { return trace.sequence == sequence; });
+        if (iterator == timing.request_traces.end()) {
+            throw std::runtime_error("command-level request trace not found");
+        }
+        return *iterator;
+    };
+    auto verify_conflict = [&](RequestClass first_class, RequestClass second_class,
+                               const std::string& label) {
+        MemoryRequest first{0, first_class, 64, 0, 0, 0};
+        MemoryRequest second{0, second_class, 64, 64, 0, 1};
+        second.producer_sequence = 0;
+        const auto timing = MemoryCoordinatorModel::Simulate(
+            {first, second}, config, MemoryPriorityMode::FIFO,
+            AddressMappingMode::LOW_BITS);
+        const auto first_trace = request_trace(timing, 0);
+        const auto second_trace = request_trace(timing, 1);
+        const uint64_t first_recovery = first_class == RequestClass::OUTPUT
+            ? config.hbm_write_to_precharge_cycles
+            : config.hbm_read_to_precharge_cycles;
+        const uint64_t first_act_to_pre =
+            first_trace.first_activate_cycle + config.hbm_activate_to_precharge_cycles;
+        const uint64_t expected_precharge = std::max(
+            first_trace.first_issue_cycle + first_recovery, first_act_to_pre);
+        const uint64_t activate_to_data = second_class == RequestClass::OUTPUT
+            ? config.hbm_activate_to_write_cycles
+            : config.hbm_activate_to_read_cycles;
+        Check(first_trace.activate_commands == 1 &&
+                  second_trace.precharge_commands == 1 &&
+                  second_trace.activate_commands == 1,
+              label + " emits ACT, PRE, ACT before the second data command");
+        Check(second_trace.first_precharge_cycle == expected_precharge &&
+                  second_trace.first_activate_cycle ==
+                      expected_precharge + config.hbm_precharge_to_activate_cycles &&
+                  second_trace.first_issue_cycle ==
+                      second_trace.first_activate_cycle + activate_to_data,
+              label + " obeys recovery, PRE-to-ACT, and ACT-to-data timing");
+        return timing;
+    };
+    const auto write_write = verify_conflict(
+        RequestClass::OUTPUT, RequestClass::OUTPUT, "WRITE-to-row-conflict-WRITE");
+    const auto write_read = verify_conflict(
+        RequestClass::OUTPUT, RequestClass::EDGE, "WRITE-to-row-conflict-READ");
+    const auto read_write = verify_conflict(
+        RequestClass::EDGE, RequestClass::OUTPUT, "READ-to-row-conflict-WRITE");
+    Check(write_write.precharge_commands == 1 && write_read.precharge_commands == 1 &&
+              read_write.precharge_commands == 1,
+          "row-conflict counterexamples expose one PRE command each");
+    std::cout << "command_recovery_evidence={\"write_write_cycles\":"
+              << write_write.cycles << ",\"write_read_cycles\":"
+              << write_read.cycles << ",\"read_write_cycles\":"
+              << read_write.cycles << "}\n";
+}
+
 void TestMemoryServiceBandwidthScope() {
     auto config = ArchitectureConfig::Load("configs/HYGCN_SMOKE.ini");
     config.hbm_channels = 1;
@@ -592,9 +762,9 @@ void TestMemoryServiceBandwidthScope() {
         (delayed.active_cycles * config.HbmBytesPerCycle());
     Check(delayed.cycles > immediate.cycles && delayed_wall < immediate_wall,
           "producer idle reduces end-to-end memory throughput");
-    Check(delayed.active_cycles < immediate.active_cycles &&
-              delayed_active > immediate_active,
-          "active-interval utilization can rise while end-to-end throughput falls");
+    Check(delayed.active_cycles == immediate.active_cycles &&
+              std::abs(delayed_active - immediate_active) < 1e-12,
+          "active-interval utilization can hide producer idle and throughput loss");
     std::cout << "bandwidth_scope_counterexample={\"immediate_service_cycles\":"
               << immediate.cycles << ",\"delayed_service_cycles\":" << delayed.cycles
               << ",\"immediate_active_cycles\":" << immediate.active_cycles
@@ -967,6 +1137,10 @@ int main() {
                      TestTransactionAdmissionBandwidth);
         RunNamedTest("V6_01_directional_hbm_queues_and_timing",
                      TestDirectionalHbmQueuesAndTiming);
+        RunNamedTest("V7_02_reconstructable_directional_occupancy_trace",
+                     TestReconstructableDirectionalOccupancyTrace);
+        RunNamedTest("V7_01_command_level_row_recovery",
+                     TestCommandLevelRowRecovery);
         RunNamedTest("V4_01_memory_service_bandwidth_scope", TestMemoryServiceBandwidthScope);
         RunNamedTest("F02_fragmentation_invariance", TestFragmentationInvariant);
         RunNamedTest("aggregation_buffer", TestAggregationBuffer);

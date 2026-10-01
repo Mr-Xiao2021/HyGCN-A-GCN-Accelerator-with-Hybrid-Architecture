@@ -41,6 +41,11 @@ def main():
         raise RuntimeError("batch-class ordering must retain its paper provenance")
     if workloads["memory_ablation"]["command_queue_entries_per_bank"] != 8:
         raise RuntimeError("command queue depth must retain its DRAMSim3 provenance")
+    if workloads.get("schema_version") != 4 or \
+            workloads["memory_ablation"]["hbm_stacks"] != 2 or \
+            workloads["memory_ablation"]["channels_per_stack"] != 8 or \
+            workloads["memory_ablation"]["physical_channels"] != 16:
+        raise RuntimeError("workload manifest must version the two-stack HBM topology")
     if workloads["graph_partition"]["calibrated_fit_datasets"] != [
             "cora", "citeseer", "pubmed"] or \
             workloads["graph_partition"]["independent_holdout_datasets"] != []:
@@ -147,8 +152,19 @@ def main():
         "hbm_write_row_hit_cycles": 4,
         "hbm_write_row_miss_cycles": 18,
         "hbm_write_row_conflict_cycles": 32,
+        "hbm_activate_to_read_cycles": 14,
+        "hbm_activate_to_write_cycles": 14,
+        "hbm_read_to_read_cycles": 4,
+        "hbm_write_to_write_cycles": 4,
         "hbm_read_to_write_cycles": 18,
         "hbm_write_to_read_cycles": 16,
+        "hbm_read_to_precharge_cycles": 10,
+        "hbm_write_to_precharge_cycles": 24,
+        "hbm_activate_to_precharge_cycles": 34,
+        "hbm_precharge_to_activate_cycles": 14,
+        "hbm_activate_to_activate_cycles": 48,
+        "hbm_command_issue_interval_cycles": 2,
+        "hbm_channels": 16,
         "coordinator_issue_blocks_per_cycle": 4,
         "input_ping_pong_regions": 2,
         "neighbor_index_ready_cycles": 2,
@@ -173,8 +189,24 @@ def main():
             timing["derived_write_row_miss_cycles"] != 18 or \
             timing["derived_write_row_conflict_cycles"] != 32 or \
             timing["derived_read_to_write_cycles"] != 18 or \
-            timing["derived_write_to_read_cycles"] != 16:
+            timing["derived_write_to_read_cycles"] != 16 or \
+            timing["derived_activate_to_read_cycles"] != 14 or \
+            timing["derived_activate_to_write_cycles"] != 14 or \
+            timing["derived_read_to_read_cycles"] != 4 or \
+            timing["derived_write_to_write_cycles"] != 4 or \
+            timing["derived_read_to_precharge_cycles"] != 10 or \
+            timing["derived_write_to_precharge_cycles"] != 24 or \
+            timing["derived_activate_to_precharge_cycles"] != 34 or \
+            timing["derived_precharge_to_activate_cycles"] != 14 or \
+            timing["derived_activate_to_activate_cycles"] != 48 or \
+            timing["derived_command_issue_interval_cycles"] != 2:
         raise RuntimeError("required directional HBM timing must be derived from DRAMSim3")
+    if timing["source_channels_per_stack"] != 8 or \
+            not math.isclose(timing["source_stack_bandwidth_gbps"], 128.0) or \
+            timing["modeled_stack_count"] != 2 or \
+            timing["modeled_physical_channels"] != 16 or \
+            not math.isclose(timing["modeled_bandwidth_gbps"], 256.0):
+        raise RuntimeError("paper HBM bandwidth must come from two replicated stacks")
     if timing["unified_queue"] or \
             timing["read_queue_entries_per_channel"] != 32 or \
             timing["write_buffer_entries_per_channel"] != 32 or \
@@ -182,6 +214,10 @@ def main():
         raise RuntimeError("required directional HBM queues must be derived from DRAMSim3")
     with (root / "configs/paper_metrics.json").open(encoding="utf-8") as stream:
         reference = json.load(stream)
+    if reference.get("schema_version") != 6 or \
+            reference["metrics"]["priority_incremental_row_hit_ratio"][
+                "reference_min"] != 1.03:
+        raise RuntimeError("versioned internal row-hit gate must use schema v6")
     if benchmark.evidence_counts(reference) != {
             "paper_metric_rows": 14, "internal_check_rows": 12}:
         raise RuntimeError("evidence must remain split into 14 paper rows and 12 checks")

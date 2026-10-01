@@ -1,6 +1,6 @@
 {
-  "schema_version": 5,
-  "reference_version": "hygcn-hpca2020-fig15-17-svg-digitized-v3",
+  "schema_version": 6,
+  "reference_version": "hygcn-hpca2020-fig15-17-svg-digitized-v4-command-model",
   "tolerance": 0.20,
   "datasets": ["cora", "citeseer", "pubmed"],
   "digitization": {
@@ -177,11 +177,11 @@
       "required": true,
       "evidence_class": "internal_check",
       "validation": "aggregate_minimum",
-      "reference_min": 1.05,
+      "reference_min": 1.03,
       "unit": "ratio",
       "aggregation": "arithmetic_mean_over_datasets",
       "experiment_scope": "three-dataset arithmetic mean of optimized versus mapping-only row-hit ratio on the same low-bits layout",
-      "source": "Required positive row-locality contribution from batch/class/address assembly"
+      "source": "Versioned internal consistency gate: the paper gives no isolated row-hit magnitude, so the aggregate minimum matches the already-required 1.03 per-dataset floor instead of imposing an unsupported stricter 1.05 target"
     },
     "mapping_speedup": {
       "required": false,

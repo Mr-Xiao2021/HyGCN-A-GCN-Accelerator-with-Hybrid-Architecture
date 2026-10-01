@@ -44,8 +44,8 @@ def main():
     with path.open(encoding="utf-8") as stream:
         manifest = json.load(stream)
 
-    if manifest.get("schema_version") != 5 or not manifest.get("reference_version"):
-        raise ValueError("reference manifest requires schema_version=5 and reference_version")
+    if manifest.get("schema_version") != 6 or not manifest.get("reference_version"):
+        raise ValueError("reference manifest requires schema_version=6 and reference_version")
     tolerance = manifest.get("tolerance")
     if not isinstance(tolerance, (int, float)) or not math.isfinite(tolerance) or tolerance != 0.20:
         raise ValueError("reference manifest tolerance must be 0.20")
