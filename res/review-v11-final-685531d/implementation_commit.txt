@@ -1,0 +1,16 @@
+commit 685531d4c450d6154208578e9cade613bc85afed
+Author:     Mr-Xiao2021 <349602396@qq.com>
+AuthorDate: Fri Oct 2 08:40:16 2026 +0800
+Commit:     Mr-Xiao2021 <349602396@qq.com>
+CommitDate: Fri Oct 2 08:40:16 2026 +0800
+
+    close review v10 command identity gap
+
+ configs/paper_workloads.json                       |   7 +-
+ docs/paper-reproduction.md                         |   2 +-
+ .../specs/paper-performance-validation/spec.md     |   3 +
+ .../reproduce-hygcn-paper-performance/tasks.md     |   8 ++
+ tools/test_paper_benchmark.py                      |   7 +-
+ tools/test_trace_validator.py                      | 108 ++++++++++++++-
+ tools/trace_validator.cpp                          | 148 ++++++++++++++++++++-
+ 7 files changed, 269 insertions(+), 14 deletions(-)

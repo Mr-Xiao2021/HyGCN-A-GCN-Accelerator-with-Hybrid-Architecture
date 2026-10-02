@@ -1,0 +1,85 @@
+{
+  "base_ref": "d0c39037605d80b812b0ddaeede927c0c665f450",
+  "calibration_differences": [],
+  "calibration_keys": [
+    "model.aggregation_shard_capacity_bytes",
+    "model.batch_launch_interval_cycles",
+    "model.neighbor_index_ready_cycles",
+    "model.coordinator_fifo_active_windows",
+    "model.row_first_bank_interleave"
+  ],
+  "implementation_ref": "685531d4c450d6154208578e9cade613bc85afed",
+  "metric_delta": [],
+  "no_target_parameter_retuning": false,
+  "no_target_parameter_retuning_derivation": "Computed from the complete versioned figures, graph_partition, and memory_ablation policy trees plus declared profile calibration keys. Source policy file hashes are part of the boolean. Any scheduler policy or source implementation change, including FIFO window count/size/release, makes this boolean false instead of being hidden by an allowlist.",
+  "profile_differences": [],
+  "profile_path": "configs/HYGCN_PAPER.ini",
+  "schema_version": 1,
+  "source_policy_files": [
+    {
+      "after_sha256": "4e974d06379a355502d0344f301c2a9ee5a7c670d95df85387e5600aa4c40554",
+      "before_sha256": "4e974d06379a355502d0344f301c2a9ee5a7c670d95df85387e5600aa4c40554",
+      "changed": false,
+      "changed_diff_lines": 0,
+      "path": "hygcn/paper_sim.cpp",
+      "unified_diff": ""
+    },
+    {
+      "after_sha256": "872ba395c66c2cabda5838057d019dda96ef9e0d14107c11c5d83d697135e2bb",
+      "before_sha256": "872ba395c66c2cabda5838057d019dda96ef9e0d14107c11c5d83d697135e2bb",
+      "changed": false,
+      "changed_diff_lines": 0,
+      "path": "hygcn/paper_sim.h",
+      "unified_diff": ""
+    }
+  ],
+  "target_files": [
+    {
+      "after_sha256": "30ba145017b0c9f028c6a11b2bc747e402d0d83bdbc7aab3724c9117e3e8291a",
+      "before_sha256": "30ba145017b0c9f028c6a11b2bc747e402d0d83bdbc7aab3724c9117e3e8291a",
+      "changed": false,
+      "changed_paths": [],
+      "path": "configs/paper_metrics.json",
+      "target_parameters_after_sha256": "3431fb583c6814d533e649a8418e9ba9f002249db6b17e4a45b36c6e0ac857eb",
+      "target_parameters_before_sha256": "3431fb583c6814d533e649a8418e9ba9f002249db6b17e4a45b36c6e0ac857eb",
+      "target_parameters_changed": false
+    },
+    {
+      "after_sha256": "366cb08473dae52aafaa016529b454294bed93c9e7cdeab44237729493601f3d",
+      "before_sha256": "53fd5dd6385ead37b14b49b8c2ea2429163e0310c7fd2547eff58f6d33b13a9f",
+      "changed": true,
+      "changed_paths": [
+        {
+          "after": [
+            "unknown_sequence",
+            "out_of_range_block",
+            "wrong_direction",
+            "wrong_mapping",
+            "duplicate_and_missing_data_block"
+          ],
+          "before": null,
+          "path": "memory_ablation.command_trace.identity_mutations"
+        },
+        {
+          "after": "every PRE, ACT, READ, and WRITE event is stored in a reversible chunked stream; the validator independently reconstructs event and command totals, checksum, edge samples, channel-lane spacing, tCCD/turnaround, and bank recovery, then resolves sequence/block_offset against memory_requests to verify request existence, block range, read/write direction, mapped channel/bank/row, one data command per expected block, and equality with directional admission totals",
+          "before": "every PRE, ACT, READ, and WRITE event is stored in a reversible chunked stream; the validator independently reconstructs event and command totals, checksum, edge samples, channel-lane spacing, tCCD/turnaround, and bank recovery",
+          "path": "memory_ablation.command_trace.policy"
+        },
+        {
+          "after": 7,
+          "before": 6,
+          "path": "schema_version"
+        },
+        {
+          "after": "hygcn-hpca2020-table5-gcn-v7-command-identity",
+          "before": "hygcn-hpca2020-table5-gcn-v6-cap-free-full-command-trace",
+          "path": "workload_version"
+        }
+      ],
+      "path": "configs/paper_workloads.json",
+      "target_parameters_after_sha256": "2c8f6cafd99e6fca2b80e46dbbc8d98ca61465357e4a21bb253a1873c775fa6f",
+      "target_parameters_before_sha256": "c66bb350738f99e461411dc70d1697dfa269fdc88fc5ce8435ce02de85cd2955",
+      "target_parameters_changed": true
+    }
+  ]
+}

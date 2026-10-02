@@ -1,0 +1,3 @@
+implementation=685531d4c450d6154208578e9cade613bc85afed
+base_remote=d0c39037605d80b812b0ddaeede927c0c665f450
+branch=run/npu

@@ -1,0 +1,26 @@
+Internal ctest changing into directory: /tmp/hygcn-review-v11-clean.H9QQCU
+Test project /tmp/hygcn-review-v11-clean.H9QQCU
+      Start  1: hygcn_unit
+ 1/10 Test  #1: hygcn_unit ........................   Passed    0.07 sec
+      Start  2: hygcn_smoke
+ 2/10 Test  #2: hygcn_smoke .......................   Passed    1.74 sec
+      Start  3: hygcn_missing_dataset
+ 3/10 Test  #3: hygcn_missing_dataset .............   Passed    0.00 sec
+      Start  4: paper_reference_manifest
+ 4/10 Test  #4: paper_reference_manifest ..........   Passed    0.07 sec
+      Start  5: paper_metric_validator_selftest
+ 5/10 Test  #5: paper_metric_validator_selftest ...   Passed    0.37 sec
+      Start  6: paper_benchmark_scope
+ 6/10 Test  #6: paper_benchmark_scope .............   Passed    0.19 sec
+      Start  7: trace_validator_mutations
+ 7/10 Test  #7: trace_validator_mutations .........   Passed   32.16 sec
+      Start  8: legacy_snapshot_fixture
+ 8/10 Test  #8: legacy_snapshot_fixture ...........   Passed    0.08 sec
+      Start  9: paper_output_determinism
+ 9/10 Test  #9: paper_output_determinism ..........   Passed   16.16 sec
+      Start 10: hygcn_cli_failures
+10/10 Test #10: hygcn_cli_failures ................   Passed    0.08 sec
+
+100% tests passed, 0 tests failed out of 10
+
+Total Test time (real) =  50.93 sec

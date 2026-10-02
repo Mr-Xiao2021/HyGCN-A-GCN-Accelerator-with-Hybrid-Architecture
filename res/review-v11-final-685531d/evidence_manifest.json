@@ -1,0 +1,204 @@
+{
+  "acceptance_boundary": "V10-02 closed; cap-free Figure 17 and overall request-level mechanism reproduction remain not accepted.",
+  "artifact_directory": "res/review-v11-final-685531d",
+  "branch": "run/npu",
+  "complete_admission_trace": {
+    "admitted_blocks": 64675995,
+    "checksums": [
+      "44da228e365ab2e7",
+      "3e1b694d7b8b2f91",
+      "dee4b4ea7e2efcbd",
+      "d962dfe4d17664cd",
+      "5e705a3ef635d8b0",
+      "62aa85962d2cbd79",
+      "384c8ff9f4b7bed4",
+      "1f83eded2ab3559a",
+      "0b4b7d3006a72745",
+      "aeec13d770b36348",
+      "1dec19f3115096fb",
+      "0d8607c9ee407ca0",
+      "7c0d47569386b002",
+      "d60b29110f30470f",
+      "c9d397335b865b2a",
+      "dd21c03eb8552498",
+      "50246bd979b440c9",
+      "8182aa2ebbbf8eaf",
+      "96925bef5952e695",
+      "df7694de26576a17",
+      "95c2cefbc5cf821b"
+    ],
+    "events": 16412982,
+    "issue_limit_blocks_per_cycle": [
+      4
+    ],
+    "max_blocks_per_cycle": 4,
+    "occupancy_reconstruction": [
+      "per-channel before/after admission snapshots"
+    ],
+    "read_blocks": 61999387,
+    "unique_checksums": 21,
+    "validator": [
+      "independent-cpp-v1"
+    ],
+    "write_blocks": 2676608
+  },
+  "complete_command_trace": {
+    "address_mapping_violations": 0,
+    "admission_data_cross_checks": [
+      "PASS"
+    ],
+    "checksums": [
+      "ece7987872b6395f",
+      "44c4e52cf4b4330d",
+      "a6c8b9a8a0da23c3",
+      "cb99752cd911cad6",
+      "1ebdf88a1179cd48",
+      "202a124b8c0a0061",
+      "cf50cdc8ad976b93",
+      "39bce7f9012b97e1",
+      "86903a578524e0fd",
+      "dd4c8c7c1e6d621f",
+      "46775b58d6d89d2e",
+      "3673fff1170c30be",
+      "d2f32563939b5bf5",
+      "051c3cb9fbd281c3",
+      "ddf5a39d27f2c0ba",
+      "2d4e9c6f4846b8f3",
+      "9d0cae3108239de7",
+      "342e19fd6e0e1731",
+      "12a980b97eae28d1",
+      "4c5ef7a226c89925",
+      "92c00c54549b6899"
+    ],
+    "command_lane_violations": 0,
+    "direction_violations": 0,
+    "duplicate_or_missing_data_commands": 0,
+    "events": 70813185,
+    "expected_request_blocks": 64675995,
+    "independently_reconstructed": true,
+    "read_data_commands": 61999387,
+    "representations": [
+      "command_delta_varint_base64_v2"
+    ],
+    "request_identity_violations": 0,
+    "unique_checksums": 21,
+    "validator": [
+      "independent-cpp-v1"
+    ],
+    "write_data_commands": 2676608
+  },
+  "date": "2026-10-02",
+  "fifo_window_sensitivity": {
+    "0": {
+      "bandwidth_gain": 1.127634774121,
+      "role": "required_cap_free",
+      "speedup": 1.127634774121,
+      "status": "FAIL"
+    },
+    "1": {
+      "bandwidth_gain": 16.475479062373193,
+      "role": "diagnostic",
+      "speedup": 16.475479062373193,
+      "status": "FAIL"
+    },
+    "2": {
+      "bandwidth_gain": 8.28955965809394,
+      "role": "diagnostic",
+      "speedup": 8.28955965809394,
+      "status": "FAIL"
+    },
+    "4": {
+      "bandwidth_gain": 4.208020114189668,
+      "role": "diagnostic",
+      "speedup": 4.208020114189669,
+      "status": "PASS"
+    },
+    "512": {
+      "bandwidth_gain": 1.127634774121,
+      "role": "diagnostic",
+      "speedup": 1.127634774121,
+      "status": "FAIL"
+    },
+    "8": {
+      "bandwidth_gain": 2.1924902669176816,
+      "role": "diagnostic",
+      "speedup": 2.192490266917681,
+      "status": "FAIL"
+    }
+  },
+  "fig17_required_cap_free": {
+    "bandwidth_gain": 1.127634774121,
+    "bandwidth_relative_error": 0.7180913064697501,
+    "fifo_active_windows": 0,
+    "speedup": 1.127634774121,
+    "speedup_relative_error": 0.6952338448321622,
+    "status": "FAIL"
+  },
+  "fixed_binary_sha256": "def86a3d89bbe591a108caf0b20d49e425c5203dc4f41d908106eb8632f4f898",
+  "implementation_commit": "685531d4c450d6154208578e9cade613bc85afed",
+  "implementation_parent_remote": "d0c39037605d80b812b0ddaeede927c0c665f450",
+  "internal_checks_schema_v5": {
+    "passed": 7,
+    "total": 12
+  },
+  "internal_checks_schema_v6": {
+    "passed": 8,
+    "total": 12
+  },
+  "model_sensitivity": {
+    "required_baseline_speedup": 1.127634774121,
+    "scenario_count": 10
+  },
+  "paper_metrics": {
+    "passed": 12,
+    "total": 14
+  },
+  "partition_sensitivity": {
+    "4_mib": "FAIL",
+    "5_mib": "PASS",
+    "6_mib": "FAIL",
+    "independent_holdout": {
+      "available": false,
+      "datasets": [],
+      "reason": "Cora, Citeseer, and PubMed were all exposed in Review v4; no retrospective used_for_selection=false claim is made"
+    }
+  },
+  "raw_storage": {
+    "csv": "21 plain text",
+    "json": "21 lossless .json.gz"
+  },
+  "request_identity_validation": {
+    "duplicate_and_missing_data_block": "REJECTED",
+    "mutation_suite": "9/9 REJECTED",
+    "out_of_range_block": "REJECTED",
+    "unknown_sequence": "REJECTED",
+    "wrong_direction": "REJECTED",
+    "wrong_mapping": "REJECTED"
+  },
+  "revision_audit": {
+    "base": "d0c39037605d80b812b0ddaeede927c0c665f450",
+    "metric_delta_rows": 0,
+    "no_target_parameter_retuning": false,
+    "note": "Validator evidence policy changed; simulator profile and paper metrics did not, and all numerical metric deltas are zero."
+  },
+  "schema_version": 2,
+  "tests": {
+    "clean_release_build": "PASS",
+    "ctest": "10/10 PASS",
+    "legacy": "Cora/Citeseer PASS",
+    "strict_openspec": "PASS",
+    "trace_validator_mutations": "9/9 REJECTED"
+  },
+  "trace_validator_sha256": "4a65fb28a392c856ceadcb40f8c60704547dcb611f37148e60d13bb6a4c8abf4",
+  "trace_validator_source_sha256": "a194c2bf349cef2a0d46531c536ac346722a797ddf329443f4592732573fd547",
+  "v10_findings": {
+    "V10-01": {
+      "reason": "cap-free Figure 17 remains outside +/-20%; no unsupported baseline throttle added",
+      "status": "OPEN"
+    },
+    "V10-02": {
+      "evidence": "request/block identity, direction, mapping, uniqueness/completeness, and admission totals independently replayed",
+      "status": "CLOSED"
+    }
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "admission": {
+    "admitted_blocks": 64675995,
+    "checksums": [
+      "44da228e365ab2e7",
+      "3e1b694d7b8b2f91",
+      "dee4b4ea7e2efcbd",
+      "d962dfe4d17664cd",
+      "5e705a3ef635d8b0",
+      "62aa85962d2cbd79",
+      "384c8ff9f4b7bed4",
+      "1f83eded2ab3559a",
+      "0b4b7d3006a72745",
+      "aeec13d770b36348",
+      "1dec19f3115096fb",
+      "0d8607c9ee407ca0",
+      "7c0d47569386b002",
+      "d60b29110f30470f",
+      "c9d397335b865b2a",
+      "dd21c03eb8552498",
+      "50246bd979b440c9",
+      "8182aa2ebbbf8eaf",
+      "96925bef5952e695",
+      "df7694de26576a17",
+      "95c2cefbc5cf821b"
+    ],
+    "events": 16412982,
+    "issue_limit_blocks_per_cycle": [
+      4
+    ],
+    "max_blocks_per_cycle": 4,
+    "occupancy_reconstruction": [
+      "per-channel before/after admission snapshots"
+    ],
+    "read_blocks": 61999387,
+    "unique_checksums": 21,
+    "validator": [
+      "independent-cpp-v1"
+    ],
+    "write_blocks": 2676608
+  },
+  "command": {
+    "address_mapping_violations": 0,
+    "admission_data_cross_checks": [
+      "PASS"
+    ],
+    "checksums": [
+      "ece7987872b6395f",
+      "44c4e52cf4b4330d",
+      "a6c8b9a8a0da23c3",
+      "cb99752cd911cad6",
+      "1ebdf88a1179cd48",
+      "202a124b8c0a0061",
+      "cf50cdc8ad976b93",
+      "39bce7f9012b97e1",
+      "86903a578524e0fd",
+      "dd4c8c7c1e6d621f",
+      "46775b58d6d89d2e",
+      "3673fff1170c30be",
+      "d2f32563939b5bf5",
+      "051c3cb9fbd281c3",
+      "ddf5a39d27f2c0ba",
+      "2d4e9c6f4846b8f3",
+      "9d0cae3108239de7",
+      "342e19fd6e0e1731",
+      "12a980b97eae28d1",
+      "4c5ef7a226c89925",
+      "92c00c54549b6899"
+    ],
+    "command_lane_violations": 0,
+    "direction_violations": 0,
+    "duplicate_or_missing_data_commands": 0,
+    "events": 70813185,
+    "expected_request_blocks": 64675995,
+    "independently_reconstructed": true,
+    "read_data_commands": 61999387,
+    "representations": [
+      "command_delta_varint_base64_v2"
+    ],
+    "request_identity_violations": 0,
+    "unique_checksums": 21,
+    "validator": [
+      "independent-cpp-v1"
+    ],
+    "write_data_commands": 2676608
+  },
+  "raw_files": 21,
+  "schema_version": 2
+}

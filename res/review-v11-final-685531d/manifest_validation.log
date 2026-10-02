@@ -1,0 +1,12 @@
+raw_manifest=21/21 PASS
+paper_metrics=12/14
+internal_checks_schema_v6=8/12
+internal_checks_schema_v5=7/12
+fig17_cap_free=FAIL_DISCLOSED
+complete_admission_trace=PASS
+complete_command_trace_timing=PASS
+command_request_identity=PASS
+command_address_mapping=PASS
+command_direction=PASS
+command_unique_complete_data_blocks=PASS
+admission_data_cross_check=PASS

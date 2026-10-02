@@ -140,4 +140,4 @@
 - [x] 17.2 按 low-bits/row-first 有效配置独立重算 channel/bank/row，校验 PRE 的目标 block bank identity 及 ACT/READ/WRITE 的完整映射
 - [x] 17.3 强制每个 expected block 恰有一个方向正确的 data command，并与 admission read/write block 总量交叉核对
 - [x] 17.4 增加 unknown sequence、out-of-range block、wrong direction、wrong mapping、duplicate/missing block 五类 identity/address mutation
-- [ ] 17.5 执行 clean Release、CTest、legacy、严格 OpenSpec 和正式 trace replay，固化 V10-02 关闭证据并推送远端
+- [x] 17.5 执行 clean Release、CTest、legacy、严格 OpenSpec 和正式 trace replay，固化 V10-02 关闭证据并推送远端
