@@ -1,0 +1,19 @@
+commit 5b49092621db327c338f48cb154f33e0f298794e
+Author:     Mr-Xiao2021 <349602396@qq.com>
+AuthorDate: Fri Oct 2 09:48:07 2026 +0800
+Commit:     Mr-Xiao2021 <349602396@qq.com>
+CommitDate: Fri Oct 2 09:48:07 2026 +0800
+
+    close review v11 temporal identity gap
+
+ configs/paper_workloads.json                       |  12 +-
+ docs/paper-reproduction.md                         |   2 +-
+ hygcn/paper_sim.cpp                                |  38 +-
+ hygcn/paper_sim.h                                  |   7 +
+ .../specs/paper-performance-validation/spec.md     |   5 +-
+ .../reproduce-hygcn-paper-performance/tasks.md     |   8 +
+ tools/paper_benchmark.py                           |  27 +-
+ tools/test_paper_benchmark.py                      |   7 +-
+ tools/test_trace_validator.py                      |  60 ++-
+ tools/trace_validator.cpp                          | 438 +++++++++++++++------
+ 10 files changed, 472 insertions(+), 132 deletions(-)

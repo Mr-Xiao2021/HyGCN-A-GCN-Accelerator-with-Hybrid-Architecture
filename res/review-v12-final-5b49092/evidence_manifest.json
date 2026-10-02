@@ -1,0 +1,228 @@
+{
+  "acceptance_boundary": "V10-02 temporal identity closed; cap-free Figure 17 and overall request-level mechanism reproduction remain not accepted.",
+  "artifact_directory": "res/review-v12-final-5b49092",
+  "branch": "run/npu",
+  "complete_admission_trace": {
+    "admitted_blocks": 64675995,
+    "block_identity_cross_checks": [
+      "PASS"
+    ],
+    "checksums": [
+      "4b197c9442c4c8cf",
+      "faf81b1d1f4a6c27",
+      "74107850dbdcf84a",
+      "afc399844689f308",
+      "f885e690a670afcf",
+      "0ac9efaf698fa3d9",
+      "9858be894a924573",
+      "0f39f587a26a9246",
+      "a4d3ae4fc61f383b",
+      "15e14bb445acfaa2",
+      "3462ee22124a16b3",
+      "3e8f3e89f8520556",
+      "1a651f3604c07705",
+      "dd2af5b81b6a59b8",
+      "218a4c325f1e2fae",
+      "33278ad24f91e39c",
+      "973dddd6e3109aee",
+      "049b97314709e54e",
+      "6cfd9e10e6d9538d",
+      "c23ac55ebad67845",
+      "d3b83994227d23b4"
+    ],
+    "events": 16412982,
+    "issue_limit_blocks_per_cycle": [
+      4
+    ],
+    "max_blocks_per_cycle": 4,
+    "occupancy_reconstruction": [
+      "per-channel before/after admission snapshots plus request-block identity"
+    ],
+    "read_blocks": 61999387,
+    "unique_checksums": 21,
+    "validator": [
+      "independent-cpp-v1"
+    ],
+    "write_blocks": 2676608
+  },
+  "complete_command_trace": {
+    "address_mapping_violations": 0,
+    "admission_data_cross_checks": [
+      "request-block identity and cycle PASS"
+    ],
+    "checksums": [
+      "202a124b8c0a0061",
+      "a6c8b9a8a0da23c3",
+      "cf50cdc8ad976b93",
+      "1ebdf88a1179cd48",
+      "44c4e52cf4b4330d",
+      "ece7987872b6395f",
+      "cb99752cd911cad6",
+      "d2f32563939b5bf5",
+      "dd4c8c7c1e6d621f",
+      "051c3cb9fbd281c3",
+      "3673fff1170c30be",
+      "86903a578524e0fd",
+      "39bce7f9012b97e1",
+      "46775b58d6d89d2e",
+      "4c5ef7a226c89925",
+      "9d0cae3108239de7",
+      "92c00c54549b6899",
+      "12a980b97eae28d1",
+      "2d4e9c6f4846b8f3",
+      "ddf5a39d27f2c0ba",
+      "342e19fd6e0e1731"
+    ],
+    "command_lane_violations": 0,
+    "direction_violations": 0,
+    "duplicate_or_missing_data_commands": 0,
+    "events": 70813185,
+    "expected_request_blocks": 64675995,
+    "independently_reconstructed": true,
+    "read_data_commands": 61999387,
+    "reconstructed_requests": 73928,
+    "representations": [
+      "command_delta_varint_base64_v2"
+    ],
+    "request_identity_violations": 0,
+    "request_timeline_cross_checks": [
+      "PASS"
+    ],
+    "transfer_cycles": [
+      4
+    ],
+    "unique_checksums": 21,
+    "validator": [
+      "independent-cpp-v1"
+    ],
+    "write_data_commands": 2676608
+  },
+  "date": "2026-10-02",
+  "fifo_window_sensitivity": {
+    "0": {
+      "bandwidth_gain": 1.127634774121,
+      "role": "required_cap_free",
+      "speedup": 1.127634774121,
+      "status": "FAIL"
+    },
+    "1": {
+      "bandwidth_gain": 16.475479062373193,
+      "role": "diagnostic",
+      "speedup": 16.475479062373193,
+      "status": "FAIL"
+    },
+    "2": {
+      "bandwidth_gain": 8.28955965809394,
+      "role": "diagnostic",
+      "speedup": 8.28955965809394,
+      "status": "FAIL"
+    },
+    "4": {
+      "bandwidth_gain": 4.208020114189668,
+      "role": "diagnostic",
+      "speedup": 4.208020114189669,
+      "status": "PASS"
+    },
+    "512": {
+      "bandwidth_gain": 1.127634774121,
+      "role": "diagnostic",
+      "speedup": 1.127634774121,
+      "status": "FAIL"
+    },
+    "8": {
+      "bandwidth_gain": 2.1924902669176816,
+      "role": "diagnostic",
+      "speedup": 2.192490266917681,
+      "status": "FAIL"
+    }
+  },
+  "fig17_required_cap_free": {
+    "bandwidth_gain": 1.127634774121,
+    "bandwidth_relative_error": 0.7180913064697501,
+    "fifo_active_windows": 0,
+    "speedup": 1.127634774121,
+    "speedup_relative_error": 0.6952338448321622,
+    "status": "FAIL"
+  },
+  "fixed_binary_sha256": "63fa45c6de0631c6a37fd920eb8e03ff4304c59f7cd6f01ca145164d0b5a608d",
+  "implementation_commit": "5b49092621db327c338f48cb154f33e0f298794e",
+  "internal_checks_schema_v5": {
+    "passed": 7,
+    "total": 12
+  },
+  "internal_checks_schema_v6": {
+    "passed": 8,
+    "total": 12
+  },
+  "model_sensitivity": {
+    "required_baseline_speedup": 1.127634774121,
+    "scenario_count": 10
+  },
+  "paper_metrics": {
+    "passed": 12,
+    "total": 14
+  },
+  "partition_sensitivity": {
+    "4_mib": "FAIL",
+    "5_mib": "PASS",
+    "6_mib": "FAIL",
+    "independent_holdout": {
+      "available": false,
+      "datasets": [],
+      "reason": "Cora, Citeseer, and PubMed were all exposed in Review v4; no retrospective used_for_selection=false claim is made"
+    }
+  },
+  "previous_implementation": "685531d4c450d6154208578e9cade613bc85afed",
+  "raw_storage": {
+    "csv": "21 plain text",
+    "json": "21 lossless .json.gz"
+  },
+  "reviewed_remote_base": "333b6a8f6d3f5c473e43c3912c4290edff134483",
+  "revision_audit": {
+    "base": "685531d4c450d6154208578e9cade613bc85afed",
+    "calibration_difference_count": 0,
+    "metric_delta_rows": 0,
+    "no_target_parameter_retuning": false,
+    "note": "Trace schema and source validation policy changed, so the broad audit boolean is false; profile/calibration differences and benchmark metric deltas are both zero.",
+    "profile_difference_count": 0
+  },
+  "schema_version": 3,
+  "temporal_identity_validation": {
+    "enqueue": "PASS",
+    "exact_block_admission": "PASS",
+    "mutation_suite": "10/10 REJECTED",
+    "producer_ready": "PASS",
+    "request_completion": "PASS",
+    "request_first_issue": "PASS",
+    "request_precharge_activate_timeline": "PASS",
+    "same_row_producer_ready_identity_swap": {
+      "early_by_cycles": 5167,
+      "early_cycle": 548,
+      "producer_ready_cycle": 5715,
+      "reason": "command precedes request producer-ready cycle",
+      "result": "REJECTED",
+      "swapped_block_offset": 14,
+      "swapped_sequence": 56
+    }
+  },
+  "tests": {
+    "clean_release_build": "PASS",
+    "ctest": "10/10 PASS",
+    "formal_trace_replay": "21/21 PASS",
+    "legacy": "Cora/Citeseer PASS",
+    "strict_openspec": "PASS",
+    "trace_validator_mutations": "10/10 REJECTED"
+  },
+  "trace_validator_sha256": "a22d72e8562f11aa630240f22775d1d687e6881a34d7e07ee4c44d1fe9cb8abb",
+  "trace_validator_source_sha256": "ac36ee1b8a51244912dc6f3f663e57232fbf9c0ff6f15f941cb407cc0f9c87f7",
+  "v11_findings": {
+    "Figure17": {
+      "reason": "cap-free speedup and bandwidth remain outside +/-20%; no unsupported baseline throttle or target retuning was introduced",
+      "status": "OPEN"
+    },
+    "V10-02": {
+      "evidence": "request-block admission identity and cycle, producer/enqueue causality, and reconstructed request command timeline all pass",
+      "status": "CLOSED"
+    }
+  }
+}

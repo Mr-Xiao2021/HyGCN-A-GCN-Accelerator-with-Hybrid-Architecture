@@ -1,0 +1,4 @@
+branch=run/npu
+head=5b49092621db327c338f48cb154f33e0f298794e
+remote=333b6a8f6d3f5c473e43c3912c4290edff134483
+status=

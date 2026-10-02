@@ -1,0 +1,152 @@
+diff --git a/configs/paper_workloads.json b/configs/paper_workloads.json
+index d06ecc5..0e78833 100644
+--- a/configs/paper_workloads.json
++++ b/configs/paper_workloads.json
+@@ -1,6 +1,6 @@
+ {
+-  "schema_version": 7,
+-  "workload_version": "hygcn-hpca2020-table5-gcn-v7-command-identity",
++  "schema_version": 8,
++  "workload_version": "hygcn-hpca2020-table5-gcn-v8-temporal-identity",
+   "paper_source": "HyGCN HPCA 2020 Table 5 and Section 5.3",
+   "figures": {
+     "figure_15": {
+@@ -90,13 +90,13 @@
+       "transfer_note": "burst/block transfer is modeled separately by transfer_cycles, so BL is not duplicated in CL/CWL completion latency"
+     },
+     "occupancy_trace": {
+-      "representation": "directional_occupancy_delta_varint_base64_v2",
+-      "policy": "every admission records per-channel read/write occupancy before and after mutation; a terminal zero snapshot lets the validator infer all intervening dispatch counts from zero and independently recompute peaks, capacity violations, totals, histograms, edge samples, and checksum"
++      "representation": "directional_occupancy_identity_delta_varint_base64_v3",
++      "policy": "every admission records the admitted sequence/block_offset identities plus per-channel read/write occupancy before and after mutation; a terminal zero snapshot lets the validator infer all intervening dispatch counts from zero, independently recompute peaks, capacity violations, totals, histograms, edge samples, and checksum, and recover the exact admission cycle of every request block"
+     },
+     "command_trace": {
+       "representation": "command_delta_varint_base64_v2",
+-      "policy": "every PRE, ACT, READ, and WRITE event is stored in a reversible chunked stream; the validator independently reconstructs event and command totals, checksum, edge samples, channel-lane spacing, tCCD/turnaround, and bank recovery, then resolves sequence/block_offset against memory_requests to verify request existence, block range, read/write direction, mapped channel/bank/row, one data command per expected block, and equality with directional admission totals",
+-      "identity_mutations": ["unknown_sequence", "out_of_range_block", "wrong_direction", "wrong_mapping", "duplicate_and_missing_data_block"]
++      "policy": "every PRE, ACT, READ, and WRITE event is stored in a reversible chunked stream; the validator independently reconstructs event and command totals, checksum, edge samples, channel-lane spacing, tCCD/turnaround, bank recovery, and each request's first issue, completion, PRE/ACT counts and first/last cycles. It resolves sequence/block_offset against memory_requests and the exact block admission timeline to verify request existence, block range, read/write direction, mapped channel/bank/row, producer-ready/enqueue/admission causality, one data command per expected block, and equality with directional admission totals",
++      "identity_mutations": ["unknown_sequence", "out_of_range_block", "wrong_direction", "wrong_mapping", "duplicate_and_missing_data_block", "same_row_producer_ready_identity_swap"]
+     }
+   },
+   "scope_limits": [
+diff --git a/hygcn/paper_sim.cpp b/hygcn/paper_sim.cpp
+index ce58d41..df76a3e 100644
+--- a/hygcn/paper_sim.cpp
++++ b/hygcn/paper_sim.cpp
+@@ -377,6 +377,7 @@ json LayerJson(const LayerMetrics& layer) {
+         json read_after = json::array();
+         json write_before = json::array();
+         json write_after = json::array();
++        json block_identities = json::array();
+         for (std::size_t channel = 0; channel < trace_channels; ++channel) {
+             const uint64_t rb = trace.channel_read_occupancy_before[channel];
+             const uint64_t ra = trace.channel_read_occupancy_after[channel];
+@@ -407,9 +408,18 @@ json LayerJson(const LayerMetrics& layer) {
+             trace_admitted_write != trace.admitted_write_blocks ||
+             trace.admitted_blocks !=
+                 trace.admitted_read_blocks + trace.admitted_write_blocks ||
++            trace.admitted_blocks > trace.block_identities.size() ||
+             (trace.terminal_snapshot && trace.admitted_blocks != 0)) {
+             throw std::runtime_error("directional admission trace delta differs");
+         }
++        for (std::size_t identity_index = 0;
++             identity_index < trace.admitted_blocks; ++identity_index) {
++            const auto& identity = trace.block_identities[identity_index];
++            block_identities.push_back({
++                {"sequence", identity.sequence},
++                {"block_offset", identity.block_offset},
++            });
++        }
+         admission_event_count += trace.terminal_snapshot ? 0 : 1;
+         IncrementHistogram(admission_histograms["admitted_blocks"],
+                            trace.admitted_blocks);
+@@ -449,6 +459,15 @@ json LayerJson(const LayerMetrics& layer) {
+             admission_checksum ^= value;
+             admission_checksum *= 1099511628211ULL;
+         }
++        for (std::size_t identity_index = 0;
++             identity_index < trace.admitted_blocks; ++identity_index) {
++            const auto& identity = trace.block_identities[identity_index];
++            for (const uint64_t value : {
++                     identity.sequence, identity.block_offset}) {
++                admission_checksum ^= value;
++                admission_checksum *= 1099511628211ULL;
++            }
++        }
+         for (std::size_t channel = 0; channel < trace_channels; ++channel) {
+             for (const uint64_t value : {
+                      static_cast<uint64_t>(trace.channel_read_occupancy_before[channel]),
+@@ -466,6 +485,7 @@ json LayerJson(const LayerMetrics& layer) {
+                 {"admitted_blocks", trace.admitted_blocks},
+                 {"admitted_read_blocks", trace.admitted_read_blocks},
+                 {"admitted_write_blocks", trace.admitted_write_blocks},
++                {"admitted_block_identities", block_identities},
+                 {"channel_read_occupancy_before", read_before},
+                 {"channel_read_occupancy_after", read_after},
+                 {"channel_write_occupancy_before", write_before},
+@@ -495,6 +515,13 @@ json LayerJson(const LayerMetrics& layer) {
+                      trace.admitted_write_blocks}) {
+                 AppendVarint(payload, value);
+             }
++            AppendVarint(payload, trace.admitted_blocks);
++            for (std::size_t identity_index = 0;
++                 identity_index < trace.admitted_blocks; ++identity_index) {
++                const auto& identity = trace.block_identities[identity_index];
++                AppendVarint(payload, identity.sequence);
++                AppendVarint(payload, identity.block_offset);
++            }
+             for (const auto* values : {
+                      &trace.channel_read_occupancy_before,
+                      &trace.channel_read_occupancy_after,
+@@ -511,9 +538,11 @@ json LayerJson(const LayerMetrics& layer) {
+         });
+     }
+     json admission_summary = {
+-        {"representation", "directional_occupancy_delta_varint_base64_v2"},
++        {"representation", "directional_occupancy_identity_delta_varint_base64_v3"},
+         {"fields", {"cycle_delta", "terminal_snapshot", "admitted_blocks",
+                     "admitted_read_blocks", "admitted_write_blocks",
++                    "identity_count",
++                    "admitted_block_identities[sequence,block_offset]",
+                     "channel_read_occupancy_before[]",
+                     "channel_read_occupancy_after[]",
+                     "channel_write_occupancy_before[]",
+@@ -1726,6 +1755,13 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+                 ++admitted_reads;
+             }
+             auto& state = states[candidate.request_index];
++            if (admitted >= trace.block_identities.size()) {
++                throw std::runtime_error("admission trace identity capacity exceeded");
++            }
++            trace.block_identities[admitted] = {
++                state.request.sequence,
++                candidate.block_offset,
++            };
+             state.first_admission = std::min(state.first_admission, cycle);
+             state.last_admission = std::max(state.last_admission, cycle);
+             ++state.admitted_blocks;
+diff --git a/hygcn/paper_sim.h b/hygcn/paper_sim.h
+index 79fb766..a5c38f0 100644
+--- a/hygcn/paper_sim.h
++++ b/hygcn/paper_sim.h
+@@ -199,6 +199,12 @@ struct EncodedCommandTraceChunk {
+ };
+
+ inline constexpr std::size_t kMaxTraceHbmChannels = 16;
++inline constexpr std::size_t kMaxAdmissionBlocksPerCycle = 4;
++
++struct AdmittedBlockTrace {
++    uint64_t sequence = 0;
++    uint64_t block_offset = 0;
++};
+
+ struct TransactionAdmissionTrace {
+     uint64_t cycle = 0;
+@@ -206,6 +212,7 @@ struct TransactionAdmissionTrace {
+     uint64_t admitted_blocks = 0;
+     uint64_t admitted_read_blocks = 0;
+     uint64_t admitted_write_blocks = 0;
++    std::array<AdmittedBlockTrace, kMaxAdmissionBlocksPerCycle> block_identities{};
+     std::array<uint16_t, kMaxTraceHbmChannels> channel_read_occupancy_before{};
+     std::array<uint16_t, kMaxTraceHbmChannels> channel_read_occupancy_after{};
+     std::array<uint16_t, kMaxTraceHbmChannels> channel_write_occupancy_before{};
