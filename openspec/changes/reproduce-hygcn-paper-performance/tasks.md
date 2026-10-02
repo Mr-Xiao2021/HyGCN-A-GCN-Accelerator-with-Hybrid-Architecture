@@ -141,3 +141,11 @@
 - [x] 17.3 强制每个 expected block 恰有一个方向正确的 data command，并与 admission read/write block 总量交叉核对
 - [x] 17.4 增加 unknown sequence、out-of-range block、wrong direction、wrong mapping、duplicate/missing block 五类 identity/address mutation
 - [x] 17.5 执行 clean Release、CTest、legacy、严格 OpenSpec 和正式 trace replay，固化 V10-02 关闭证据并推送远端
+
+## 18. Review v11 command identity 时间线闭环整改
+
+- [x] 18.1 将 admission trace 升级为 v3，逐 admission 保存 sequence/block offset，使 validator 可恢复每个 request block 的精确 admission cycle
+- [x] 18.2 从完整 command 流重算 request first issue、completion、PRE/ACT 数量及首尾周期，并逐项对照 memory_requests
+- [x] 18.3 强制 PRE/ACT/READ/WRITE 不早于 request producer-ready、enqueue 和对应 block admission，保持地址、方向和唯一性检查
+- [x] 18.4 增加同 row、同方向且跨 producer-ready 边界的双向 identity swap mutation，并按正式 first-32/last-32 schema 重建样本
+- [ ] 18.5 执行 clean Release、CTest、legacy、严格 OpenSpec、正式 14+12、partition/model/FIFO sensitivity 和 21 份完整 trace replay，固化 V10-02 关闭证据并推送远端

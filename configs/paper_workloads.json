@@ -1,6 +1,6 @@
 {
-  "schema_version": 7,
-  "workload_version": "hygcn-hpca2020-table5-gcn-v7-command-identity",
+  "schema_version": 8,
+  "workload_version": "hygcn-hpca2020-table5-gcn-v8-temporal-identity",
   "paper_source": "HyGCN HPCA 2020 Table 5 and Section 5.3",
   "figures": {
     "figure_15": {
@@ -90,13 +90,13 @@
       "transfer_note": "burst/block transfer is modeled separately by transfer_cycles, so BL is not duplicated in CL/CWL completion latency"
     },
     "occupancy_trace": {
-      "representation": "directional_occupancy_delta_varint_base64_v2",
-      "policy": "every admission records per-channel read/write occupancy before and after mutation; a terminal zero snapshot lets the validator infer all intervening dispatch counts from zero and independently recompute peaks, capacity violations, totals, histograms, edge samples, and checksum"
+      "representation": "directional_occupancy_identity_delta_varint_base64_v3",
+      "policy": "every admission records the admitted sequence/block_offset identities plus per-channel read/write occupancy before and after mutation; a terminal zero snapshot lets the validator infer all intervening dispatch counts from zero, independently recompute peaks, capacity violations, totals, histograms, edge samples, and checksum, and recover the exact admission cycle of every request block"
     },
     "command_trace": {
       "representation": "command_delta_varint_base64_v2",
-      "policy": "every PRE, ACT, READ, and WRITE event is stored in a reversible chunked stream; the validator independently reconstructs event and command totals, checksum, edge samples, channel-lane spacing, tCCD/turnaround, and bank recovery, then resolves sequence/block_offset against memory_requests to verify request existence, block range, read/write direction, mapped channel/bank/row, one data command per expected block, and equality with directional admission totals",
-      "identity_mutations": ["unknown_sequence", "out_of_range_block", "wrong_direction", "wrong_mapping", "duplicate_and_missing_data_block"]
+      "policy": "every PRE, ACT, READ, and WRITE event is stored in a reversible chunked stream; the validator independently reconstructs event and command totals, checksum, edge samples, channel-lane spacing, tCCD/turnaround, bank recovery, and each request's first issue, completion, PRE/ACT counts and first/last cycles. It resolves sequence/block_offset against memory_requests and the exact block admission timeline to verify request existence, block range, read/write direction, mapped channel/bank/row, producer-ready/enqueue/admission causality, one data command per expected block, and equality with directional admission totals",
+      "identity_mutations": ["unknown_sequence", "out_of_range_block", "wrong_direction", "wrong_mapping", "duplicate_and_missing_data_block", "same_row_producer_ready_identity_swap"]
     }
   },
   "scope_limits": [

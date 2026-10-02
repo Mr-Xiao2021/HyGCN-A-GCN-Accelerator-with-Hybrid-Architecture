@@ -681,6 +681,8 @@ ADMISSION_TRACE_FIELDS = (
     "admitted_blocks",
     "admitted_read_blocks",
     "admitted_write_blocks",
+    "identity_count",
+    "admitted_block_identities[sequence,block_offset]",
     "channel_read_occupancy_before[]",
     "channel_read_occupancy_after[]",
     "channel_write_occupancy_before[]",
@@ -715,7 +717,8 @@ def decode_varint(payload, offset):
 
 
 def iter_admission_trace(summary):
-    if summary.get("representation") != "directional_occupancy_delta_varint_base64_v2":
+    if summary.get("representation") != \
+            "directional_occupancy_identity_delta_varint_base64_v3":
         raise ValueError("admission evidence is not a reconstructable directional trace")
     if tuple(summary.get("fields", ())) != ADMISSION_TRACE_FIELDS:
         raise ValueError("admission trace field schema does not match the decoder")
@@ -734,6 +737,15 @@ def iter_admission_trace(summary):
                 scalar_values.append(value)
             cycle = scalar_values[0] if index == 0 else previous_cycle + scalar_values[0]
             previous_cycle = cycle
+            identity_count, offset = decode_varint(payload, offset)
+            identities = []
+            for _ in range(identity_count):
+                sequence, offset = decode_varint(payload, offset)
+                block_offset, offset = decode_varint(payload, offset)
+                identities.append({
+                    "sequence": sequence,
+                    "block_offset": block_offset,
+                })
             arrays = []
             for _ in range(4):
                 values = []
@@ -747,6 +759,7 @@ def iter_admission_trace(summary):
                 "admitted_blocks": scalar_values[2],
                 "admitted_read_blocks": scalar_values[3],
                 "admitted_write_blocks": scalar_values[4],
+                "admitted_block_identities": identities,
                 "channel_read_occupancy_before": arrays[0],
                 "channel_read_occupancy_after": arrays[1],
                 "channel_write_occupancy_before": arrays[2],
@@ -849,6 +862,10 @@ def validate_transaction_admission(dataset, variant, run):
         saw_terminal = False
         for trace in iter_admission_trace(summary):
             admitted = trace["admitted_blocks"]
+            if len(trace["admitted_block_identities"]) != admitted:
+                raise ValueError(
+                    f"{dataset} {variant} admission identity count differs"
+                )
             if previous_cycle is not None and trace["cycle"] <= previous_cycle:
                 raise ValueError(f"{dataset} {variant} occupancy events are not increasing")
             if saw_terminal:
@@ -959,6 +976,10 @@ def validate_transaction_admission(dataset, variant, run):
             for value in checksum_inputs:
                 checksum ^= value
                 checksum = (checksum * 1099511628211) & 0xFFFFFFFFFFFFFFFF
+            for identity in trace["admitted_block_identities"]:
+                for value in (identity["sequence"], identity["block_offset"]):
+                    checksum ^= value
+                    checksum = (checksum * 1099511628211) & 0xFFFFFFFFFFFFFFFF
             for channel in range(channels):
                 for value in (
                         read_before[channel], read_after[channel],
@@ -1044,7 +1065,9 @@ def validate_transaction_admission(dataset, variant, run):
         "total_read_queue_capacity": channels * read_capacity,
         "total_write_buffer_capacity": channels * write_capacity,
         "trace_checksums": checksum_values,
-        "occupancy_reconstruction": "per-channel before/after admission snapshots",
+        "occupancy_reconstruction": (
+            "per-channel before/after admission snapshots plus request-block identity"
+        ),
     }
 
 

@@ -199,6 +199,12 @@ struct EncodedCommandTraceChunk {
 };
 
 inline constexpr std::size_t kMaxTraceHbmChannels = 16;
+inline constexpr std::size_t kMaxAdmissionBlocksPerCycle = 4;
+
+struct AdmittedBlockTrace {
+    uint64_t sequence = 0;
+    uint64_t block_offset = 0;
+};
 
 struct TransactionAdmissionTrace {
     uint64_t cycle = 0;
@@ -206,6 +212,7 @@ struct TransactionAdmissionTrace {
     uint64_t admitted_blocks = 0;
     uint64_t admitted_read_blocks = 0;
     uint64_t admitted_write_blocks = 0;
+    std::array<AdmittedBlockTrace, kMaxAdmissionBlocksPerCycle> block_identities{};
     std::array<uint16_t, kMaxTraceHbmChannels> channel_read_occupancy_before{};
     std::array<uint16_t, kMaxTraceHbmChannels> channel_read_occupancy_after{};
     std::array<uint16_t, kMaxTraceHbmChannels> channel_write_occupancy_before{};

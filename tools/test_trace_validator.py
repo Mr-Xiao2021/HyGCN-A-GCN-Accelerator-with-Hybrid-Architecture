@@ -21,7 +21,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def run_validator(validator, path, expect_success):
+def run_validator(validator, path, expect_success, expected_error=None):
     completed = subprocess.run(
         [str(validator), str(path)],
         capture_output=True,
@@ -31,6 +31,11 @@ def run_validator(validator, path, expect_success):
         raise RuntimeError(
             f"validator {'accepted' if completed.returncode == 0 else 'rejected'} "
             f"{path.name}: {completed.stderr.strip()}"
+        )
+    if expected_error is not None and expected_error not in completed.stderr:
+        raise RuntimeError(
+            f"validator rejected {path.name} for the wrong reason: "
+            f"{completed.stderr.strip()}"
         )
 
 
@@ -210,7 +215,58 @@ def main():
             write_case(directory, "duplicate-and-missing-data-block", duplicate_missing),
             False,
         )
-    print("compiled_trace_validator_mutations=9/9_REJECTED")
+
+        requests = {
+            request["sequence"]: request for request in layer["memory_requests"]
+        }
+        temporal_pair = None
+        for indices in groups.values():
+            for position, first_index in enumerate(indices):
+                first = events[first_index]
+                for second_index in indices[position + 1:]:
+                    second = events[second_index]
+                    if requests[second["sequence"]]["producer_ready_cycle"] > \
+                            first["cycle"]:
+                        temporal_pair = (first_index, second_index)
+                        break
+                if temporal_pair is not None:
+                    break
+            if temporal_pair is not None:
+                break
+        if temporal_pair is None:
+            raise RuntimeError(
+                "smoke command trace lacks a same-row producer-ready swap pair"
+            )
+        temporal_swap = copy.deepcopy(document)
+        temporal_events = copy.deepcopy(events)
+        first_index, second_index = temporal_pair
+        first_identity = (
+            temporal_events[first_index]["sequence"],
+            temporal_events[first_index]["block_offset"],
+        )
+        second_identity = (
+            temporal_events[second_index]["sequence"],
+            temporal_events[second_index]["block_offset"],
+        )
+        temporal_events[first_index]["sequence"], \
+            temporal_events[first_index]["block_offset"] = second_identity
+        temporal_events[second_index]["sequence"], \
+            temporal_events[second_index]["block_offset"] = first_identity
+        apply_command_events(temporal_swap, temporal_events)
+        run_validator(
+            validator,
+            write_case(directory, "same-row-producer-ready-identity-swap", temporal_swap),
+            False,
+            "command precedes request producer-ready cycle",
+        )
+        second_request = requests[second_identity[0]]
+        print(
+            "temporal_identity_swap="
+            f"cycle-{temporal_events[first_index]['cycle']}:seq-{second_identity[0]}:"
+            f"block-{second_identity[1]}:producer-ready-"
+            f"{second_request['producer_ready_cycle']}:REJECTED"
+        )
+    print("compiled_trace_validator_mutations=10/10_REJECTED")
     return 0
 
 

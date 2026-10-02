@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <deque>
 #include <fstream>
@@ -110,12 +111,92 @@ void RequireFields(const json& summary, const std::vector<std::string>& expected
     }
 }
 
+struct MappedBlock {
+    uint64_t channel = 0;
+    uint64_t bank = 0;
+    uint64_t row = 0;
+};
+
+bool IsWriteClass(const std::string& request_class) {
+    if (request_class == "output" || request_class == "intermediate_write") {
+        return true;
+    }
+    if (request_class == "edge" || request_class == "input" ||
+        request_class == "weight" || request_class == "intermediate_read") {
+        return false;
+    }
+    Fail("memory request has an unknown request class");
+}
+
+MappedBlock MapBlock(const json& run, uint64_t block) {
+    const auto& architecture = run.at("architecture");
+    const uint64_t channels = architecture.at("hbm_channels").get<uint64_t>();
+    const uint64_t banks = architecture.at(
+        "hbm_banks_per_channel").get<uint64_t>();
+    const uint64_t block_size = architecture.at("block_size").get<uint64_t>();
+    const uint64_t row_bytes = architecture.at("hbm_row_bytes").get<uint64_t>();
+    if (channels == 0 || banks == 0 || block_size == 0 ||
+        row_bytes < block_size || row_bytes % block_size != 0) {
+        Fail("architecture has invalid address-mapping dimensions");
+    }
+    const uint64_t blocks_per_row = row_bytes / block_size;
+    const std::string mapping = run.at("manifest").at("address_mapping");
+    if (mapping == "low-bits") {
+        return {
+            block % channels,
+            (block / channels) % banks,
+            block / (channels * banks * blocks_per_row),
+        };
+    }
+    if (mapping != "row-first") {
+        Fail("manifest has an unknown address mapping");
+    }
+    const uint64_t interleave = architecture.at(
+        "row_first_bank_interleave").get<uint64_t>();
+    if (interleave == 0 || interleave > banks || banks % interleave != 0) {
+        Fail("row-first interleave is invalid");
+    }
+    const uint64_t interleaved_block = block / interleave;
+    const uint64_t bank_groups = banks / interleave;
+    return {
+        (interleaved_block / blocks_per_row) % channels,
+        ((interleaved_block / (blocks_per_row * channels)) % bank_groups) *
+            interleave + block % interleave,
+        interleaved_block / (blocks_per_row * channels * bank_groups),
+    };
+}
+
+struct RequestIdentity {
+    uint64_t first_block = 0;
+    uint64_t block_count = 0;
+    bool is_write = false;
+    uint64_t producer_ready_cycle = 0;
+    uint64_t enqueue_cycle = 0;
+    uint64_t first_admission_cycle = 0;
+    uint64_t last_admission_cycle = 0;
+    uint64_t first_issue_cycle = 0;
+    uint64_t completion_cycle = 0;
+    uint64_t precharge_commands = 0;
+    uint64_t activate_commands = 0;
+    uint64_t first_precharge_cycle = 0;
+    uint64_t last_precharge_cycle = 0;
+    uint64_t first_activate_cycle = 0;
+    uint64_t last_activate_cycle = 0;
+    std::vector<uint64_t> admission_cycles;
+};
+
+struct AdmissionValidation {
+    json oracle;
+    std::vector<std::map<uint64_t, RequestIdentity>> layer_requests;
+};
+
 json AdmissionEventJson(
         uint64_t cycle,
         bool terminal,
         uint64_t admitted,
         uint64_t admitted_reads,
         uint64_t admitted_writes,
+        const json& identities,
         const std::vector<uint64_t>& read_before,
         const std::vector<uint64_t>& read_after,
         const std::vector<uint64_t>& write_before,
@@ -126,6 +207,7 @@ json AdmissionEventJson(
         {"admitted_blocks", admitted},
         {"admitted_read_blocks", admitted_reads},
         {"admitted_write_blocks", admitted_writes},
+        {"admitted_block_identities", identities},
         {"channel_read_occupancy_before", read_before},
         {"channel_read_occupancy_after", read_after},
         {"channel_write_occupancy_before", write_before},
@@ -133,7 +215,7 @@ json AdmissionEventJson(
     };
 }
 
-json ValidateAdmission(const json& run) {
+AdmissionValidation ValidateAdmission(const json& run) {
     const auto& architecture = run.at("architecture");
     const uint64_t issue_limit = architecture.at(
         "coordinator_issue_blocks_per_cycle").get<uint64_t>();
@@ -157,16 +239,69 @@ json ValidateAdmission(const json& run) {
     const std::vector<std::string> expected_fields{
         "cycle_delta", "terminal_snapshot", "admitted_blocks",
         "admitted_read_blocks", "admitted_write_blocks",
+        "identity_count", "admitted_block_identities[sequence,block_offset]",
         "channel_read_occupancy_before[]",
         "channel_read_occupancy_after[]",
         "channel_write_occupancy_before[]",
         "channel_write_occupancy_after[]",
     };
 
+    AdmissionValidation validation;
     for (const auto& layer : run.at("layers")) {
+        std::map<uint64_t, RequestIdentity> requests;
+        for (const auto& request : layer.at("memory_requests")) {
+            const uint64_t sequence = request.at("sequence").get<uint64_t>();
+            const uint64_t address = request.at("address").get<uint64_t>();
+            const uint64_t bytes = request.at("bytes").get<uint64_t>();
+            if (bytes == 0 || block_size == 0 ||
+                address > std::numeric_limits<uint64_t>::max() - bytes) {
+                Fail("memory request identity is invalid");
+            }
+            const uint64_t blocks = (bytes + block_size - 1) / block_size;
+            RequestIdentity identity;
+            identity.first_block = address / block_size;
+            identity.block_count = blocks;
+            identity.is_write = IsWriteClass(
+                request.at("request_class").get<std::string>());
+            identity.producer_ready_cycle = request.at(
+                "producer_ready_cycle").get<uint64_t>();
+            identity.enqueue_cycle = request.at("enqueue_cycle").get<uint64_t>();
+            identity.first_admission_cycle = request.at(
+                "first_admission_cycle").get<uint64_t>();
+            identity.last_admission_cycle = request.at(
+                "last_admission_cycle").get<uint64_t>();
+            identity.first_issue_cycle = request.at(
+                "first_issue_cycle").get<uint64_t>();
+            identity.completion_cycle = request.at(
+                "completion_cycle").get<uint64_t>();
+            identity.precharge_commands = request.at(
+                "precharge_commands").get<uint64_t>();
+            identity.activate_commands = request.at(
+                "activate_commands").get<uint64_t>();
+            identity.first_precharge_cycle = request.at(
+                "first_precharge_cycle").get<uint64_t>();
+            identity.last_precharge_cycle = request.at(
+                "last_precharge_cycle").get<uint64_t>();
+            identity.first_activate_cycle = request.at(
+                "first_activate_cycle").get<uint64_t>();
+            identity.last_activate_cycle = request.at(
+                "last_activate_cycle").get<uint64_t>();
+            identity.admission_cycles.assign(
+                static_cast<std::size_t>(blocks),
+                std::numeric_limits<uint64_t>::max());
+            if (!requests.emplace(sequence, std::move(identity)).second) {
+                Fail("memory request sequence is duplicated");
+            }
+            expected_total += blocks;
+            if (IsWriteClass(request.at("request_class").get<std::string>())) {
+                expected_write_total += blocks;
+            } else {
+                expected_read_total += blocks;
+            }
+        }
         const auto& summary = layer.at("transaction_admission_trace");
         if (summary.at("representation") !=
-            "directional_occupancy_delta_varint_base64_v2") {
+            "directional_occupancy_identity_delta_varint_base64_v3") {
             Fail("admission trace representation differs");
         }
         RequireFields(summary, expected_fields);
@@ -210,6 +345,42 @@ json ValidateAdmission(const json& run) {
                 const uint64_t admitted = DecodeVarint(payload, offset);
                 const uint64_t admitted_reads = DecodeVarint(payload, offset);
                 const uint64_t admitted_writes = DecodeVarint(payload, offset);
+                const uint64_t identity_count = DecodeVarint(payload, offset);
+                if (identity_count != admitted) {
+                    Fail("admission identity count differs from admitted blocks");
+                }
+                json identities = json::array();
+                std::vector<uint64_t> identity_reads(channels, 0);
+                std::vector<uint64_t> identity_writes(channels, 0);
+                for (uint64_t identity_index = 0;
+                     identity_index < identity_count; ++identity_index) {
+                    const uint64_t sequence = DecodeVarint(payload, offset);
+                    const uint64_t block_offset = DecodeVarint(payload, offset);
+                    auto request = requests.find(sequence);
+                    if (request == requests.end()) {
+                        Fail("admission trace references an unknown request sequence");
+                    }
+                    if (block_offset >= request->second.block_count) {
+                        Fail("admission trace block offset is outside its request");
+                    }
+                    auto& admission_cycle = request->second.admission_cycles.at(
+                        static_cast<std::size_t>(block_offset));
+                    if (admission_cycle != std::numeric_limits<uint64_t>::max()) {
+                        Fail("request block has duplicate admission identities");
+                    }
+                    admission_cycle = cycle;
+                    const MappedBlock mapped = MapBlock(
+                        run, request->second.first_block + block_offset);
+                    if (request->second.is_write) {
+                        ++identity_writes.at(static_cast<std::size_t>(mapped.channel));
+                    } else {
+                        ++identity_reads.at(static_cast<std::size_t>(mapped.channel));
+                    }
+                    identities.push_back({
+                        {"sequence", sequence},
+                        {"block_offset", block_offset},
+                    });
+                }
                 std::array<std::vector<uint64_t>, 4> arrays;
                 for (auto& values : arrays) {
                     values.resize(channels);
@@ -276,6 +447,22 @@ json ValidateAdmission(const json& run) {
                     admitted != admitted_reads + admitted_writes) {
                     Fail("admission directional delta differs");
                 }
+                uint64_t identity_read_total = 0;
+                uint64_t identity_write_total = 0;
+                for (std::size_t channel = 0; channel < channels; ++channel) {
+                    const uint64_t read_delta = read_after[channel] - read_before[channel];
+                    const uint64_t write_delta = write_after[channel] - write_before[channel];
+                    if (identity_reads[channel] != read_delta ||
+                        identity_writes[channel] != write_delta) {
+                        Fail("admission block identity differs from directional occupancy");
+                    }
+                    identity_read_total += identity_reads[channel];
+                    identity_write_total += identity_writes[channel];
+                }
+                if (identity_read_total != admitted_reads ||
+                    identity_write_total != admitted_writes) {
+                    Fail("admission block identity direction totals differ");
+                }
                 if (terminal && (total_read_before != 0 || total_read_after != 0 ||
                                  total_write_before != 0 || total_write_after != 0)) {
                     Fail("terminal occupancy is not zero");
@@ -316,6 +503,10 @@ json ValidateAdmission(const json& run) {
                          admitted_reads, admitted_writes}) {
                     UpdateFnv(checksum, value);
                 }
+                for (const auto& identity : identities) {
+                    UpdateFnv(checksum, identity.at("sequence").get<uint64_t>());
+                    UpdateFnv(checksum, identity.at("block_offset").get<uint64_t>());
+                }
                 for (std::size_t channel = 0; channel < channels; ++channel) {
                     for (const uint64_t value : {
                              read_before[channel], read_after[channel],
@@ -325,6 +516,7 @@ json ValidateAdmission(const json& run) {
                 }
                 const json sample = AdmissionEventJson(
                     cycle, terminal, admitted, admitted_reads, admitted_writes,
+                    identities,
                     read_before, read_after, write_before, write_after);
                 if (event_count < 16) {
                     first_samples.push_back(sample);
@@ -423,32 +615,35 @@ json ValidateAdmission(const json& run) {
             max_blocks_per_cycle, actual_max["blocks_admitted_per_cycle"]);
         checksums.push_back(Hex64(checksum));
 
-        for (const auto& request : layer.at("memory_requests")) {
-            const uint64_t bytes = request.at("bytes").get<uint64_t>();
-            const uint64_t blocks = (bytes + block_size - 1) / block_size;
-            expected_total += blocks;
-            const std::string request_class = request.at("request_class");
-            if (request_class == "output" || request_class == "intermediate_write") {
-                expected_write_total += blocks;
-            } else {
-                expected_read_total += blocks;
+        for (const auto& [sequence, request] : requests) {
+            (void)sequence;
+            if (std::any_of(request.admission_cycles.begin(),
+                            request.admission_cycles.end(),
+                            [](uint64_t cycle) {
+                                return cycle == std::numeric_limits<uint64_t>::max();
+                            })) {
+                Fail("admission trace has missing request-block identities");
             }
-            if (request.at("first_admission_cycle").get<uint64_t>() <
-                    request.at("enqueue_cycle").get<uint64_t>() ||
-                request.at("last_admission_cycle").get<uint64_t>() <
-                    request.at("first_admission_cycle").get<uint64_t>() ||
-                request.at("first_issue_cycle").get<uint64_t>() <
-                    request.at("first_admission_cycle").get<uint64_t>()) {
+            const auto bounds = std::minmax_element(
+                request.admission_cycles.begin(), request.admission_cycles.end());
+            if (*bounds.first != request.first_admission_cycle ||
+                *bounds.second != request.last_admission_cycle) {
+                Fail("request admission timeline differs from block identities");
+            }
+            if (request.first_admission_cycle < request.enqueue_cycle ||
+                request.last_admission_cycle < request.first_admission_cycle ||
+                request.first_issue_cycle < request.first_admission_cycle) {
                 Fail("request admission violates causality");
             }
         }
+        validation.layer_requests.push_back(std::move(requests));
     }
     if (admitted_total != expected_total ||
         admitted_read_total != expected_read_total ||
         admitted_write_total != expected_write_total) {
         Fail("admission trace does not cover all request blocks");
     }
-    return {
+    validation.oracle = {
         {"admitted_blocks", admitted_total},
         {"admitted_read_blocks", admitted_read_total},
         {"admitted_write_blocks", admitted_write_total},
@@ -461,9 +656,11 @@ json ValidateAdmission(const json& run) {
         {"total_write_buffer_capacity", channels * write_capacity},
         {"trace_checksums", checksums},
         {"occupancy_reconstruction",
-         "per-channel before/after admission snapshots"},
+         "per-channel before/after admission snapshots plus request-block identity"},
+        {"block_identity_cross_check", "PASS"},
         {"validator", "independent-cpp-v1"},
     };
+    return validation;
 }
 
 struct ChannelTiming {
@@ -482,67 +679,6 @@ struct BankTiming {
     uint64_t next_write = 0;
 };
 
-struct RequestIdentity {
-    uint64_t first_block = 0;
-    uint64_t block_count = 0;
-    bool is_write = false;
-};
-
-struct MappedBlock {
-    uint64_t channel = 0;
-    uint64_t bank = 0;
-    uint64_t row = 0;
-};
-
-bool IsWriteClass(const std::string& request_class) {
-    if (request_class == "output" || request_class == "intermediate_write") {
-        return true;
-    }
-    if (request_class == "edge" || request_class == "input" ||
-        request_class == "weight" || request_class == "intermediate_read") {
-        return false;
-    }
-    Fail("memory request has an unknown request class");
-}
-
-MappedBlock MapBlock(const json& run, uint64_t block) {
-    const auto& architecture = run.at("architecture");
-    const uint64_t channels = architecture.at("hbm_channels").get<uint64_t>();
-    const uint64_t banks = architecture.at(
-        "hbm_banks_per_channel").get<uint64_t>();
-    const uint64_t block_size = architecture.at("block_size").get<uint64_t>();
-    const uint64_t row_bytes = architecture.at("hbm_row_bytes").get<uint64_t>();
-    if (channels == 0 || banks == 0 || block_size == 0 ||
-        row_bytes < block_size || row_bytes % block_size != 0) {
-        Fail("architecture has invalid address-mapping dimensions");
-    }
-    const uint64_t blocks_per_row = row_bytes / block_size;
-    const std::string mapping = run.at("manifest").at("address_mapping");
-    if (mapping == "low-bits") {
-        return {
-            block % channels,
-            (block / channels) % banks,
-            block / (channels * banks * blocks_per_row),
-        };
-    }
-    if (mapping != "row-first") {
-        Fail("manifest has an unknown address mapping");
-    }
-    const uint64_t interleave = architecture.at(
-        "row_first_bank_interleave").get<uint64_t>();
-    if (interleave == 0 || interleave > banks || banks % interleave != 0) {
-        Fail("row-first interleave is invalid");
-    }
-    const uint64_t interleaved_block = block / interleave;
-    const uint64_t bank_groups = banks / interleave;
-    return {
-        (interleaved_block / blocks_per_row) % channels,
-        ((interleaved_block / (blocks_per_row * channels)) % bank_groups) *
-            interleave + block % interleave,
-        interleaved_block / (blocks_per_row * channels * bank_groups),
-    };
-}
-
 json CommandEventJson(uint64_t cycle, uint64_t sequence, uint64_t block_offset,
                       uint64_t channel, uint64_t bank, uint64_t row,
                       uint64_t command) {
@@ -557,7 +693,19 @@ json CommandEventJson(uint64_t cycle, uint64_t sequence, uint64_t block_offset,
     };
 }
 
-json ValidateCommands(const json& run, const json& admission_oracle) {
+struct RequestCommandStats {
+    uint64_t first_issue_cycle = std::numeric_limits<uint64_t>::max();
+    uint64_t completion_cycle = 0;
+    uint64_t precharge_commands = 0;
+    uint64_t activate_commands = 0;
+    uint64_t first_precharge_cycle = std::numeric_limits<uint64_t>::max();
+    uint64_t last_precharge_cycle = 0;
+    uint64_t first_activate_cycle = std::numeric_limits<uint64_t>::max();
+    uint64_t last_activate_cycle = 0;
+    std::vector<bool> data_commands;
+};
+
+json ValidateCommands(const json& run, const AdmissionValidation& admission) {
     const auto& architecture = run.at("architecture");
     const uint64_t interval = architecture.at(
         "hbm_command_issue_interval_cycles").get<uint64_t>();
@@ -572,39 +720,40 @@ json ValidateCommands(const json& run, const json& admission_oracle) {
     uint64_t expected_request_blocks = 0;
     uint64_t read_data_commands = 0;
     uint64_t write_data_commands = 0;
+    uint64_t reconstructed_requests = 0;
     std::vector<std::string> checksums;
+    const uint64_t block_size = architecture.at("block_size").get<uint64_t>();
+    const double bytes_per_channel_cycle = std::max(
+        1.0,
+        architecture.at("hbm_bandwidth_gbps").get<double>() /
+            architecture.at("frequency_ghz").get<double>() /
+            static_cast<double>(channels));
+    const uint64_t transfer_cycles = std::max<uint64_t>(
+        1, static_cast<uint64_t>(std::ceil(
+            static_cast<double>(block_size) / bytes_per_channel_cycle)));
+    const uint64_t read_latency = architecture.at(
+        "hbm_read_row_hit_cycles").get<uint64_t>();
+    const uint64_t write_latency = architecture.at(
+        "hbm_write_row_hit_cycles").get<uint64_t>();
+    std::size_t layer_index = 0;
     for (const auto& layer : run.at("layers")) {
         const auto& summary = layer.at("command_trace");
         if (summary.at("representation") != "command_delta_varint_base64_v2") {
             Fail("command trace representation differs");
         }
         RequireFields(summary, expected_fields);
-        const uint64_t block_size = architecture.at("block_size").get<uint64_t>();
-        std::map<uint64_t, RequestIdentity> requests;
-        std::set<std::pair<uint64_t, uint64_t>> expected_blocks;
-        for (const auto& request : layer.at("memory_requests")) {
-            const uint64_t sequence = request.at("sequence").get<uint64_t>();
-            const uint64_t address = request.at("address").get<uint64_t>();
-            const uint64_t bytes = request.at("bytes").get<uint64_t>();
-            if (bytes == 0 || block_size == 0 ||
-                address > std::numeric_limits<uint64_t>::max() - bytes) {
-                Fail("memory request identity is invalid");
-            }
-            const uint64_t block_count = (bytes + block_size - 1) / block_size;
-            const RequestIdentity identity{
-                address / block_size,
-                block_count,
-                IsWriteClass(request.at("request_class").get<std::string>()),
-            };
-            if (!requests.emplace(sequence, identity).second) {
-                Fail("memory request sequence is duplicated");
-            }
-            for (uint64_t offset = 0; offset < block_count; ++offset) {
-                expected_blocks.emplace(sequence, offset);
-            }
-            expected_request_blocks += block_count;
+        if (layer_index >= admission.layer_requests.size()) {
+            Fail("admission timeline layer count differs");
         }
-        std::set<std::pair<uint64_t, uint64_t>> seen_data_blocks;
+        const auto& requests = admission.layer_requests[layer_index];
+        std::map<uint64_t, RequestCommandStats> request_stats;
+        for (const auto& [sequence, request] : requests) {
+            RequestCommandStats stats;
+            stats.data_commands.assign(
+                static_cast<std::size_t>(request.block_count), false);
+            request_stats.emplace(sequence, std::move(stats));
+            expected_request_blocks += request.block_count;
+        }
         std::vector<ChannelTiming> channel_state(channels);
         std::vector<BankTiming> bank_state(channels * banks_per_channel);
         std::array<uint64_t, 4> counts{};
@@ -658,19 +807,52 @@ json ValidateCommands(const json& run, const json& admission_oracle) {
                 if (command != 0 && row != mapped.row) {
                     Fail("command trace row differs from request address mapping");
                 }
+                if (cycle < request->second.producer_ready_cycle) {
+                    Fail("command precedes request producer-ready cycle");
+                }
+                if (cycle < request->second.enqueue_cycle) {
+                    Fail("command precedes request enqueue cycle");
+                }
+                const uint64_t admission_cycle = request->second.admission_cycles.at(
+                    static_cast<std::size_t>(block_offset));
+                if (cycle < admission_cycle) {
+                    Fail("command precedes matching block admission");
+                }
+                auto& stats = request_stats.at(sequence);
                 if (command == 2 || command == 3) {
                     const uint64_t expected_command = request->second.is_write ? 3 : 2;
                     if (command != expected_command) {
                         Fail("data command direction differs from request class");
                     }
-                    if (!seen_data_blocks.emplace(sequence, block_offset).second) {
+                    const std::size_t data_index = static_cast<std::size_t>(
+                        block_offset);
+                    if (stats.data_commands.at(data_index)) {
                         Fail("request block has duplicate data commands");
                     }
+                    stats.data_commands[data_index] = true;
+                    stats.first_issue_cycle = std::min(
+                        stats.first_issue_cycle, cycle);
+                    stats.completion_cycle = std::max(
+                        stats.completion_cycle,
+                        cycle + (command == 3 ? write_latency : read_latency) +
+                            transfer_cycles);
                     if (command == 2) {
                         ++read_data_commands;
                     } else {
                         ++write_data_commands;
                     }
+                } else if (command == 0) {
+                    ++stats.precharge_commands;
+                    stats.first_precharge_cycle = std::min(
+                        stats.first_precharge_cycle, cycle);
+                    stats.last_precharge_cycle = std::max(
+                        stats.last_precharge_cycle, cycle);
+                } else {
+                    ++stats.activate_commands;
+                    stats.first_activate_cycle = std::min(
+                        stats.first_activate_cycle, cycle);
+                    stats.last_activate_cycle = std::max(
+                        stats.last_activate_cycle, cycle);
                 }
                 if (have_previous_cycle && cycle < previous_cycle) {
                     Fail("command trace is not time ordered");
@@ -793,8 +975,27 @@ json ValidateCommands(const json& run, const json& admission_oracle) {
             decoded != summary.at("event_count").get<uint64_t>()) {
             Fail("command event or type totals differ");
         }
-        if (seen_data_blocks != expected_blocks) {
-            Fail("command trace has missing request-block data commands");
+        for (const auto& [sequence, request] : requests) {
+            const auto& stats = request_stats.at(sequence);
+            if (std::any_of(stats.data_commands.begin(), stats.data_commands.end(),
+                            [](bool seen) { return !seen; })) {
+                Fail("command trace has missing request-block data commands");
+            }
+            const uint64_t first_precharge = stats.precharge_commands == 0
+                ? 0 : stats.first_precharge_cycle;
+            const uint64_t first_activate = stats.activate_commands == 0
+                ? 0 : stats.first_activate_cycle;
+            if (stats.first_issue_cycle != request.first_issue_cycle ||
+                stats.completion_cycle != request.completion_cycle ||
+                stats.precharge_commands != request.precharge_commands ||
+                stats.activate_commands != request.activate_commands ||
+                first_precharge != request.first_precharge_cycle ||
+                stats.last_precharge_cycle != request.last_precharge_cycle ||
+                first_activate != request.first_activate_cycle ||
+                stats.last_activate_cycle != request.last_activate_cycle) {
+                Fail("request command timeline differs from reconstructed events");
+            }
+            ++reconstructed_requests;
         }
         std::vector<json> samples = first_samples;
         samples.insert(samples.end(), last_samples.begin(), last_samples.end());
@@ -809,13 +1010,17 @@ json ValidateCommands(const json& run, const json& admission_oracle) {
         }
         total_events += decoded;
         checksums.push_back(Hex64(checksum));
+        ++layer_index;
+    }
+    if (layer_index != admission.layer_requests.size()) {
+        Fail("admission timeline layer count differs");
     }
     if (read_data_commands !=
-            admission_oracle.at("admitted_read_blocks").get<uint64_t>() ||
+            admission.oracle.at("admitted_read_blocks").get<uint64_t>() ||
         write_data_commands !=
-            admission_oracle.at("admitted_write_blocks").get<uint64_t>() ||
+            admission.oracle.at("admitted_write_blocks").get<uint64_t>() ||
         expected_request_blocks !=
-            admission_oracle.at("admitted_blocks").get<uint64_t>()) {
+            admission.oracle.at("admitted_blocks").get<uint64_t>()) {
         Fail("command data blocks differ from directional admission totals");
     }
     return {
@@ -828,11 +1033,14 @@ json ValidateCommands(const json& run, const json& admission_oracle) {
         {"expected_request_blocks", expected_request_blocks},
         {"read_data_commands", read_data_commands},
         {"write_data_commands", write_data_commands},
+        {"reconstructed_requests", reconstructed_requests},
         {"request_identity_violations", 0},
         {"address_mapping_violations", 0},
         {"direction_violations", 0},
         {"duplicate_or_missing_data_commands", 0},
-        {"admission_data_cross_check", "PASS"},
+        {"admission_data_cross_check", "request-block identity and cycle PASS"},
+        {"request_timeline_cross_check", "PASS"},
+        {"transfer_cycles", transfer_cycles},
         {"validator", "independent-cpp-v1"},
     };
 }
@@ -844,9 +1052,9 @@ json ValidateFile(const std::string& path) {
     }
     json run;
     stream >> run;
-    const json admission = ValidateAdmission(run);
+    const AdmissionValidation admission = ValidateAdmission(run);
     return {
-        {"transaction_admission_oracle", admission},
+        {"transaction_admission_oracle", admission.oracle},
         {"command_trace_oracle", ValidateCommands(run, admission)},
     };
 }
