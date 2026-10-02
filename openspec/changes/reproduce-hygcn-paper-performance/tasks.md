@@ -133,3 +133,11 @@
 - [x] 16.4 增加删除 event、修改中间 cycle、清空 edge samples 和伪造 checksum 的 mutation tests，四类篡改均必须失败
 - [x] 16.5 扩展 revision audit 到完整 workload policy tree、调度源码 diff 和修正前后 metric delta；调度政策变化时不得输出无限定的 no-retuning 声明
 - [x] 16.6 执行 clean Release、CTest、legacy、cap-free 14+12、FIFO window 全扫描、partition/model sensitivity 和严格 OpenSpec，固化结果并推送远端
+
+## 17. Review v10 command identity 与地址闭环整改
+
+- [x] 17.1 从 `memory_requests` 独立重建 sequence、block offset、方向和 expected block set，并与 command stream 逐事件关联
+- [x] 17.2 按 low-bits/row-first 有效配置独立重算 channel/bank/row，校验 PRE 的目标 block bank identity 及 ACT/READ/WRITE 的完整映射
+- [x] 17.3 强制每个 expected block 恰有一个方向正确的 data command，并与 admission read/write block 总量交叉核对
+- [x] 17.4 增加 unknown sequence、out-of-range block、wrong direction、wrong mapping、duplicate/missing block 五类 identity/address mutation
+- [ ] 17.5 执行 clean Release、CTest、legacy、严格 OpenSpec 和正式 trace replay，固化 V10-02 关闭证据并推送远端

@@ -112,11 +112,16 @@ def main():
         raise RuntimeError("batch-class ordering must retain its paper provenance")
     if workloads["memory_ablation"]["command_queue_entries_per_bank"] != 8:
         raise RuntimeError("command queue depth must retain its DRAMSim3 provenance")
-    if workloads.get("schema_version") != 6 or \
+    if workloads.get("schema_version") != 7 or \
             workloads["memory_ablation"]["hbm_stacks"] != 2 or \
             workloads["memory_ablation"]["channels_per_stack"] != 8 or \
             workloads["memory_ablation"]["physical_channels"] != 16:
         raise RuntimeError("workload manifest must version the two-stack HBM topology")
+    command_policy = workloads["memory_ablation"]["command_trace"]
+    if command_policy.get("identity_mutations") != [
+            "unknown_sequence", "out_of_range_block", "wrong_direction",
+            "wrong_mapping", "duplicate_and_missing_data_block"]:
+        raise RuntimeError("command trace must version request identity mutations")
     if workloads["memory_ablation"]["fifo_active_windows"] != 0 or \
             workloads["memory_ablation"]["fifo_window_sensitivity"] != \
             [0, 1, 2, 4, 8, 512]:

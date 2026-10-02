@@ -7,6 +7,7 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -481,6 +482,67 @@ struct BankTiming {
     uint64_t next_write = 0;
 };
 
+struct RequestIdentity {
+    uint64_t first_block = 0;
+    uint64_t block_count = 0;
+    bool is_write = false;
+};
+
+struct MappedBlock {
+    uint64_t channel = 0;
+    uint64_t bank = 0;
+    uint64_t row = 0;
+};
+
+bool IsWriteClass(const std::string& request_class) {
+    if (request_class == "output" || request_class == "intermediate_write") {
+        return true;
+    }
+    if (request_class == "edge" || request_class == "input" ||
+        request_class == "weight" || request_class == "intermediate_read") {
+        return false;
+    }
+    Fail("memory request has an unknown request class");
+}
+
+MappedBlock MapBlock(const json& run, uint64_t block) {
+    const auto& architecture = run.at("architecture");
+    const uint64_t channels = architecture.at("hbm_channels").get<uint64_t>();
+    const uint64_t banks = architecture.at(
+        "hbm_banks_per_channel").get<uint64_t>();
+    const uint64_t block_size = architecture.at("block_size").get<uint64_t>();
+    const uint64_t row_bytes = architecture.at("hbm_row_bytes").get<uint64_t>();
+    if (channels == 0 || banks == 0 || block_size == 0 ||
+        row_bytes < block_size || row_bytes % block_size != 0) {
+        Fail("architecture has invalid address-mapping dimensions");
+    }
+    const uint64_t blocks_per_row = row_bytes / block_size;
+    const std::string mapping = run.at("manifest").at("address_mapping");
+    if (mapping == "low-bits") {
+        return {
+            block % channels,
+            (block / channels) % banks,
+            block / (channels * banks * blocks_per_row),
+        };
+    }
+    if (mapping != "row-first") {
+        Fail("manifest has an unknown address mapping");
+    }
+    const uint64_t interleave = architecture.at(
+        "row_first_bank_interleave").get<uint64_t>();
+    if (interleave == 0 || interleave > banks || banks % interleave != 0) {
+        Fail("row-first interleave is invalid");
+    }
+    const uint64_t interleaved_block = block / interleave;
+    const uint64_t bank_groups = banks / interleave;
+    return {
+        (interleaved_block / blocks_per_row) % channels,
+        ((interleaved_block / (blocks_per_row * channels)) % bank_groups) *
+            interleave + block % interleave,
+        interleaved_block / (blocks_per_row * channels * bank_groups),
+    };
+}
+
 json CommandEventJson(uint64_t cycle, uint64_t sequence, uint64_t block_offset,
                       uint64_t channel, uint64_t bank, uint64_t row,
                       uint64_t command) {
@@ -495,7 +557,7 @@ json CommandEventJson(uint64_t cycle, uint64_t sequence, uint64_t block_offset,
     };
 }
 
-json ValidateCommands(const json& run) {
+json ValidateCommands(const json& run, const json& admission_oracle) {
     const auto& architecture = run.at("architecture");
     const uint64_t interval = architecture.at(
         "hbm_command_issue_interval_cycles").get<uint64_t>();
@@ -507,6 +569,9 @@ json ValidateCommands(const json& run) {
         "row", "command",
     };
     uint64_t total_events = 0;
+    uint64_t expected_request_blocks = 0;
+    uint64_t read_data_commands = 0;
+    uint64_t write_data_commands = 0;
     std::vector<std::string> checksums;
     for (const auto& layer : run.at("layers")) {
         const auto& summary = layer.at("command_trace");
@@ -514,6 +579,32 @@ json ValidateCommands(const json& run) {
             Fail("command trace representation differs");
         }
         RequireFields(summary, expected_fields);
+        const uint64_t block_size = architecture.at("block_size").get<uint64_t>();
+        std::map<uint64_t, RequestIdentity> requests;
+        std::set<std::pair<uint64_t, uint64_t>> expected_blocks;
+        for (const auto& request : layer.at("memory_requests")) {
+            const uint64_t sequence = request.at("sequence").get<uint64_t>();
+            const uint64_t address = request.at("address").get<uint64_t>();
+            const uint64_t bytes = request.at("bytes").get<uint64_t>();
+            if (bytes == 0 || block_size == 0 ||
+                address > std::numeric_limits<uint64_t>::max() - bytes) {
+                Fail("memory request identity is invalid");
+            }
+            const uint64_t block_count = (bytes + block_size - 1) / block_size;
+            const RequestIdentity identity{
+                address / block_size,
+                block_count,
+                IsWriteClass(request.at("request_class").get<std::string>()),
+            };
+            if (!requests.emplace(sequence, identity).second) {
+                Fail("memory request sequence is duplicated");
+            }
+            for (uint64_t offset = 0; offset < block_count; ++offset) {
+                expected_blocks.emplace(sequence, offset);
+            }
+            expected_request_blocks += block_count;
+        }
+        std::set<std::pair<uint64_t, uint64_t>> seen_data_blocks;
         std::vector<ChannelTiming> channel_state(channels);
         std::vector<BankTiming> bank_state(channels * banks_per_channel);
         std::array<uint64_t, 4> counts{};
@@ -549,6 +640,37 @@ json ValidateCommands(const json& run) {
                 if (command >= kCommandNames.size() || channel >= channels ||
                     bank >= banks_per_channel) {
                     Fail("command trace event is out of range");
+                }
+                const auto request = requests.find(sequence);
+                if (request == requests.end()) {
+                    Fail("command trace references an unknown request sequence");
+                }
+                if (block_offset >= request->second.block_count ||
+                    request->second.first_block >
+                        std::numeric_limits<uint64_t>::max() - block_offset) {
+                    Fail("command trace block offset is outside its request");
+                }
+                const MappedBlock mapped = MapBlock(
+                    run, request->second.first_block + block_offset);
+                if (channel != mapped.channel || bank != mapped.bank) {
+                    Fail("command trace channel/bank differs from request address mapping");
+                }
+                if (command != 0 && row != mapped.row) {
+                    Fail("command trace row differs from request address mapping");
+                }
+                if (command == 2 || command == 3) {
+                    const uint64_t expected_command = request->second.is_write ? 3 : 2;
+                    if (command != expected_command) {
+                        Fail("data command direction differs from request class");
+                    }
+                    if (!seen_data_blocks.emplace(sequence, block_offset).second) {
+                        Fail("request block has duplicate data commands");
+                    }
+                    if (command == 2) {
+                        ++read_data_commands;
+                    } else {
+                        ++write_data_commands;
+                    }
                 }
                 if (have_previous_cycle && cycle < previous_cycle) {
                     Fail("command trace is not time ordered");
@@ -671,6 +793,9 @@ json ValidateCommands(const json& run) {
             decoded != summary.at("event_count").get<uint64_t>()) {
             Fail("command event or type totals differ");
         }
+        if (seen_data_blocks != expected_blocks) {
+            Fail("command trace has missing request-block data commands");
+        }
         std::vector<json> samples = first_samples;
         samples.insert(samples.end(), last_samples.begin(), last_samples.end());
         if (json(samples) != summary.at("samples")) {
@@ -685,6 +810,14 @@ json ValidateCommands(const json& run) {
         total_events += decoded;
         checksums.push_back(Hex64(checksum));
     }
+    if (read_data_commands !=
+            admission_oracle.at("admitted_read_blocks").get<uint64_t>() ||
+        write_data_commands !=
+            admission_oracle.at("admitted_write_blocks").get<uint64_t>() ||
+        expected_request_blocks !=
+            admission_oracle.at("admitted_blocks").get<uint64_t>()) {
+        Fail("command data blocks differ from directional admission totals");
+    }
     return {
         {"event_count", total_events},
         {"checksums", checksums},
@@ -692,6 +825,14 @@ json ValidateCommands(const json& run) {
         {"command_lane_violations", 0},
         {"trace_representation", "command_delta_varint_base64_v2"},
         {"independently_reconstructed", true},
+        {"expected_request_blocks", expected_request_blocks},
+        {"read_data_commands", read_data_commands},
+        {"write_data_commands", write_data_commands},
+        {"request_identity_violations", 0},
+        {"address_mapping_violations", 0},
+        {"direction_violations", 0},
+        {"duplicate_or_missing_data_commands", 0},
+        {"admission_data_cross_check", "PASS"},
         {"validator", "independent-cpp-v1"},
     };
 }
@@ -703,9 +844,10 @@ json ValidateFile(const std::string& path) {
     }
     json run;
     stream >> run;
+    const json admission = ValidateAdmission(run);
     return {
-        {"transaction_admission_oracle", ValidateAdmission(run)},
-        {"command_trace_oracle", ValidateCommands(run)},
+        {"transaction_admission_oracle", admission},
+        {"command_trace_oracle", ValidateCommands(run, admission)},
     };
 }
 

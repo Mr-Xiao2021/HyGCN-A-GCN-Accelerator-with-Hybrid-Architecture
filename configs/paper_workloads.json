@@ -1,6 +1,6 @@
 {
-  "schema_version": 6,
-  "workload_version": "hygcn-hpca2020-table5-gcn-v6-cap-free-full-command-trace",
+  "schema_version": 7,
+  "workload_version": "hygcn-hpca2020-table5-gcn-v7-command-identity",
   "paper_source": "HyGCN HPCA 2020 Table 5 and Section 5.3",
   "figures": {
     "figure_15": {
@@ -95,7 +95,8 @@
     },
     "command_trace": {
       "representation": "command_delta_varint_base64_v2",
-      "policy": "every PRE, ACT, READ, and WRITE event is stored in a reversible chunked stream; the validator independently reconstructs event and command totals, checksum, edge samples, channel-lane spacing, tCCD/turnaround, and bank recovery"
+      "policy": "every PRE, ACT, READ, and WRITE event is stored in a reversible chunked stream; the validator independently reconstructs event and command totals, checksum, edge samples, channel-lane spacing, tCCD/turnaround, and bank recovery, then resolves sequence/block_offset against memory_requests to verify request existence, block range, read/write direction, mapped channel/bank/row, one data command per expected block, and equality with directional admission totals",
+      "identity_mutations": ["unknown_sequence", "out_of_range_block", "wrong_direction", "wrong_mapping", "duplicate_and_missing_data_block"]
     }
   },
   "scope_limits": [

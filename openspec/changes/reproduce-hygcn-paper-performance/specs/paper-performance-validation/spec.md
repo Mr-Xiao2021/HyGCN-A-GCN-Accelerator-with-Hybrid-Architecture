@@ -90,6 +90,8 @@ FIFO 与 batch-class MUST 共享全局 transaction admission 带宽。四个 buf
 
 admission 与 command 证据 MUST 保存可逆的完整压缩 trace，或明确降级为 summary/sample。正式 benchmark 使用完整 trace 时，每次 admission MUST 保存逐 channel read/write occupancy before/after，并保存 terminal zero snapshot，使 validator 能从零推导 admission、intervening dispatch、逐 channel peak 和 capacity violation，再重算方向 histogram、weighted total、actual maximum 与 checksum。每条 command event MUST 保存 cycle、sequence、block offset、channel、bank、row 和 PRE/ACT/READ/WRITE 类型，使 validator 能从零重算 event count、command totals、checksum、channel lane 排他、row state 与 recovery timing；edge sample 不得被声明为 raw trace。
 
+command validator MUST 将每个 `sequence/block offset` 解析回唯一 `memory_requests` block，核对 request 存在性、block 范围、读写方向和当前 address mapping 的 channel/bank/row。每个 expected block MUST 恰有一个 READ 或 WRITE data command，且 read/write data-command 总量 MUST 分别等于 admission trace 的方向 block 总量。PRE MAY 记录旧 open row，但其 sequence/block identity 和 mapped channel/bank 仍 MUST 对应目标 request block。
+
 #### Scenario: 请求切分反例
 - **WHEN** 同一 128 个连续 block 分别封装为一个请求和 128 个请求
 - **THEN** 两次模拟的完成周期、row hit/miss、channel 和 bank 事务计数完全一致
@@ -129,6 +131,7 @@ admission 与 command 证据 MUST 保存可逆的完整压缩 trace，或明确�
 - **WHEN** benchmark 读取一层 command 证据
 - **THEN** validator 从压缩分块恢复全部 PRE/ACT/READ/WRITE 事件，独立重算 count、type totals、checksum、channel lane、row state 和 recovery timing
 - **AND** 删除任一 event、修改中间 cycle、清空 edge samples 或伪造 checksum 均导致验证失败
+- **AND** 将 data command 改为不存在的 sequence、越界 block offset、错误 READ/WRITE 方向、错误 mapped channel/bank/row 或 duplicate/missing request block 均导致验证失败，即使 chunks、event count、checksum、samples 和 simulator counters 已同步重算
 
 ### Requirement: 自检与回归
 构建系统 SHALL 注册单元测试、集成 smoke 测试和论文指标验收测试。默认快速测试 MUST 在合理时间内运行且不依赖缺失的大型数据集；完整论文验收 MUST 可单独触发并输出汇总报告。

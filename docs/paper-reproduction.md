@@ -65,7 +65,7 @@ partition sensitivity 继续报告 4/5/6 MiB，供读者判断拟合脆弱性；
 论文给出 256 GB/s HBM1；bundled `HBM1_4Gb_x128.ini` 是 8-channel、128 GB/s 单栈，因此 paper profile 显式复制为两栈共 16 个物理 channel。每个物理 channel 仍使用同一份 DRAMSim3 时序和独立 32-entry read/write queue，不通过缩短 tCCD 伪造带宽。HBM read `14/28/42` 周期由 bundled DRAMSim3 HBM 的 `CL/tRCDRD/tRP` 推导，write `4/18/32` 周期由 `CWL/tRCDWR/tRP` 推导，read-to-write/write-to-read 分别为 `18/16` 周期；row-command issue interval 为 `tCK=2` 个模型周期。未由论文公开的 neighbor-index 延迟另做固定邻域敏感性。row-first=1 是
 `rorabgbachco` 的 required 基线，interleave=2 只作为诊断反事实，不参与目标拟合。
 
-每层 admission 与 command 证据都保存完整、可逆的 delta-varint/base64 分块 trace。独立的 `hygcn_trace_validator` C++ 可执行程序不链接模拟器状态，会解码全部 admission 事件，重算读写 histogram、weighted totals、actual maxima 和 FNV-1a checksum；同时解码全部 PRE/ACT/READ/WRITE 事件，重算命令类型、FNV-1a checksum、每 channel command-lane、row state 和 recovery timing。Python benchmark 只消费该独立重放结果，避免把数千万事件降级成抽样。两类首尾样本都只用于人工浏览，不作为完整 trace 的替代；删除事件、修改中间周期、清空样本或伪造 checksum 的 compiled-validator mutation test 必须失败。
+每层 admission 与 command 证据都保存完整、可逆的 delta-varint/base64 分块 trace。独立的 `hygcn_trace_validator` C++ 可执行程序不链接模拟器状态，会解码全部 admission 事件，重算读写 histogram、weighted totals、actual maxima 和 FNV-1a checksum；同时解码全部 PRE/ACT/READ/WRITE 事件，重算命令类型、FNV-1a checksum、每 channel command-lane、row state 和 recovery timing。每个 command 的 `sequence/block_offset` 还会解析回 `memory_requests`，独立核对 request 存在性、block 范围、读写方向、地址映射、data-command 唯一性和 admission 方向总量。Python benchmark 只消费该独立重放结果，避免把数千万事件降级成抽样。两类首尾样本都只用于人工浏览，不作为完整 trace 的替代；删除事件、修改中间周期、清空样本、伪造 checksum、伪造 request identity/direction/mapping 或制造 duplicate/missing block 的 compiled-validator mutation test 必须失败。
 
 验收报告始终分开列出 `14` 项论文数值和 `12` 项内部因果检查，不以 `26/26` 表述扩大外部证据。
 
