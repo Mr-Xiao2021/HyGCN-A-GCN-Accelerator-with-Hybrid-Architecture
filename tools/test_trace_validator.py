@@ -266,7 +266,80 @@ def main():
             f"block-{second_identity[1]}:producer-ready-"
             f"{second_request['producer_ready_cycle']}:REJECTED"
         )
-    print("compiled_trace_validator_mutations=10/10_REJECTED")
+
+        dependent_requests = [
+            request for request in layer["memory_requests"]
+            if request["producer_sequence"] is not None
+        ]
+        if not dependent_requests:
+            raise RuntimeError("smoke trace lacks producer-dependent requests")
+        dependency = dependent_requests[0]
+
+        unknown_producer = copy.deepcopy(document)
+        unknown_request = next(
+            request for request in unknown_producer["layers"][0]["memory_requests"]
+            if request["sequence"] == dependency["sequence"]
+        )
+        unknown_request["producer_sequence"] = max(requests) + 1
+        run_validator(
+            validator,
+            write_case(directory, "unknown-producer-sequence", unknown_producer),
+            False,
+            "producer sequence is unknown",
+        )
+
+        self_dependency = copy.deepcopy(document)
+        self_request = next(
+            request for request in self_dependency["layers"][0]["memory_requests"]
+            if request["sequence"] == dependency["sequence"]
+        )
+        self_request["producer_sequence"] = self_request["sequence"]
+        run_validator(
+            validator,
+            write_case(directory, "self-producer-dependency", self_dependency),
+            False,
+            "request has a self producer dependency",
+        )
+
+        future_pair = None
+        for consumer in dependent_requests:
+            producer_class = (
+                "edge" if consumer["request_class"] == "input"
+                else "intermediate_write"
+            )
+            for producer in layer["memory_requests"]:
+                dependency_ready = (
+                    producer["completion_cycle"] + consumer["producer_delay_cycles"]
+                )
+                if producer["request_class"] == producer_class and \
+                        producer["sequence"] != consumer["producer_sequence"] and \
+                        dependency_ready > consumer["first_issue_cycle"]:
+                    future_pair = (consumer, producer, dependency_ready)
+                    break
+            if future_pair is not None:
+                break
+        if future_pair is None:
+            raise RuntimeError("smoke trace lacks a future producer mutation pair")
+        future_consumer, future_producer, future_ready = future_pair
+        future_dependency = copy.deepcopy(document)
+        future_request = next(
+            request for request in future_dependency["layers"][0]["memory_requests"]
+            if request["sequence"] == future_consumer["sequence"]
+        )
+        future_request["producer_sequence"] = future_producer["sequence"]
+        run_validator(
+            validator,
+            write_case(directory, "future-late-producer", future_dependency),
+            False,
+            "consumer request precedes reconstructed producer completion",
+        )
+        print(
+            "future_producer_dependency="
+            f"consumer-seq-{future_consumer['sequence']}:issue-"
+            f"{future_consumer['first_issue_cycle']}:producer-seq-"
+            f"{future_producer['sequence']}:dependency-ready-{future_ready}:REJECTED"
+        )
+    print("compiled_trace_validator_mutations=13/13_REJECTED")
     return 0
 
 

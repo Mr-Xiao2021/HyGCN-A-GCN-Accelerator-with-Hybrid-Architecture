@@ -149,3 +149,11 @@
 - [x] 18.3 强制 PRE/ACT/READ/WRITE 不早于 request producer-ready、enqueue 和对应 block admission，保持地址、方向和唯一性检查
 - [x] 18.4 增加同 row、同方向且跨 producer-ready 边界的双向 identity swap mutation，并按正式 first-32/last-32 schema 重建样本
 - [x] 18.5 执行 clean Release、CTest、legacy、严格 OpenSpec、正式 14+12、partition/model/FIFO sensitivity 和 21 份完整 trace replay，固化 V10-02 关闭证据并推送远端
+
+## 19. Review v12 producer graph 与依赖时序闭环整改
+
+- [x] 19.1 在每个 memory request trace 中保存 base producer-ready、base enqueue、producer sequence、producer delay 及 effective ready/enqueue
+- [x] 19.2 standalone validator 从完整 command stream 重建 producer completion，独立校验 producer graph、request class、delay 和 consumer release 时序
+- [x] 19.3 拒绝 unknown producer、自依赖、依赖环及 future/late producer，并将 producer graph/timing 作为独立 oracle 输出
+- [x] 19.4 增加 unknown/self/future producer 三类 compiled mutation，保持已有 command/admission mutation 全部有效
+- [ ] 19.5 执行 clean Release、CTest、legacy、严格 OpenSpec、正式 14+12、partition/model/FIFO sensitivity 和 21 份 producer graph replay，固化 Review v12 关闭证据并推送远端

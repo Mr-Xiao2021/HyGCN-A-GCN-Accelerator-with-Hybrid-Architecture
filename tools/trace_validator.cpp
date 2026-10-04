@@ -4,10 +4,12 @@
 #include <cstdint>
 #include <deque>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <limits>
 #include <map>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -169,7 +171,11 @@ MappedBlock MapBlock(const json& run, uint64_t block) {
 struct RequestIdentity {
     uint64_t first_block = 0;
     uint64_t block_count = 0;
+    std::string request_class;
     bool is_write = false;
+    uint64_t base_producer_ready_cycle = 0;
+    uint64_t base_enqueue_cycle = 0;
+    uint64_t producer_delay_cycles = 0;
     uint64_t producer_ready_cycle = 0;
     uint64_t enqueue_cycle = 0;
     uint64_t first_admission_cycle = 0;
@@ -182,6 +188,7 @@ struct RequestIdentity {
     uint64_t last_precharge_cycle = 0;
     uint64_t first_activate_cycle = 0;
     uint64_t last_activate_cycle = 0;
+    std::optional<uint64_t> producer_sequence;
     std::vector<uint64_t> admission_cycles;
 };
 
@@ -261,8 +268,14 @@ AdmissionValidation ValidateAdmission(const json& run) {
             RequestIdentity identity;
             identity.first_block = address / block_size;
             identity.block_count = blocks;
-            identity.is_write = IsWriteClass(
-                request.at("request_class").get<std::string>());
+            identity.request_class = request.at("request_class").get<std::string>();
+            identity.is_write = IsWriteClass(identity.request_class);
+            identity.base_producer_ready_cycle = request.at(
+                "base_producer_ready_cycle").get<uint64_t>();
+            identity.base_enqueue_cycle = request.at(
+                "base_enqueue_cycle").get<uint64_t>();
+            identity.producer_delay_cycles = request.at(
+                "producer_delay_cycles").get<uint64_t>();
             identity.producer_ready_cycle = request.at(
                 "producer_ready_cycle").get<uint64_t>();
             identity.enqueue_cycle = request.at("enqueue_cycle").get<uint64_t>();
@@ -286,6 +299,10 @@ AdmissionValidation ValidateAdmission(const json& run) {
                 "first_activate_cycle").get<uint64_t>();
             identity.last_activate_cycle = request.at(
                 "last_activate_cycle").get<uint64_t>();
+            if (!request.at("producer_sequence").is_null()) {
+                identity.producer_sequence = request.at(
+                    "producer_sequence").get<uint64_t>();
+            }
             identity.admission_cycles.assign(
                 static_cast<std::size_t>(blocks),
                 std::numeric_limits<uint64_t>::max());
@@ -293,7 +310,7 @@ AdmissionValidation ValidateAdmission(const json& run) {
                 Fail("memory request sequence is duplicated");
             }
             expected_total += blocks;
-            if (IsWriteClass(request.at("request_class").get<std::string>())) {
+            if (identity.is_write) {
                 expected_write_total += blocks;
             } else {
                 expected_read_total += blocks;
@@ -705,7 +722,124 @@ struct RequestCommandStats {
     std::vector<bool> data_commands;
 };
 
-json ValidateCommands(const json& run, const AdmissionValidation& admission) {
+struct ProducerValidation {
+    uint64_t dependencies = 0;
+    uint64_t input_dependencies = 0;
+    uint64_t intermediate_raw_dependencies = 0;
+    std::map<uint64_t, uint64_t> delay_histogram;
+};
+
+ProducerValidation ValidateProducerDependencies(
+        const std::map<uint64_t, RequestIdentity>& requests,
+        const std::map<uint64_t, RequestCommandStats>& command_stats,
+        uint64_t neighbor_index_ready_cycles) {
+    for (const auto& [sequence, request] : requests) {
+        if (!request.producer_sequence.has_value()) {
+            continue;
+        }
+        if (*request.producer_sequence == sequence) {
+            Fail("request has a self producer dependency");
+        }
+        if (requests.find(*request.producer_sequence) == requests.end()) {
+            Fail("producer sequence is unknown");
+        }
+    }
+
+    std::map<uint64_t, int> visit_state;
+    std::function<void(uint64_t)> visit = [&](uint64_t sequence) {
+        const int state = visit_state[sequence];
+        if (state == 1) {
+            Fail("producer dependency graph contains a cycle");
+        }
+        if (state == 2) {
+            return;
+        }
+        visit_state[sequence] = 1;
+        const auto& request = requests.at(sequence);
+        if (request.producer_sequence.has_value()) {
+            visit(*request.producer_sequence);
+        }
+        visit_state[sequence] = 2;
+    };
+    for (const auto& [sequence, request] : requests) {
+        (void)request;
+        visit(sequence);
+    }
+
+    ProducerValidation validation;
+    for (const auto& [sequence, request] : requests) {
+        const bool requires_producer = request.request_class == "input" ||
+            request.request_class == "intermediate_read";
+        if (requires_producer != request.producer_sequence.has_value()) {
+            Fail("request class producer dependency presence differs");
+        }
+        if (!request.producer_sequence.has_value()) {
+            if (request.producer_delay_cycles != 0) {
+                Fail("request without a producer has a nonzero producer delay");
+            }
+            const uint64_t expected_ready = request.base_producer_ready_cycle;
+            const uint64_t expected_enqueue = std::max(
+                request.base_enqueue_cycle, expected_ready);
+            if (request.producer_ready_cycle != expected_ready ||
+                request.enqueue_cycle != expected_enqueue) {
+                Fail("independent request effective timeline differs from base fields");
+            }
+            continue;
+        }
+
+        const uint64_t producer_sequence = *request.producer_sequence;
+        const auto& producer = requests.at(producer_sequence);
+        if (request.request_class == "input") {
+            if (producer.request_class != "edge" ||
+                request.producer_delay_cycles != neighbor_index_ready_cycles) {
+                Fail("input producer class or delay differs");
+            }
+            ++validation.input_dependencies;
+        } else if (request.request_class == "intermediate_read") {
+            if (producer.request_class != "intermediate_write" ||
+                request.producer_delay_cycles != 0) {
+                Fail("intermediate RAW producer class or delay differs");
+            }
+            ++validation.intermediate_raw_dependencies;
+        } else {
+            Fail("request class has an unsupported producer dependency");
+        }
+
+        const uint64_t producer_completion = command_stats.at(
+            producer_sequence).completion_cycle;
+        if (producer_completion > std::numeric_limits<uint64_t>::max() -
+                request.producer_delay_cycles) {
+            Fail("producer completion plus delay overflows");
+        }
+        const uint64_t dependency_ready =
+            producer_completion + request.producer_delay_cycles;
+        const uint64_t expected_ready = std::max(
+            request.base_producer_ready_cycle, dependency_ready);
+        const uint64_t expected_enqueue = std::max(
+            request.base_enqueue_cycle, expected_ready);
+        if (request.first_admission_cycle < dependency_ready ||
+            request.first_issue_cycle < dependency_ready) {
+            Fail("consumer request precedes reconstructed producer completion");
+        }
+        if (request.producer_ready_cycle != expected_ready) {
+            Fail("request producer-ready cycle differs from reconstructed dependency graph");
+        }
+        if (request.enqueue_cycle != expected_enqueue) {
+            Fail("request enqueue cycle differs from reconstructed dependency graph");
+        }
+        ++validation.dependencies;
+        ++validation.delay_histogram[request.producer_delay_cycles];
+    }
+    return validation;
+}
+
+struct CommandValidation {
+    json command_oracle;
+    json producer_oracle;
+};
+
+CommandValidation ValidateCommands(
+        const json& run, const AdmissionValidation& admission) {
     const auto& architecture = run.at("architecture");
     const uint64_t interval = architecture.at(
         "hbm_command_issue_interval_cycles").get<uint64_t>();
@@ -721,6 +855,11 @@ json ValidateCommands(const json& run, const AdmissionValidation& admission) {
     uint64_t read_data_commands = 0;
     uint64_t write_data_commands = 0;
     uint64_t reconstructed_requests = 0;
+    uint64_t producer_dependencies = 0;
+    uint64_t input_dependencies = 0;
+    uint64_t intermediate_raw_dependencies = 0;
+    std::map<uint64_t, uint64_t> producer_delay_histogram;
+    json producer_layers = json::array();
     std::vector<std::string> checksums;
     const uint64_t block_size = architecture.at("block_size").get<uint64_t>();
     const double bytes_per_channel_cycle = std::max(
@@ -997,6 +1136,23 @@ json ValidateCommands(const json& run, const AdmissionValidation& admission) {
             }
             ++reconstructed_requests;
         }
+        const ProducerValidation producer_validation = ValidateProducerDependencies(
+            requests, request_stats,
+            architecture.at("neighbor_index_ready_cycles").get<uint64_t>());
+        producer_dependencies += producer_validation.dependencies;
+        input_dependencies += producer_validation.input_dependencies;
+        intermediate_raw_dependencies +=
+            producer_validation.intermediate_raw_dependencies;
+        for (const auto& [delay, count] : producer_validation.delay_histogram) {
+            producer_delay_histogram[delay] += count;
+        }
+        producer_layers.push_back({
+            {"layer_index", layer_index},
+            {"dependencies", producer_validation.dependencies},
+            {"input_dependencies", producer_validation.input_dependencies},
+            {"intermediate_raw_dependencies",
+             producer_validation.intermediate_raw_dependencies},
+        });
         std::vector<json> samples = first_samples;
         samples.insert(samples.end(), last_samples.begin(), last_samples.end());
         if (json(samples) != summary.at("samples")) {
@@ -1023,7 +1179,12 @@ json ValidateCommands(const json& run, const AdmissionValidation& admission) {
             admission.oracle.at("admitted_blocks").get<uint64_t>()) {
         Fail("command data blocks differ from directional admission totals");
     }
-    return {
+    json delay_histogram = json::object();
+    for (const auto& [delay, count] : producer_delay_histogram) {
+        delay_histogram[std::to_string(delay)] = count;
+    }
+    CommandValidation validation;
+    validation.command_oracle = {
         {"event_count", total_events},
         {"checksums", checksums},
         {"command_issue_interval_cycles", interval},
@@ -1043,6 +1204,22 @@ json ValidateCommands(const json& run, const AdmissionValidation& admission) {
         {"transfer_cycles", transfer_cycles},
         {"validator", "independent-cpp-v1"},
     };
+    validation.producer_oracle = {
+        {"dependencies", producer_dependencies},
+        {"input_dependencies", input_dependencies},
+        {"intermediate_raw_dependencies", intermediate_raw_dependencies},
+        {"producer_delay_histogram", delay_histogram},
+        {"layers", producer_layers},
+        {"producer_graph_cross_check", "PASS"},
+        {"producer_timing_cross_check", "PASS"},
+        {"unknown_producer_violations", 0},
+        {"self_dependency_violations", 0},
+        {"cycle_violations", 0},
+        {"future_or_late_producer_violations", 0},
+        {"class_or_delay_violations", 0},
+        {"validator", "independent-cpp-v1"},
+    };
+    return validation;
 }
 
 json ValidateFile(const std::string& path) {
@@ -1053,9 +1230,11 @@ json ValidateFile(const std::string& path) {
     json run;
     stream >> run;
     const AdmissionValidation admission = ValidateAdmission(run);
+    const CommandValidation commands = ValidateCommands(run, admission);
     return {
         {"transaction_admission_oracle", admission.oracle},
-        {"command_trace_oracle", ValidateCommands(run, admission)},
+        {"command_trace_oracle", commands.command_oracle},
+        {"producer_dependency_oracle", commands.producer_oracle},
     };
 }
 

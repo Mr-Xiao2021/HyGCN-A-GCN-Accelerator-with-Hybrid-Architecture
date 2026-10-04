@@ -112,7 +112,7 @@ def main():
         raise RuntimeError("batch-class ordering must retain its paper provenance")
     if workloads["memory_ablation"]["command_queue_entries_per_bank"] != 8:
         raise RuntimeError("command queue depth must retain its DRAMSim3 provenance")
-    if workloads.get("schema_version") != 8 or \
+    if workloads.get("schema_version") != 9 or \
             workloads["memory_ablation"]["hbm_stacks"] != 2 or \
             workloads["memory_ablation"]["channels_per_stack"] != 8 or \
             workloads["memory_ablation"]["physical_channels"] != 16:
@@ -123,6 +123,9 @@ def main():
             "wrong_mapping", "duplicate_and_missing_data_block",
             "same_row_producer_ready_identity_swap"]:
         raise RuntimeError("command trace must version request identity mutations")
+    if command_policy.get("producer_graph_mutations") != [
+            "unknown_producer", "self_dependency", "future_late_producer"]:
+        raise RuntimeError("command trace must version producer graph mutations")
     if workloads["memory_ablation"]["fifo_active_windows"] != 0 or \
             workloads["memory_ablation"]["fifo_window_sensitivity"] != \
             [0, 1, 2, 4, 8, 512]:

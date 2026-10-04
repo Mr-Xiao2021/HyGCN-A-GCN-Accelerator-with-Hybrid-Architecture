@@ -176,7 +176,8 @@ def run_compiled_trace_validator(validator, result_path):
             f"trace validator returned invalid JSON for {result_path}: {error}"
         ) from error
     if set(evidence) != {
-            "transaction_admission_oracle", "command_trace_oracle"}:
+            "transaction_admission_oracle", "command_trace_oracle",
+            "producer_dependency_oracle"}:
         raise ValueError(f"trace validator result schema differs for {result_path}")
     return evidence
 
@@ -1536,6 +1537,10 @@ def main():
             name: result["_trace_oracles"]["command_trace_oracle"]
             for name, result in runs.items()
         }
+        producer_oracles = {
+            name: result["_trace_oracles"]["producer_dependency_oracle"]
+            for name, result in runs.items()
+        }
         summaries = {name: summarize_result(result) for name, result in runs.items()}
         metrics = calculate_metrics(
             summaries["optimized"],
@@ -1572,6 +1577,7 @@ def main():
             },
             "transaction_admission_oracles": admission_oracles,
             "command_trace_oracles": command_oracles,
+            "producer_dependency_oracles": producer_oracles,
             "directional_memory_evidence": {
                 name: directional_memory_evidence(result)
                 for name, result in runs.items()

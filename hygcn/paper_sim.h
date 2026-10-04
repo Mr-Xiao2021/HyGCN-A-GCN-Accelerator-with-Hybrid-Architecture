@@ -160,6 +160,9 @@ struct MemoryRequestTrace {
     RequestClass request_class = RequestClass::EDGE;
     uint64_t bytes = 0;
     uint64_t address = 0;
+    uint64_t base_producer_ready_cycle = 0;
+    uint64_t base_enqueue_cycle = 0;
+    uint64_t producer_delay_cycles = 0;
     uint64_t producer_ready_cycle = 0;
     uint64_t enqueue_cycle = 0;
     uint64_t first_admission_cycle = 0;
