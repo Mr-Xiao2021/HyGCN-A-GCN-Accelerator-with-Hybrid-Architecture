@@ -1,0 +1,108 @@
+{
+  "schema_version": 9,
+  "workload_version": "hygcn-hpca2020-table5-gcn-v9-producer-graph",
+  "paper_source": "HyGCN HPCA 2020 Table 5 and Section 5.3",
+  "figures": {
+    "figure_15": {
+      "model": "gcn",
+      "selected_layer": "0",
+      "scope": "aggregation",
+      "input_features": "dataset_metadata.feature",
+      "output_features": 128,
+      "aggregation": "per_dataset"
+    },
+    "figure_16": {
+      "model": "gcn",
+      "selected_layer": "0",
+      "scope": "full",
+      "input_features": "dataset_metadata.feature",
+      "output_features": 128,
+      "aggregation": "per_dataset"
+    },
+    "figure_17": {
+      "model": "gcn",
+      "selected_layer": "0",
+      "scope": "full",
+      "input_features": "dataset_metadata.feature",
+      "output_features": 128,
+      "aggregation": "arithmetic_mean_over_datasets"
+    }
+  },
+  "graph_partition": {
+    "aggregation_shard_capacity_bytes": 5242880,
+    "aggregation_ping_pong_half_capacity_bytes": 8388608,
+    "policy": "fixed dataset-independent scheduler occupancy cap below one physical ping-pong half",
+    "source": "HyGCN Section 4.3.2 requires the destination interval and its aggregation results to fit the on-chip Aggregation Buffer; the paper does not publish the simulator's interval occupancy, so this request-level model reports the fixed scheduler cap separately from the 16 MiB physical capacity",
+    "fit_disclosure": "Cora, Citeseer, and PubMed were all exposed before this version; the 5 MiB scheduler cap and the 14 paper rows are reported as a calibrated fit, not independent hold-out validation",
+    "calibrated_fit_datasets": ["cora", "citeseer", "pubmed"],
+    "independent_holdout_datasets": [],
+    "historical_exposure": "Review v4 evaluated all three datasets at 4, 5, and 6 MiB before Review v5; no dataset in this repository remains unexposed for scheduler-cap selection",
+    "candidate_capacities_mib": [4, 5, 6]
+  },
+  "memory_ablation": {
+    "hbm_stacks": 2,
+    "channels_per_stack": 8,
+    "physical_channels": 16,
+    "topology_source": "HyGCN reports 256 GB/s HBM1. The bundled DRAMSim3 HBM1_4Gb_x128 profile is one 8-channel 128 GB/s stack, so the paper profile replicates that timing and queue topology across two stacks rather than inventing a faster per-channel command rate.",
+    "read_queue_entries_per_channel": 32,
+    "write_buffer_entries_per_channel": 32,
+    "transaction_queue_source": "configs/HBM1_4Gb_x128.ini sets unified_queue=False and trans_queue_size=32; DRAMSim3 therefore allocates an independent 32-entry read_queue and 32-entry write_buffer in every channel controller",
+    "command_queue_entries_per_bank": 8,
+    "command_queue_source": "configs/HBM1_4Gb_x128.ini cmd_queue_size=8; the request-level controller bounds each bank command queue to the same depth",
+    "coordinator_issue_blocks_per_cycle": 4,
+    "coordinator_issue_width_source": "derived from the paper profile peak interface width: floor(256 bytes/cycle divided by 64 bytes/block)",
+    "fifo_active_windows": 0,
+    "fifo_window_blocks": "hbm_row_bytes / block_size",
+    "fifo_window_release": "diagnostic-only when fifo_active_windows is positive; the required profile is unbounded",
+    "fifo_window_sensitivity": [0, 1, 2, 4, 8, 512],
+    "coordinator_input_policy": "The required FIFO baseline has no active-window resource cap: each admission cycle selects one ready Edge/Input/Weight/Output port and admits up to four consecutive blocks subject only to the same transaction and command queue capacities used by batch-class. Positive fifo_active_windows values are diagnostic counterfactuals, not paper evidence. Batch-class changes only request ordering and assembles batch-local Edge > Input > Weight > Output streams with same batch/class open-row continuation.",
+    "coordinator_input_source": "HyGCN HPCA 2020 Figure 9 identifies four Edge, Input, Weight, and Output request sources; it does not specify four unfinished 2 KiB windows. Section 4.5.2 attributes the optimization to priority-based request reordering and low-bit channel/bank mapping.",
+    "admission_policy": "FIFO and batch-class share one global admission clock; at most four 64-byte blocks enter all channel controllers per paper cycle, while each channel independently enforces the 32-entry read queue and 32-entry write buffer",
+    "priority_order_source": "HyGCN HPCA 2020 Section 4.5.2 executes requests batch-by-batch: all requests from the current batch, including its lower-priority classes, precede high-priority requests from the next batch",
+    "priority_baseline": "fifo",
+    "priority_optimized": "batch-class",
+    "mapping_baseline": "row-first",
+    "mapping_optimized": "low-bits",
+    "row_first_bank_interleave": 1,
+    "row_first_source": "configs/HBM1_4Gb_x128.ini selects address_mapping=rorabgbachco. The collapsed request-level baseline therefore keeps every contiguous row span in one bank; it does not add an unsupported adjacent-bank striping factor.",
+    "row_first_layout_basis": "one row-sized block span stays in one bank, then the collapsed mapping advances channel and bank fields in the order represented by rorabgbachco",
+    "low_bits_source": "HyGCN HPCA 2020 Section 4.5.2: channel and bank identifiers use lower address bits",
+    "dram_timing": {
+      "config": "configs/HBM1_4Gb_x128.ini",
+      "source": "bundled DRAMSim3 HBM timing configuration",
+      "model_cycle_ns": "1 / architecture.frequency_ghz",
+      "read_row_hit_formula": "ceil(CL * tCK / model_cycle_ns)",
+      "read_row_miss_formula": "ceil((tRCDRD + CL) * tCK / model_cycle_ns)",
+      "read_row_conflict_formula": "ceil((tRP + tRCDRD + CL) * tCK / model_cycle_ns)",
+      "write_row_hit_formula": "ceil(CWL * tCK / model_cycle_ns)",
+      "write_row_miss_formula": "ceil((tRCDWR + CWL) * tCK / model_cycle_ns)",
+      "write_row_conflict_formula": "ceil((tRP + tRCDWR + CWL) * tCK / model_cycle_ns)",
+      "read_to_write_formula": "ceil((RL + burst_cycle - WL + tRTRS) * tCK / model_cycle_ns)",
+      "write_to_read_formula": "ceil((write_delay + tWTR_L) * tCK / model_cycle_ns)",
+      "read_to_precharge_formula": "ceil((AL + tRTP) * tCK / model_cycle_ns); bundled HBM config omits tRTP, so DRAMSim3 default tRTP=5 applies",
+      "write_to_precharge_formula": "ceil((WL + burst_cycle + tWR) * tCK / model_cycle_ns)",
+      "activate_to_precharge_formula": "ceil(tRAS * tCK / model_cycle_ns)",
+      "precharge_to_activate_formula": "ceil(tRP * tCK / model_cycle_ns)",
+      "activate_to_activate_formula": "ceil((tRAS + tRP) * tCK / model_cycle_ns)",
+      "command_issue_interval_formula": "ceil(tCK / model_cycle_ns); each physical channel issues row commands on its own replicated DRAMSim3 command lane",
+      "same_direction_formula": "ceil(max(burst_cycle, tCCD_L) * tCK / model_cycle_ns)",
+      "command_model": "request completion is measured from actual READ/WRITE issue; row conflicts explicitly schedule PRE then ACT before the data command, while tWR/tRTP/tRAS and PRE-to-ACT constrain recovery",
+      "transfer_note": "burst/block transfer is modeled separately by transfer_cycles, so BL is not duplicated in CL/CWL completion latency"
+    },
+    "occupancy_trace": {
+      "representation": "directional_occupancy_identity_delta_varint_base64_v3",
+      "policy": "every admission records the admitted sequence/block_offset identities plus per-channel read/write occupancy before and after mutation; a terminal zero snapshot lets the validator infer all intervening dispatch counts from zero, independently recompute peaks, capacity violations, totals, histograms, edge samples, and checksum, and recover the exact admission cycle of every request block"
+    },
+    "command_trace": {
+      "representation": "command_delta_varint_base64_v2",
+      "policy": "every PRE, ACT, READ, and WRITE event is stored in a reversible chunked stream; the validator independently reconstructs event and command totals, checksum, edge samples, channel-lane spacing, tCCD/turnaround, bank recovery, and each request's first issue, completion, PRE/ACT counts and first/last cycles. It resolves sequence/block_offset against memory_requests and the exact block admission timeline to verify request existence, block range, read/write direction, mapped channel/bank/row, producer-ready/enqueue/admission causality, one data command per expected block, and equality with directional admission totals. Producer dependencies separately preserve base ready/enqueue, producer sequence and delay; the validator rejects unknown/self/cyclic dependencies and derives effective ready/enqueue from the producer's reconstructed completion cycle",
+      "identity_mutations": ["unknown_sequence", "out_of_range_block", "wrong_direction", "wrong_mapping", "duplicate_and_missing_data_block", "same_row_producer_ready_identity_swap"],
+      "producer_graph_mutations": ["unknown_producer", "self_dependency", "future_late_producer"]
+    }
+  },
+  "scope_limits": [
+    "GCN only",
+    "Cora, Citeseer, and PubMed only",
+    "request-level model rather than Ramulator or RTL cycle accuracy"
+  ]
+}

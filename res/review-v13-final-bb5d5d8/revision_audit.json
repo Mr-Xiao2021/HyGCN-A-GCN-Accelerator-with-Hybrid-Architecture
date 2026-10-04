@@ -1,0 +1,83 @@
+{
+  "base_ref": "5b49092621db327c338f48cb154f33e0f298794e",
+  "calibration_differences": [],
+  "calibration_keys": [
+    "model.aggregation_shard_capacity_bytes",
+    "model.batch_launch_interval_cycles",
+    "model.neighbor_index_ready_cycles",
+    "model.coordinator_fifo_active_windows",
+    "model.row_first_bank_interleave"
+  ],
+  "implementation_ref": "bb5d5d8d4e3b68a0805a2db2641ae06f6aa570f5",
+  "metric_delta": [],
+  "no_target_parameter_retuning": false,
+  "no_target_parameter_retuning_derivation": "Computed from the complete versioned figures, graph_partition, and memory_ablation policy trees plus declared profile calibration keys. Source policy file hashes are part of the boolean. Any scheduler policy or source implementation change, including FIFO window count/size/release, makes this boolean false instead of being hidden by an allowlist.",
+  "profile_differences": [],
+  "profile_path": "configs/HYGCN_PAPER.ini",
+  "schema_version": 1,
+  "source_policy_files": [
+    {
+      "after_sha256": "0cde7924ed5abf1afd10291073f175a7f11643d45f7b6d11d48ef3f309733a60",
+      "before_sha256": "5d213af468ff78ea422a2e9424c782f1dc23b821b9fab2268bacba4986c9c44b",
+      "changed": true,
+      "changed_diff_lines": 9,
+      "path": "hygcn/paper_sim.cpp",
+      "unified_diff": "diff --git a/hygcn/paper_sim.cpp b/hygcn/paper_sim.cpp\nindex df76a3e..4abc9d0 100644\n--- a/hygcn/paper_sim.cpp\n+++ b/hygcn/paper_sim.cpp\n@@ -265,0 +266,3 @@ json LayerJson(const LayerMetrics& layer) {\n+            {\"base_producer_ready_cycle\", trace.base_producer_ready_cycle},\n+            {\"base_enqueue_cycle\", trace.base_enqueue_cycle},\n+            {\"producer_delay_cycles\", trace.producer_delay_cycles},\n@@ -289,0 +293,3 @@ json LayerJson(const LayerMetrics& layer) {\n+            {\"base_producer_ready_cycle\", trace.base_producer_ready_cycle},\n+            {\"base_enqueue_cycle\", trace.base_enqueue_cycle},\n+            {\"producer_delay_cycles\", trace.producer_delay_cycles},\n@@ -2261,0 +2268,3 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(\n+            request.producer_ready_cycle,\n+            request.enqueue_cycle,\n+            request.producer_delay_cycles,\n"
+    },
+    {
+      "after_sha256": "89906dd468f154d1ddb26a9d92db9015ca6636d8b86c48f0b2a1bdde239945b0",
+      "before_sha256": "7926834569eff4908be459b7d76a8457e128b4e88de3a2fb11948aabc5d869f1",
+      "changed": true,
+      "changed_diff_lines": 3,
+      "path": "hygcn/paper_sim.h",
+      "unified_diff": "diff --git a/hygcn/paper_sim.h b/hygcn/paper_sim.h\nindex a5c38f0..76beb41 100644\n--- a/hygcn/paper_sim.h\n+++ b/hygcn/paper_sim.h\n@@ -162,0 +163,3 @@ struct MemoryRequestTrace {\n+    uint64_t base_producer_ready_cycle = 0;\n+    uint64_t base_enqueue_cycle = 0;\n+    uint64_t producer_delay_cycles = 0;\n"
+    }
+  ],
+  "target_files": [
+    {
+      "after_sha256": "30ba145017b0c9f028c6a11b2bc747e402d0d83bdbc7aab3724c9117e3e8291a",
+      "before_sha256": "30ba145017b0c9f028c6a11b2bc747e402d0d83bdbc7aab3724c9117e3e8291a",
+      "changed": false,
+      "changed_paths": [],
+      "path": "configs/paper_metrics.json",
+      "target_parameters_after_sha256": "3431fb583c6814d533e649a8418e9ba9f002249db6b17e4a45b36c6e0ac857eb",
+      "target_parameters_before_sha256": "3431fb583c6814d533e649a8418e9ba9f002249db6b17e4a45b36c6e0ac857eb",
+      "target_parameters_changed": false
+    },
+    {
+      "after_sha256": "895643e35486a1e87f5312c760efe865bbd7431d51d1a0b4eccb10f3fb0132f1",
+      "before_sha256": "253fdcc0c50f3a6d59aea57fc82f94ab8cc027303fa8d39ae9152bd48382a865",
+      "changed": true,
+      "changed_paths": [
+        {
+          "after": "every PRE, ACT, READ, and WRITE event is stored in a reversible chunked stream; the validator independently reconstructs event and command totals, checksum, edge samples, channel-lane spacing, tCCD/turnaround, bank recovery, and each request's first issue, completion, PRE/ACT counts and first/last cycles. It resolves sequence/block_offset against memory_requests and the exact block admission timeline to verify request existence, block range, read/write direction, mapped channel/bank/row, producer-ready/enqueue/admission causality, one data command per expected block, and equality with directional admission totals. Producer dependencies separately preserve base ready/enqueue, producer sequence and delay; the validator rejects unknown/self/cyclic dependencies and derives effective ready/enqueue from the producer's reconstructed completion cycle",
+          "before": "every PRE, ACT, READ, and WRITE event is stored in a reversible chunked stream; the validator independently reconstructs event and command totals, checksum, edge samples, channel-lane spacing, tCCD/turnaround, bank recovery, and each request's first issue, completion, PRE/ACT counts and first/last cycles. It resolves sequence/block_offset against memory_requests and the exact block admission timeline to verify request existence, block range, read/write direction, mapped channel/bank/row, producer-ready/enqueue/admission causality, one data command per expected block, and equality with directional admission totals",
+          "path": "memory_ablation.command_trace.policy"
+        },
+        {
+          "after": [
+            "unknown_producer",
+            "self_dependency",
+            "future_late_producer"
+          ],
+          "before": null,
+          "path": "memory_ablation.command_trace.producer_graph_mutations"
+        },
+        {
+          "after": 9,
+          "before": 8,
+          "path": "schema_version"
+        },
+        {
+          "after": "hygcn-hpca2020-table5-gcn-v9-producer-graph",
+          "before": "hygcn-hpca2020-table5-gcn-v8-temporal-identity",
+          "path": "workload_version"
+        }
+      ],
+      "path": "configs/paper_workloads.json",
+      "target_parameters_after_sha256": "ad457422e9f17b9a9776c2460318d023829b4378279cc6f22e17b1fd125037e7",
+      "target_parameters_before_sha256": "bb2845d5d5f2507dd15653ddc707765d23f758733087ac05780f04e2f337466a",
+      "target_parameters_changed": true
+    }
+  ]
+}

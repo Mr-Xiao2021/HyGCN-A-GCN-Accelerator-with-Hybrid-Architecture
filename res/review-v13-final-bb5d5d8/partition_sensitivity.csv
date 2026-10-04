@@ -1,0 +1,4 @@
+capacity_mib,paper_rows_passed,paper_rows_total,status
+4,11,12,FAIL
+5,12,12,PASS
+6,10,12,FAIL

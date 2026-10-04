@@ -156,4 +156,4 @@
 - [x] 19.2 standalone validator 从完整 command stream 重建 producer completion，独立校验 producer graph、request class、delay 和 consumer release 时序
 - [x] 19.3 拒绝 unknown producer、自依赖、依赖环及 future/late producer，并将 producer graph/timing 作为独立 oracle 输出
 - [x] 19.4 增加 unknown/self/future producer 三类 compiled mutation，保持已有 command/admission mutation 全部有效
-- [ ] 19.5 执行 clean Release、CTest、legacy、严格 OpenSpec、正式 14+12、partition/model/FIFO sensitivity 和 21 份 producer graph replay，固化 Review v12 关闭证据并推送远端
+- [x] 19.5 执行 clean Release、CTest、legacy、严格 OpenSpec、正式 14+12、partition/model/FIFO sensitivity 和 21 份 producer graph replay，固化 Review v12 关闭证据并推送远端

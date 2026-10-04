@@ -1,0 +1,150 @@
+{
+  "acceptance_boundary": "Review v12 producer graph/timing closed; cap-free Figure 17 and overall request-level mechanism reproduction remain not accepted. This is the final delivery candidate with no further implementation iteration planned.",
+  "artifact_directory": "res/review-v13-final-bb5d5d8",
+  "branch": "run/npu",
+  "complete_admission_trace": {
+    "admitted_blocks": 64675995,
+    "block_identity_cross_check": "PASS",
+    "events": 16412982,
+    "max_blocks_per_cycle": 4,
+    "read_blocks": 61999387,
+    "write_blocks": 2676608
+  },
+  "complete_command_trace": {
+    "command_lane_violations": 0,
+    "events": 70813185,
+    "expected_request_blocks": 64675995,
+    "read_data_commands": 61999387,
+    "reconstructed_requests": 73928,
+    "request_timeline_cross_check": "PASS",
+    "write_data_commands": 2676608
+  },
+  "date": "2026-10-04",
+  "delivery_policy": "Final candidate per Eric; hand off to tg-bot for independent review and do not start another implementation iteration.",
+  "fifo_window_sensitivity": {
+    "0": {
+      "bandwidth_gain": 1.127634774121,
+      "role": "required_cap_free",
+      "speedup": 1.127634774121,
+      "status": "FAIL"
+    },
+    "1": {
+      "bandwidth_gain": 16.475479062373193,
+      "role": "diagnostic",
+      "speedup": 16.475479062373193,
+      "status": "FAIL"
+    },
+    "2": {
+      "bandwidth_gain": 8.28955965809394,
+      "role": "diagnostic",
+      "speedup": 8.28955965809394,
+      "status": "FAIL"
+    },
+    "4": {
+      "bandwidth_gain": 4.208020114189668,
+      "role": "diagnostic",
+      "speedup": 4.208020114189669,
+      "status": "PASS"
+    },
+    "512": {
+      "bandwidth_gain": 1.127634774121,
+      "role": "diagnostic",
+      "speedup": 1.127634774121,
+      "status": "FAIL"
+    },
+    "8": {
+      "bandwidth_gain": 2.1924902669176816,
+      "role": "diagnostic",
+      "speedup": 2.192490266917681,
+      "status": "FAIL"
+    }
+  },
+  "fig17_required_cap_free": {
+    "bandwidth_gain": 1.127634774121,
+    "bandwidth_relative_error": 0.7180913064697501,
+    "fifo_active_windows": 0,
+    "speedup": 1.127634774121,
+    "speedup_relative_error": 0.6952338448321622,
+    "status": "FAIL"
+  },
+  "final_findings": {
+    "figure17": {
+      "reason": "cap-free speedup and bandwidth remain outside +/-20%; no unsupported throttle or target retuning was introduced",
+      "status": "OPEN"
+    },
+    "review_v12_producer_graph": {
+      "evidence": "unknown/self/cycle/future-late mutations rejected and 73640 formal dependencies independently derived from producer completion",
+      "status": "CLOSED"
+    }
+  },
+  "fixed_binary_sha256": "c9cc21948410a22d209e34040a3da9df66473df743cfcb3b2f0120646fa7df77",
+  "implementation_commit": "bb5d5d8d4e3b68a0805a2db2641ae06f6aa570f5",
+  "internal_checks_schema_v5": {
+    "passed": 7,
+    "total": 12
+  },
+  "internal_checks_schema_v6": {
+    "passed": 8,
+    "total": 12
+  },
+  "model_sensitivity": {
+    "required_baseline_speedup": 1.127634774121,
+    "scenario_count": 10
+  },
+  "paper_metrics": {
+    "passed": 12,
+    "total": 14
+  },
+  "partition_sensitivity": {
+    "4_mib": "FAIL",
+    "5_mib": "PASS",
+    "6_mib": "FAIL",
+    "independent_holdout": {
+      "available": false,
+      "datasets": [],
+      "reason": "Cora, Citeseer, and PubMed were all exposed in Review v4; no retrospective used_for_selection=false claim is made"
+    }
+  },
+  "previous_implementation": "5b49092621db327c338f48cb154f33e0f298794e",
+  "producer_dependency_oracle": {
+    "class_or_delay_violations": 0,
+    "cycle_violations": 0,
+    "dependencies": 73640,
+    "future_or_late_producer_violations": 0,
+    "input_dependencies": 73619,
+    "intermediate_raw_dependencies": 21,
+    "producer_delay_histogram": {
+      "0": 21,
+      "2": 73619
+    },
+    "producer_graph_cross_check": "PASS",
+    "producer_timing_cross_check": "PASS",
+    "self_dependency_violations": 0,
+    "unknown_producer_violations": 0
+  },
+  "raw_storage": {
+    "csv": "21 plain text",
+    "json": "21 lossless .json.gz"
+  },
+  "reviewed_remote_base": "9a3c1c19a428e88f134c13d70a655b73db38d649",
+  "revision_audit": {
+    "base": "5b49092621db327c338f48cb154f33e0f298794e",
+    "calibration_difference_count": 0,
+    "metric_delta_rows": 0,
+    "no_target_parameter_retuning": false,
+    "note": "Trace schema and validation policy changed, so the broad audit boolean is false; profile/calibration differences and benchmark metric deltas are zero.",
+    "profile_difference_count": 0
+  },
+  "schema_version": 4,
+  "tests": {
+    "clean_release_build": "PASS",
+    "ctest": "10/10 PASS",
+    "formal_trace_replay": "21/21 PASS",
+    "legacy": "Cora/Citeseer PASS",
+    "producer_graph_timing": "73640/73640 PASS",
+    "strict_openspec": "PASS",
+    "trace_validator_mutations": "13/13 REJECTED"
+  },
+  "trace_validator_sha256": "1f305420ac4319e3b8f257748628c858ee2c541525038f867478cdcb81377fb5",
+  "trace_validator_source_sha256": "9612bdba09e36482aa073c8789066babc046a17afda78feb1f68e93dbeb52ac8"
+}

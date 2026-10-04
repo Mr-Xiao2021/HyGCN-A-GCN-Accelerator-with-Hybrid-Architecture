@@ -1,0 +1,1428 @@
+{
+  "complete_admission_trace": {
+    "admitted_blocks": 64675995,
+    "block_identity_cross_check": "PASS",
+    "events": 16412982,
+    "max_blocks_per_cycle": 4,
+    "read_blocks": 61999387,
+    "write_blocks": 2676608
+  },
+  "complete_command_trace": {
+    "command_lane_violations": 0,
+    "events": 70813185,
+    "expected_request_blocks": 64675995,
+    "read_data_commands": 61999387,
+    "reconstructed_requests": 73928,
+    "request_timeline_cross_check": "PASS",
+    "write_data_commands": 2676608
+  },
+  "files": {
+    "paper_paper_gcn_citeseer_latency-aware_independent_sparse-off_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "202a124b8c0a0061"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 8212019,
+        "expected_request_blocks": 7720407,
+        "independently_reconstructed": true,
+        "read_data_commands": 7720407,
+        "reconstructed_requests": 8330,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 0
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 8320,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 8320,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 8320,
+            "input_dependencies": 8320,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 8320
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 1930938,
+        "admitted_blocks": 7720407,
+        "admitted_read_blocks": 7720407,
+        "admitted_write_blocks": 0,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 512,
+        "max_total_write_buffer_occupancy": 0,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "4b197c9442c4c8cf"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "a6c8b9a8a0da23c3"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 3164969,
+        "expected_request_blocks": 2657567,
+        "independently_reconstructed": true,
+        "read_data_commands": 2630951,
+        "reconstructed_requests": 4596,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 26616
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 4575,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 4575,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 4575,
+            "input_dependencies": 4575,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 4575
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 665195,
+        "admitted_blocks": 2657567,
+        "admitted_read_blocks": 2630951,
+        "admitted_write_blocks": 26616,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 512,
+        "max_total_write_buffer_occupancy": 490,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "faf81b1d1f4a6c27"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "cf50cdc8ad976b93"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 3083659,
+        "expected_request_blocks": 2601327,
+        "independently_reconstructed": true,
+        "read_data_commands": 2601327,
+        "reconstructed_requests": 4585,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 0
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 4575,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 4575,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 4575,
+            "input_dependencies": 4575,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 4575
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 651555,
+        "admitted_blocks": 2601327,
+        "admitted_read_blocks": 2601327,
+        "admitted_write_blocks": 0,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 512,
+        "max_total_write_buffer_occupancy": 0,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "74107850dbdcf84a"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-batch-class_mapping-row-first_seed-1_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "1ebdf88a1179cd48"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 2828875,
+        "expected_request_blocks": 2657567,
+        "independently_reconstructed": true,
+        "read_data_commands": 2630951,
+        "reconstructed_requests": 4596,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 26616
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 4575,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 4575,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 4575,
+            "input_dependencies": 4575,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 4575
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 730114,
+        "admitted_blocks": 2657567,
+        "admitted_read_blocks": 2630951,
+        "admitted_write_blocks": 26616,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 397,
+        "max_total_write_buffer_occupancy": 321,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "afc399844689f308"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-fifo_mapping-low-bits_seed-1_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "44c4e52cf4b4330d"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 3298391,
+        "expected_request_blocks": 2657567,
+        "independently_reconstructed": true,
+        "read_data_commands": 2630951,
+        "reconstructed_requests": 4596,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 26616
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 4575,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 4575,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 4575,
+            "input_dependencies": 4575,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 4575
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 667647,
+        "admitted_blocks": 2657567,
+        "admitted_read_blocks": 2630951,
+        "admitted_write_blocks": 26616,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 512,
+        "max_total_write_buffer_occupancy": 512,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "f885e690a670afcf"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_citeseer_latency-aware_independent_sparse-on_priority-fifo_mapping-row-first_seed-1_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "ece7987872b6395f"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 2828821,
+        "expected_request_blocks": 2657567,
+        "independently_reconstructed": true,
+        "read_data_commands": 2630951,
+        "reconstructed_requests": 4596,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 26616
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 4575,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 4575,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 4575,
+            "input_dependencies": 4575,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 4575
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 706308,
+        "admitted_blocks": 2657567,
+        "admitted_read_blocks": 2630951,
+        "admitted_write_blocks": 26616,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 379,
+        "max_total_write_buffer_occupancy": 318,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "0ac9efaf698fa3d9"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_citeseer_sequential_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "cb99752cd911cad6"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 4785791,
+        "expected_request_blocks": 4201295,
+        "independently_reconstructed": true,
+        "read_data_commands": 3402815,
+        "reconstructed_requests": 4616,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 798480
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 4585,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 4575,
+        "intermediate_raw_dependencies": 10,
+        "layers": [
+          {
+            "dependencies": 4585,
+            "input_dependencies": 4575,
+            "intermediate_raw_dependencies": 10,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "0": 10,
+          "2": 4575
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 1052042,
+        "admitted_blocks": 4201295,
+        "admitted_read_blocks": 3402815,
+        "admitted_write_blocks": 798480,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 512,
+        "max_total_write_buffer_occupancy": 512,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "9858be894a924573"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_cora_latency-aware_independent_sparse-off_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "d2f32563939b5bf5"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 781020,
+        "expected_request_blocks": 732988,
+        "independently_reconstructed": true,
+        "read_data_commands": 732988,
+        "reconstructed_requests": 744,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 0
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 741,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 741,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 741,
+            "input_dependencies": 741,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 741
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 183289,
+        "admitted_blocks": 732988,
+        "admitted_read_blocks": 732988,
+        "admitted_write_blocks": 0,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 512,
+        "max_total_write_buffer_occupancy": 0,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "0f39f587a26a9246"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "dd4c8c7c1e6d621f"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 771050,
+        "expected_request_blocks": 715266,
+        "independently_reconstructed": true,
+        "read_data_commands": 693602,
+        "reconstructed_requests": 720,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 21664
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 713,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 713,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 713,
+            "input_dependencies": 713,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 713
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 178838,
+        "admitted_blocks": 715266,
+        "admitted_read_blocks": 693602,
+        "admitted_write_blocks": 21664,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 378,
+        "max_total_write_buffer_occupancy": 494,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "a4d3ae4fc61f383b"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "051c3cb9fbd281c3"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 729994,
+        "expected_request_blocks": 682138,
+        "independently_reconstructed": true,
+        "read_data_commands": 682138,
+        "reconstructed_requests": 716,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 0
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 713,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 713,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 713,
+            "input_dependencies": 713,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 713
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 170595,
+        "admitted_blocks": 682138,
+        "admitted_read_blocks": 682138,
+        "admitted_write_blocks": 0,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 478,
+        "max_total_write_buffer_occupancy": 0,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "15e14bb445acfaa2"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-batch-class_mapping-row-first_seed-1_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "3673fff1170c30be"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 760224,
+        "expected_request_blocks": 715266,
+        "independently_reconstructed": true,
+        "read_data_commands": 693602,
+        "reconstructed_requests": 720,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 21664
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 713,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 713,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 713,
+            "input_dependencies": 713,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 713
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 185822,
+        "admitted_blocks": 715266,
+        "admitted_read_blocks": 693602,
+        "admitted_write_blocks": 21664,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 370,
+        "max_total_write_buffer_occupancy": 293,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "3462ee22124a16b3"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-fifo_mapping-low-bits_seed-1_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "86903a578524e0fd"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 824810,
+        "expected_request_blocks": 715266,
+        "independently_reconstructed": true,
+        "read_data_commands": 693602,
+        "reconstructed_requests": 720,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 21664
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 713,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 713,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 713,
+            "input_dependencies": 713,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 713
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 180214,
+        "admitted_blocks": 715266,
+        "admitted_read_blocks": 693602,
+        "admitted_write_blocks": 21664,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 512,
+        "max_total_write_buffer_occupancy": 498,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "3e8f3e89f8520556"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_cora_latency-aware_independent_sparse-on_priority-fifo_mapping-row-first_seed-1_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "39bce7f9012b97e1"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 760242,
+        "expected_request_blocks": 715266,
+        "independently_reconstructed": true,
+        "read_data_commands": 693602,
+        "reconstructed_requests": 720,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 21664
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 713,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 713,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 713,
+            "input_dependencies": 713,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 713
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 181387,
+        "admitted_blocks": 715266,
+        "admitted_read_blocks": 693602,
+        "admitted_write_blocks": 21664,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 367,
+        "max_total_write_buffer_occupancy": 313,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "1a651f3604c07705"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_cora_sequential_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "46775b58d6d89d2e"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 1284544,
+        "expected_request_blocks": 1202706,
+        "independently_reconstructed": true,
+        "read_data_commands": 937322,
+        "reconstructed_requests": 726,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 265384
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 716,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 713,
+        "intermediate_raw_dependencies": 3,
+        "layers": [
+          {
+            "dependencies": 716,
+            "input_dependencies": 713,
+            "intermediate_raw_dependencies": 3,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "0": 3,
+          "2": 713
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 300708,
+        "admitted_blocks": 1202706,
+        "admitted_read_blocks": 937322,
+        "admitted_write_blocks": 265384,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 476,
+        "max_total_write_buffer_occupancy": 252,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "dd2af5b81b6a59b8"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_pubmed_latency-aware_independent_sparse-off_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "4c5ef7a226c89925"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 5403790,
+        "expected_request_blocks": 5062334,
+        "independently_reconstructed": true,
+        "read_data_commands": 5062334,
+        "reconstructed_requests": 4944,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 0
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 4936,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 4936,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 4936,
+            "input_dependencies": 4936,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 4936
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 1266022,
+        "admitted_blocks": 5062334,
+        "admitted_read_blocks": 5062334,
+        "admitted_write_blocks": 0,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 512,
+        "max_total_write_buffer_occupancy": 0,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "218a4c325f1e2fae"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "9d0cae3108239de7"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 5026662,
+        "expected_request_blocks": 4646886,
+        "independently_reconstructed": true,
+        "read_data_commands": 4489150,
+        "reconstructed_requests": 4666,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 157736
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 4649,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 4649,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 4649,
+            "input_dependencies": 4649,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 4649
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 1162376,
+        "admitted_blocks": 4646886,
+        "admitted_read_blocks": 4489150,
+        "admitted_write_blocks": 157736,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 512,
+        "max_total_write_buffer_occupancy": 489,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "33278ad24f91e39c"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_scope-aggregation_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "92c00c54549b6899"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 4824790,
+        "expected_request_blocks": 4485150,
+        "independently_reconstructed": true,
+        "read_data_commands": 4485150,
+        "reconstructed_requests": 4657,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 0
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 4649,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 4649,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 4649,
+            "input_dependencies": 4649,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 4649
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 1121572,
+        "admitted_blocks": 4485150,
+        "admitted_read_blocks": 4485150,
+        "admitted_write_blocks": 0,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 512,
+        "max_total_write_buffer_occupancy": 0,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "973dddd6e3109aee"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-batch-class_mapping-row-first_seed-1_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "12a980b97eae28d1"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 4937390,
+        "expected_request_blocks": 4646886,
+        "independently_reconstructed": true,
+        "read_data_commands": 4489150,
+        "reconstructed_requests": 4666,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 157736
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 4649,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 4649,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 4649,
+            "input_dependencies": 4649,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 4649
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 1245958,
+        "admitted_blocks": 4646886,
+        "admitted_read_blocks": 4489150,
+        "admitted_write_blocks": 157736,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 376,
+        "max_total_write_buffer_occupancy": 329,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "049b97314709e54e"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-fifo_mapping-low-bits_seed-1_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "2d4e9c6f4846b8f3"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 5230194,
+        "expected_request_blocks": 4646886,
+        "independently_reconstructed": true,
+        "read_data_commands": 4489150,
+        "reconstructed_requests": 4666,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 157736
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 4649,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 4649,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 4649,
+            "input_dependencies": 4649,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 4649
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 1164922,
+        "admitted_blocks": 4646886,
+        "admitted_read_blocks": 4489150,
+        "admitted_write_blocks": 157736,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 512,
+        "max_total_write_buffer_occupancy": 512,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "6cfd9e10e6d9538d"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_pubmed_latency-aware_independent_sparse-on_priority-fifo_mapping-row-first_seed-1_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "ddf5a39d27f2c0ba"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 4937774,
+        "expected_request_blocks": 4646886,
+        "independently_reconstructed": true,
+        "read_data_commands": 4489150,
+        "reconstructed_requests": 4666,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 157736
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 4649,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 4649,
+        "intermediate_raw_dependencies": 0,
+        "layers": [
+          {
+            "dependencies": 4649,
+            "input_dependencies": 4649,
+            "intermediate_raw_dependencies": 0,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "2": 4649
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 1189379,
+        "admitted_blocks": 4646886,
+        "admitted_read_blocks": 4489150,
+        "admitted_write_blocks": 157736,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 410,
+        "max_total_write_buffer_occupancy": 382,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "c23ac55ebad67845"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    },
+    "paper_paper_gcn_pubmed_sequential_independent_sparse-on_priority-batch-class_mapping-low-bits_seed-1_layer-0.json": {
+      "command_trace_oracle": {
+        "address_mapping_violations": 0,
+        "admission_data_cross_check": "request-block identity and cycle PASS",
+        "checksums": [
+          "342e19fd6e0e1731"
+        ],
+        "command_issue_interval_cycles": 2,
+        "command_lane_violations": 0,
+        "direction_violations": 0,
+        "duplicate_or_missing_data_commands": 0,
+        "event_count": 6338176,
+        "expected_request_blocks": 5908774,
+        "independently_reconstructed": true,
+        "read_data_commands": 5120094,
+        "reconstructed_requests": 4682,
+        "request_identity_violations": 0,
+        "request_timeline_cross_check": "PASS",
+        "trace_representation": "command_delta_varint_base64_v2",
+        "transfer_cycles": 4,
+        "validator": "independent-cpp-v1",
+        "write_data_commands": 788680
+      },
+      "producer_dependency_oracle": {
+        "class_or_delay_violations": 0,
+        "cycle_violations": 0,
+        "dependencies": 4657,
+        "future_or_late_producer_violations": 0,
+        "input_dependencies": 4649,
+        "intermediate_raw_dependencies": 8,
+        "layers": [
+          {
+            "dependencies": 4657,
+            "input_dependencies": 4649,
+            "intermediate_raw_dependencies": 8,
+            "layer_index": 0
+          }
+        ],
+        "producer_delay_histogram": {
+          "0": 8,
+          "2": 4649
+        },
+        "producer_graph_cross_check": "PASS",
+        "producer_timing_cross_check": "PASS",
+        "self_dependency_violations": 0,
+        "unknown_producer_violations": 0,
+        "validator": "independent-cpp-v1"
+      },
+      "transaction_admission_oracle": {
+        "admission_cycles": 1478101,
+        "admitted_blocks": 5908774,
+        "admitted_read_blocks": 5120094,
+        "admitted_write_blocks": 788680,
+        "block_identity_cross_check": "PASS",
+        "issue_limit_blocks_per_cycle": 4,
+        "max_blocks_admitted_per_cycle": 4,
+        "max_total_read_queue_occupancy": 512,
+        "max_total_write_buffer_occupancy": 512,
+        "occupancy_reconstruction": "per-channel before/after admission snapshots plus request-block identity",
+        "total_read_queue_capacity": 512,
+        "total_write_buffer_capacity": 512,
+        "trace_checksums": [
+          "d3b83994227d23b4"
+        ],
+        "validator": "independent-cpp-v1"
+      }
+    }
+  },
+  "producer_dependency_oracle": {
+    "class_or_delay_violations": 0,
+    "cycle_violations": 0,
+    "dependencies": 73640,
+    "future_or_late_producer_violations": 0,
+    "input_dependencies": 73619,
+    "intermediate_raw_dependencies": 21,
+    "producer_delay_histogram": {
+      "0": 21,
+      "2": 73619
+    },
+    "producer_graph_cross_check": "PASS",
+    "producer_timing_cross_check": "PASS",
+    "self_dependency_violations": 0,
+    "unknown_producer_violations": 0
+  },
+  "raw_files": 21,
+  "schema_version": 4
+}

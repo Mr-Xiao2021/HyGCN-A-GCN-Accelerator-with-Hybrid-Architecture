@@ -1,0 +1,73 @@
+diff --git a/configs/paper_workloads.json b/configs/paper_workloads.json
+index 0e78833..46fca3e 100644
+--- a/configs/paper_workloads.json
++++ b/configs/paper_workloads.json
+@@ -1,6 +1,6 @@
+ {
+-  "schema_version": 8,
+-  "workload_version": "hygcn-hpca2020-table5-gcn-v8-temporal-identity",
++  "schema_version": 9,
++  "workload_version": "hygcn-hpca2020-table5-gcn-v9-producer-graph",
+   "paper_source": "HyGCN HPCA 2020 Table 5 and Section 5.3",
+   "figures": {
+     "figure_15": {
+@@ -95,8 +95,9 @@
+     },
+     "command_trace": {
+       "representation": "command_delta_varint_base64_v2",
+-      "policy": "every PRE, ACT, READ, and WRITE event is stored in a reversible chunked stream; the validator independently reconstructs event and command totals, checksum, edge samples, channel-lane spacing, tCCD/turnaround, bank recovery, and each request's first issue, completion, PRE/ACT counts and first/last cycles. It resolves sequence/block_offset against memory_requests and the exact block admission timeline to verify request existence, block range, read/write direction, mapped channel/bank/row, producer-ready/enqueue/admission causality, one data command per expected block, and equality with directional admission totals",
+-      "identity_mutations": ["unknown_sequence", "out_of_range_block", "wrong_direction", "wrong_mapping", "duplicate_and_missing_data_block", "same_row_producer_ready_identity_swap"]
++      "policy": "every PRE, ACT, READ, and WRITE event is stored in a reversible chunked stream; the validator independently reconstructs event and command totals, checksum, edge samples, channel-lane spacing, tCCD/turnaround, bank recovery, and each request's first issue, completion, PRE/ACT counts and first/last cycles. It resolves sequence/block_offset against memory_requests and the exact block admission timeline to verify request existence, block range, read/write direction, mapped channel/bank/row, producer-ready/enqueue/admission causality, one data command per expected block, and equality with directional admission totals. Producer dependencies separately preserve base ready/enqueue, producer sequence and delay; the validator rejects unknown/self/cyclic dependencies and derives effective ready/enqueue from the producer's reconstructed completion cycle",
++      "identity_mutations": ["unknown_sequence", "out_of_range_block", "wrong_direction", "wrong_mapping", "duplicate_and_missing_data_block", "same_row_producer_ready_identity_swap"],
++      "producer_graph_mutations": ["unknown_producer", "self_dependency", "future_late_producer"]
+     }
+   },
+   "scope_limits": [
+diff --git a/hygcn/paper_sim.cpp b/hygcn/paper_sim.cpp
+index df76a3e..4abc9d0 100644
+--- a/hygcn/paper_sim.cpp
++++ b/hygcn/paper_sim.cpp
+@@ -263,6 +263,9 @@ json LayerJson(const LayerMetrics& layer) {
+             {"request_class", RequestClassName(trace.request_class)},
+             {"address", trace.address},
+             {"bytes", trace.bytes},
++            {"base_producer_ready_cycle", trace.base_producer_ready_cycle},
++            {"base_enqueue_cycle", trace.base_enqueue_cycle},
++            {"producer_delay_cycles", trace.producer_delay_cycles},
+             {"producer_ready_cycle", trace.producer_ready_cycle},
+             {"enqueue_cycle", trace.enqueue_cycle},
+             {"first_admission_cycle", trace.first_admission_cycle},
+@@ -287,6 +290,9 @@ json LayerJson(const LayerMetrics& layer) {
+             {"request_class", RequestClassName(trace.request_class)},
+             {"address", trace.address},
+             {"bytes", trace.bytes},
++            {"base_producer_ready_cycle", trace.base_producer_ready_cycle},
++            {"base_enqueue_cycle", trace.base_enqueue_cycle},
++            {"producer_delay_cycles", trace.producer_delay_cycles},
+             {"producer_ready_cycle", trace.producer_ready_cycle},
+             {"enqueue_cycle", trace.enqueue_cycle},
+             {"first_admission_cycle", trace.first_admission_cycle},
+@@ -2259,6 +2265,9 @@ MemoryTimingResult MemoryCoordinatorModel::Simulate(
+             request.request_class,
+             request.bytes,
+             request.address,
++            request.producer_ready_cycle,
++            request.enqueue_cycle,
++            request.producer_delay_cycles,
+             state.effective_producer_ready,
+             state.effective_enqueue,
+             state.first_admission,
+diff --git a/hygcn/paper_sim.h b/hygcn/paper_sim.h
+index a5c38f0..76beb41 100644
+--- a/hygcn/paper_sim.h
++++ b/hygcn/paper_sim.h
+@@ -160,6 +160,9 @@ struct MemoryRequestTrace {
+     RequestClass request_class = RequestClass::EDGE;
+     uint64_t bytes = 0;
+     uint64_t address = 0;
++    uint64_t base_producer_ready_cycle = 0;
++    uint64_t base_enqueue_cycle = 0;
++    uint64_t producer_delay_cycles = 0;
+     uint64_t producer_ready_cycle = 0;
+     uint64_t enqueue_cycle = 0;
+     uint64_t first_admission_cycle = 0;

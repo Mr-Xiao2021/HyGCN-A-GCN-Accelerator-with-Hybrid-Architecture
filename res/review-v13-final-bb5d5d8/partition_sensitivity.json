@@ -1,0 +1,311 @@
+{
+  "base_profile": "configs/HYGCN_PAPER.ini",
+  "base_profile_sha256": "245ce7ca2434081cae28e23372efe63b556c45eac9f8f88cacd472cb90dec0fb",
+  "binary": "build-review-v13-release-bb5d5d8/hygcntest",
+  "binary_sha256": "c9cc21948410a22d209e34040a3da9df66473df743cfcb3b2f0120646fa7df77",
+  "calibrated_fit": {
+    "candidates": {
+      "4": {
+        "all_paper_rows_pass": false,
+        "mean_relative_error": 0.11869136123168515
+      },
+      "5": {
+        "all_paper_rows_pass": true,
+        "mean_relative_error": 0.08482090970632182
+      },
+      "6": {
+        "all_paper_rows_pass": false,
+        "mean_relative_error": 0.11320139835620673
+      }
+    },
+    "datasets": [
+      "cora",
+      "citeseer",
+      "pubmed"
+    ],
+    "historical_exposure": "Review v4 evaluated all three datasets at 4, 5, and 6 MiB before Review v5; no dataset in this repository remains unexposed for scheduler-cap selection",
+    "selected_capacity_mib": 5,
+    "selection_method": "among capacities passing every Figure 15-16 paper row on all historically exposed datasets, select the minimum mean relative error; ties select the smaller capacity"
+  },
+  "capacities": {
+    "4": {
+      "all_required_pass": false,
+      "binary_digest": "0f089f3a7ebf5c56",
+      "capacity_bytes": 4194304,
+      "per_dataset": {
+        "citeseer": {
+          "pipeline_dram_ratio": {
+            "measured": 0.6421625350482888,
+            "pass": true,
+            "reference": 0.535832,
+            "relative_error": 0.19844006152728622
+          },
+          "pipeline_speedup": {
+            "measured": 2.1686252192039177,
+            "pass": true,
+            "reference": 1.842621,
+            "relative_error": 0.1769241852795109
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.29296633814529494,
+            "pass": true,
+            "reference": 0.339962,
+            "relative_error": 0.13823798499451426
+          },
+          "sparsity_speedup": {
+            "measured": 3.3546678656178717,
+            "pass": true,
+            "reference": 2.883223,
+            "relative_error": 0.16351314678672846
+          }
+        },
+        "cora": {
+          "pipeline_dram_ratio": {
+            "measured": 0.6440685020631964,
+            "pass": false,
+            "reference": 0.501466,
+            "relative_error": 0.2843712276868152
+          },
+          "pipeline_speedup": {
+            "measured": 1.983706435104571,
+            "pass": true,
+            "reference": 2.125024,
+            "relative_error": 0.06650163240294171
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.8691524292291768,
+            "pass": true,
+            "reference": 0.879502,
+            "relative_error": 0.011767535231100343
+          },
+          "sparsity_speedup": {
+            "measured": 1.1447052125506072,
+            "pass": true,
+            "reference": 1.082102,
+            "relative_error": 0.05785333780975112
+          }
+        },
+        "pubmed": {
+          "pipeline_dram_ratio": {
+            "measured": 0.8159656259780428,
+            "pass": true,
+            "reference": 0.731763,
+            "relative_error": 0.1150681654825985
+          },
+          "pipeline_speedup": {
+            "measured": 1.5404935714179229,
+            "pass": true,
+            "reference": 1.366562,
+            "relative_error": 0.12727675101306987
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.8591067802490172,
+            "pass": true,
+            "reference": 0.896637,
+            "relative_error": 0.041856648511028216
+          },
+          "sparsity_speedup": {
+            "measured": 1.162661319744127,
+            "pass": true,
+            "reference": 1.115278,
+            "relative_error": 0.042485658054876814
+          }
+        }
+      },
+      "profile_sha256": "68b65beaa58e282cbda0fa59dd7f6ebbd0009ca73433669891c646098ed30640",
+      "source_git_commit": "bb5d5d8d4e3b"
+    },
+    "5": {
+      "all_required_pass": true,
+      "binary_digest": "0f089f3a7ebf5c56",
+      "capacity_bytes": 5242880,
+      "per_dataset": {
+        "citeseer": {
+          "pipeline_dram_ratio": {
+            "measured": 0.6325590085913986,
+            "pass": true,
+            "reference": 0.535832,
+            "relative_error": 0.1805174170101797
+          },
+          "pipeline_speedup": {
+            "measured": 2.178639581075711,
+            "pass": true,
+            "reference": 1.842621,
+            "relative_error": 0.18235903155109542
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.3369416923226975,
+            "pass": true,
+            "reference": 0.339962,
+            "relative_error": 0.008884250820098987
+          },
+          "sparsity_speedup": {
+            "measured": 2.9303150110325404,
+            "pass": true,
+            "reference": 2.883223,
+            "relative_error": 0.01633311437670286
+          }
+        },
+        "cora": {
+          "pipeline_dram_ratio": {
+            "measured": 0.5947139201101516,
+            "pass": true,
+            "reference": 0.501466,
+            "relative_error": 0.18595063296445144
+          },
+          "pipeline_speedup": {
+            "measured": 1.9518921642328178,
+            "pass": true,
+            "reference": 2.125024,
+            "relative_error": 0.08147288490256208
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.9306264222606646,
+            "pass": true,
+            "reference": 0.879502,
+            "relative_error": 0.05812883002047136
+          },
+          "sparsity_speedup": {
+            "measured": 1.068573665610202,
+            "pass": true,
+            "reference": 1.082102,
+            "relative_error": 0.012501903138334313
+          }
+        },
+        "pubmed": {
+          "pipeline_dram_ratio": {
+            "measured": 0.7864382695970433,
+            "pass": true,
+            "reference": 0.731763,
+            "relative_error": 0.07471718247170638
+          },
+          "pipeline_speedup": {
+            "measured": 1.6322935860314118,
+            "pass": true,
+            "reference": 1.366562,
+            "relative_error": 0.1944526381030731
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.8859846071002032,
+            "pass": true,
+            "reference": 0.896637,
+            "relative_error": 0.011880385150062739
+          },
+          "sparsity_speedup": {
+            "measured": 1.1271586616889213,
+            "pass": true,
+            "reference": 1.115278,
+            "relative_error": 0.010652645967123285
+          }
+        }
+      },
+      "profile_sha256": "20cb3d2e174ddbcb63a56939a69c1155b7f39bda51785cd3f899c3b62b407ab5",
+      "source_git_commit": "bb5d5d8d4e3b"
+    },
+    "6": {
+      "all_required_pass": false,
+      "binary_digest": "0f089f3a7ebf5c56",
+      "capacity_bytes": 6291456,
+      "per_dataset": {
+        "citeseer": {
+          "pipeline_dram_ratio": {
+            "measured": 0.625970280234934,
+            "pass": true,
+            "reference": 0.535832,
+            "relative_error": 0.1682211593091379
+          },
+          "pipeline_speedup": {
+            "measured": 2.1672242395866794,
+            "pass": true,
+            "reference": 1.842621,
+            "relative_error": 0.17616386635487133
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.40917117434789796,
+            "pass": false,
+            "reference": 0.339962,
+            "relative_error": 0.20357914810448807
+          },
+          "sparsity_speedup": {
+            "measured": 2.4060511881591804,
+            "pass": true,
+            "reference": 2.883223,
+            "relative_error": 0.16549944691784843
+          }
+        },
+        "cora": {
+          "pipeline_dram_ratio": {
+            "measured": 0.5867986474149061,
+            "pass": true,
+            "reference": 0.501466,
+            "relative_error": 0.1701663670416461
+          },
+          "pipeline_speedup": {
+            "measured": 1.893596161203928,
+            "pass": true,
+            "reference": 2.125024,
+            "relative_error": 0.10890598825993109
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.8991935758926806,
+            "pass": true,
+            "reference": 0.879502,
+            "relative_error": 0.022389461186763143
+          },
+          "sparsity_speedup": {
+            "measured": 1.1069666366927209,
+            "pass": true,
+            "reference": 1.082102,
+            "relative_error": 0.022978089581870278
+          }
+        },
+        "pubmed": {
+          "pipeline_dram_ratio": {
+            "measured": 0.7656102651755283,
+            "pass": true,
+            "reference": 0.731763,
+            "relative_error": 0.046254409112688494
+          },
+          "pipeline_speedup": {
+            "measured": 1.73338104632077,
+            "pass": false,
+            "reference": 1.366562,
+            "relative_error": 0.2684247376414461
+          },
+          "sparsity_ae_dram_ratio": {
+            "measured": 0.8936459877478596,
+            "pass": true,
+            "reference": 0.896637,
+            "relative_error": 0.0033358117634453843
+          },
+          "sparsity_speedup": {
+            "measured": 1.118064293451394,
+            "pass": true,
+            "reference": 1.115278,
+            "relative_error": 0.002498295000344334
+          }
+        }
+      },
+      "profile_sha256": "a79021e2dac552b9329d97e7269aff37db97215f986f7e0280e23513b83c3cc4",
+      "source_git_commit": "bb5d5d8d4e3b"
+    }
+  },
+  "datasets": [
+    "cora",
+    "citeseer",
+    "pubmed"
+  ],
+  "fixed_parameters": {
+    "aggregation_ping_pong_regions": 2,
+    "changed_parameter": "aggregation_shard_capacity_bytes",
+    "physical_aggregation_buffer_bytes": 16777216
+  },
+  "independent_validation": {
+    "available": false,
+    "datasets": [],
+    "reason": "Cora, Citeseer, and PubMed were all exposed in Review v4; no retrospective used_for_selection=false claim is made"
+  },
+  "schema_version": 1,
+  "workload_manifest": "configs/paper_workloads.json",
+  "workload_manifest_sha256": "895643e35486a1e87f5312c760efe865bbd7431d51d1a0b4eccb10f3fb0132f1"
+}
