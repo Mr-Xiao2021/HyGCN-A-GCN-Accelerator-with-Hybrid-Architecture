@@ -97,6 +97,15 @@ if(Python3_Interpreter_FOUND)
                     --binary $<TARGET_FILE:hygcntest>)
     set_tests_properties(hygcn_cli_failures PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
+    add_test(NAME report_figure_pipeline
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/test_report_figures.py)
+    set_tests_properties(report_figure_pipeline PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+    add_test(NAME report_legacy_evidence
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/test_report_legacy.py
+                    --binary $<TARGET_FILE:hygcntest>)
+    set_tests_properties(report_legacy_evidence PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
     add_custom_target(legacy_regression
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/check_legacy_snapshot.py
                     --binary $<TARGET_FILE:hygcntest>
@@ -115,6 +124,14 @@ if(Python3_Interpreter_FOUND)
                     --report ${CMAKE_SOURCE_DIR}/res/paper/benchmark_report.json
                     --output ${CMAKE_SOURCE_DIR}/res/paper/validation_report.md
             DEPENDS hygcntest hygcn_trace_validator
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            USES_TERMINAL)
+
+    add_custom_target(report_figures
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/report_figures.py
+                    --binary $<TARGET_FILE:hygcntest>
+                    --output-dir ${CMAKE_SOURCE_DIR}/res/report
+            DEPENDS hygcntest
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
             USES_TERMINAL)
 endif()

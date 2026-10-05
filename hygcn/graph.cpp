@@ -148,7 +148,7 @@ Graph GraphLoader::GetSampleGraph(int sample_size) {
 
 Graph GraphLoader::LoadSampleGraph(int sample_size) {
     Graph new_graph;
-    new_graph.num_edge = sample_size * raw_graph.num_vertex;
+    new_graph.num_edge = 0;
     new_graph.num_vertex = raw_graph.num_vertex;
     new_graph.num_class= raw_graph.num_class;
     new_graph.len_feature = raw_graph.len_feature;
@@ -158,13 +158,34 @@ Graph GraphLoader::LoadSampleGraph(int sample_size) {
     std::string graph_edge_path = "sample/" + graph_name + "_sample.csv";
     std::ifstream graph_edge(graph_edge_path);
 
-    std::string line;
-    const std::string delimiter = ",";
-    while (std::getline(graph_edge, line)) {
-        auto pos = line.find(delimiter);
-        int src = std::atoi(line.substr(0, pos).c_str());
-        int dst = std::atoi(line.substr(pos + 1, line.size()).c_str());
-        new_graph.r_adj[dst].push_back(src);
+    if (graph_edge.is_open()) {
+        std::string line;
+        const std::string delimiter = ",";
+        while (std::getline(graph_edge, line)) {
+            auto pos = line.find(delimiter);
+            int src = std::atoi(line.substr(0, pos).c_str());
+            int dst = std::atoi(line.substr(pos + 1, line.size()).c_str());
+            assert(src >= 0 && src < new_graph.num_vertex);
+            assert(dst >= 0 && dst < new_graph.num_vertex);
+            new_graph.r_adj[dst].push_back(src);
+            ++new_graph.num_edge;
+        }
+        return new_graph;
+    }
+
+    for (int dst = 0; dst < raw_graph.num_vertex; ++dst) {
+        const auto& sources = raw_graph.r_adj[dst];
+        if (sources.empty()) {
+            continue;
+        }
+        auto& sampled = new_graph.r_adj[dst];
+        sampled.reserve(sample_size);
+        for (int index = 0; index < sample_size; ++index) {
+            const auto source_index = static_cast<std::size_t>(
+                (static_cast<uint64_t>(index) * sources.size()) / sample_size);
+            sampled.push_back(sources[std::min(source_index, sources.size() - 1)]);
+            ++new_graph.num_edge;
+        }
     }
     return new_graph;
 

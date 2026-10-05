@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "source": {
+    "file": "ResearchReport.pdf",
+    "page": 9,
+    "speedup_figure": 7,
+    "energy_figure": 8,
+    "digitization_method": "PDF vector bar tops mapped through a least-squares log10 axis fit, then uniformly anchored to the arithmetic mean stated in the report text"
+  },
+  "workloads": [
+    {"label": "GCN-CS", "model": "gcn", "dataset": "citeseer"},
+    {"label": "GCN-CR", "model": "gcn", "dataset": "cora"},
+    {"label": "GCN-DBLP", "model": "gcn", "dataset": "dblp"},
+    {"label": "GCN-PB", "model": "gcn", "dataset": "pubmed"},
+    {"label": "GCN-RD", "model": "gcn", "dataset": "reddit"},
+    {"label": "GIN-CS", "model": "gin", "dataset": "citeseer"},
+    {"label": "GIN-CR", "model": "gin", "dataset": "cora"},
+    {"label": "GIN-DBLP", "model": "gin", "dataset": "dblp"},
+    {"label": "GIN-PB", "model": "gin", "dataset": "pubmed"},
+    {"label": "GIN-RD", "model": "gin", "dataset": "reddit"},
+    {"label": "GS-CS", "model": "gs", "dataset": "citeseer"},
+    {"label": "GS-CR", "model": "gs", "dataset": "cora"},
+    {"label": "GS-DBLP", "model": "gs", "dataset": "dblp"},
+    {"label": "GS-PB", "model": "gs", "dataset": "pubmed"},
+    {"label": "GS-RD", "model": "gs", "dataset": "reddit"}
+  ],
+  "axes": {
+    "speedup": {
+      "reported_arithmetic_mean": 275.0,
+      "tick_y": [332.7297668457031, 306.12725830078125, 279.6475524902344, 253.0450439453125, 226.44125366210938],
+      "tick_log10": [0, 1, 2, 3, 4],
+      "bar_top_y": [284.8892517089844, 271.2093811035156, 286.3013610839844, 277.85040283203125, 273.762451171875, 277.4667053222656, 267.62921142578125, 270.9497375488281, 273.11651611328125, 251.2479248046875, 271.3334655761719, 264.1718444824219, 267.2454833984375, 270.5647277832031, 261.4819030761719]
+    },
+    "energy_reduction": {
+      "reported_arithmetic_mean": 4112.0,
+      "tick_y": [128.31768798828125, 110.5511245727539, 92.8932876586914, 75.11138916015625, 57.46762466430664, 39.6870002746582],
+      "tick_log10": [0, 1, 2, 3, 4, 5],
+      "bar_top_y": [72.94461059570312, 63.861793518066406, 74.98859405517578, 68.59442138671875, 68.97943115234375, 68.97943115234375, 62.064674377441406, 65.64484405517578, 65.78298950195312, 54.134315490722656, 67.5660400390625, 61.817806243896484, 65.13704681396484, 65.64484405517578, 60.14348220825195]
+    }
+  },
+  "simulator": {
+    "frequency_ghz": 0.5,
+    "supported_datasets": ["citeseer", "cora", "dblp", "pubmed"],
+    "energy_scope": "legacy DRAMSim3 total DRAM energy only",
+    "cpu_baseline_scope": "report-calibrated equivalent reconstructed from the normalized PDF ratios; not a local PyG-CPU measurement"
+  }
+}

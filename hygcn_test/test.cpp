@@ -177,13 +177,6 @@ void ValidateInputs(const Options& options) {
     if (options.model != "gcn" && options.model != "gin" && options.model != "gs") {
         throw std::runtime_error("unsupported model: " + options.model);
     }
-    if (options.model == "gs") {
-        const auto sample_path = std::filesystem::path("sample") /
-                                 (options.dataset + "_sample.csv");
-        if (!std::filesystem::is_regular_file(sample_path)) {
-            throw std::runtime_error("missing GraphSAGE sample file: " + sample_path.string());
-        }
-    }
     if (options.engine == "legacy" && options.flags.aggregation_only) {
         throw std::runtime_error("aggregation scope is supported only by the paper engine");
     }
@@ -223,8 +216,11 @@ int RunPaper(const Options& options) {
                           DigestFile((std::filesystem::path(options.graph_dir) /
                                       (options.dataset + "_edge.csv")).string());
     if (options.model == "gs") {
-        result.graph_digest += "-" + DigestFile(
-            (std::filesystem::path("sample") / (options.dataset + "_sample.csv")).string());
+        const auto sample_path = std::filesystem::path("sample") /
+                                 (options.dataset + "_sample.csv");
+        result.graph_digest += std::filesystem::is_regular_file(sample_path)
+            ? "-" + DigestFile(sample_path.string())
+            : "-deterministic-neighbor-sample-v1-25";
     }
 
     const auto stem = ResultStem(options);
@@ -253,6 +249,9 @@ int RunLegacy(const Options& options) {
     std::vector<HyRec> records;
     std::vector<int> record_layers;
     uint64_t total_cycles = 0;
+    double total_dram_energy = 0.0;
+    double total_dram_dynamic_energy = 0.0;
+    double total_dram_standby_energy = 0.0;
     int current_layer = 0;
     while (true) {
         HyGCN hygcn(hy_config);
@@ -262,6 +261,9 @@ int RunLegacy(const Options& options) {
         hygcn.Record();
         if (options.layer < 0 || options.layer == current_layer) {
             total_cycles += hygcn.clk;
+            total_dram_energy += hygcn.hyrec.dram_energy;
+            total_dram_dynamic_energy += hygcn.hyrec.dram_dynamic_energy;
+            total_dram_standby_energy += hygcn.hyrec.dram_standby_energy;
             records.push_back(hygcn.hyrec);
             record_layers.push_back(current_layer);
         }
@@ -298,18 +300,32 @@ int RunLegacy(const Options& options) {
             {"dataset", options.dataset},
             {"seed", options.seed},
             {"selected_layer", options.layer < 0 ? "all" : std::to_string(options.layer)},
+            {"graphsage_sample_source", options.model == "gs"
+                ? (std::filesystem::is_regular_file(
+                       std::filesystem::path("sample") /
+                       (options.dataset + "_sample.csv"))
+                       ? "sample-file" : "deterministic-neighbor-sample-v1")
+                : "not-applicable"},
             {"graph_digest", DigestFile((std::filesystem::path(options.graph_dir) /
                                          (options.dataset + ".txt")).string()) + "-" +
                              DigestFile((std::filesystem::path(options.graph_dir) /
                                          (options.dataset + "_edge.csv")).string())},
         }},
-        {"summary", {{"total_cycles", total_cycles}}},
+        {"summary", {
+            {"total_cycles", total_cycles},
+            {"total_dram_energy_pj", total_dram_energy},
+            {"total_dram_dynamic_energy_pj", total_dram_dynamic_energy},
+            {"total_dram_standby_energy_pj", total_dram_standby_energy},
+        }},
         {"layers", json::array()},
     };
     for (std::size_t layer = 0; layer < records.size(); ++layer) {
         output["layers"].push_back({
             {"layer", record_layers[layer]},
             {"cycles", records[layer].finish_time},
+            {"dram_energy_pj", records[layer].dram_energy},
+            {"dram_dynamic_energy_pj", records[layer].dram_dynamic_energy},
+            {"dram_standby_energy_pj", records[layer].dram_standby_energy},
             {"dram_edge_read", records[layer].dram_edge_read},
             {"dram_input_read", records[layer].dram_input_read},
             {"dram_weight_read", records[layer].dram_weight_read},

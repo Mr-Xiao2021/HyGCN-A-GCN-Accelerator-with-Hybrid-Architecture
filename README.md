@@ -58,3 +58,20 @@ Table 5 layer-0 shape；参数报告根据 `configs/paper_parameter_baseline.jso
 并在正式证据中保留 4/5/6 MiB 敏感性对照。
 
 实现范围、指标定义和声明边界见 [docs/paper-reproduction.md](docs/paper-reproduction.md)。
+
+## ResearchReport.pdf 最终对比图
+
+`report` 分支增加了报告第 9 页 Fig. 7/8 的可审计复刻流程。它从版本化的 PDF
+矢量坐标恢复 15 组 speedup/energy 柱值，并以正文给出的算术平均值 `275x` 和
+`4112x` 做统一锚定。运行下面的目标会同时复跑仓库现有四个数据集上的
+GCN、GIN 和 GraphSAGE legacy 模型：
+
+```bash
+cmake --build build --target report_figures
+```
+
+结果位于 `res/report/`，包括合并版 PDF/PNG/SVG、独立图、逐工作负载 CSV、JSON
+清单以及本地 simulator 原始输出。GraphSAGE 在采样文件缺失时使用确定性的 25
+邻居 fallback；Reddit 因仓库缺少图文件只保留报告数字化柱值。当前能耗证据仅覆盖
+DRAMSim3 的 DRAM 能耗，CPU、RTL 综合和 CACTI 数据仍属于报告校准输入，而非本地
+独立实测。完整边界见 [docs/report-figures.md](docs/report-figures.md)。
