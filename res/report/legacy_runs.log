@@ -1,0 +1,143 @@
+$ /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/build-report/hygcntest --engine legacy --profile legacy --model gcn --dataset citeseer --seed 1 --output-dir /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/res/report/raw --quiet
+store amplification:1.037
+weight_buf utilization:1
+input_buf utilization:1
+output_buf utilization:0.5
+store amplification:2.66667
+weight_buf utilization:0.0625
+input_buf utilization:1
+output_buf utilization:0.125
+
+returncode=0
+
+$ /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/build-report/hygcntest --engine legacy --profile legacy --model gcn --dataset cora --seed 1 --output-dir /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/res/report/raw --quiet
+store amplification:1.07188
+weight_buf utilization:1
+input_buf utilization:1
+output_buf utilization:0.5
+store amplification:2.28571
+weight_buf utilization:0.0625
+input_buf utilization:1
+output_buf utilization:0.125
+
+returncode=0
+
+$ /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/build-report/hygcntest --engine legacy --profile legacy --model gcn --dataset dblp --seed 1 --output-dir /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/res/report/raw --quiet
+store amplification:1.09335
+weight_buf utilization:1
+input_buf utilization:1
+output_buf utilization:0.5
+store amplification:4
+weight_buf utilization:0.0625
+input_buf utilization:1
+output_buf utilization:0.125
+
+returncode=0
+
+$ /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/build-report/hygcntest --engine legacy --profile legacy --model gcn --dataset pubmed --seed 1 --output-dir /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/res/report/raw --quiet
+store amplification:1.024
+weight_buf utilization:1
+input_buf utilization:1
+output_buf utilization:0.5
+store amplification:5.33333
+weight_buf utilization:0.0625
+input_buf utilization:1
+output_buf utilization:0.125
+
+returncode=0
+
+$ /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/build-report/hygcntest --engine legacy --profile legacy --model gin --dataset citeseer --seed 1 --output-dir /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/res/report/raw --quiet
+store amplification:1.12184
+weight_buf utilization:0.984375
+input_buf utilization:0.999756
+output_buf utilization:0.6427
+store amplification:1
+weight_buf utilization:1
+input_buf utilization:0.5
+output_buf utilization:1
+
+returncode=0
+
+$ /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/build-report/hygcntest --engine legacy --profile legacy --model gin --dataset cora --seed 1 --output-dir /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/res/report/raw --quiet
+store amplification:1.13357
+weight_buf utilization:0.984375
+input_buf utilization:0.999756
+output_buf utilization:0.6427
+store amplification:1
+weight_buf utilization:1
+input_buf utilization:0.5
+output_buf utilization:1
+
+returncode=0
+
+$ /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/build-report/hygcntest --engine legacy --profile legacy --model gin --dataset dblp --seed 1 --output-dir /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/res/report/raw --quiet
+store amplification:1.14921
+weight_buf utilization:0.984375
+input_buf utilization:0.999756
+output_buf utilization:0.6427
+store amplification:1
+weight_buf utilization:1
+input_buf utilization:0.5
+output_buf utilization:1
+
+returncode=0
+
+$ /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/build-report/hygcntest --engine legacy --profile legacy --model gin --dataset pubmed --seed 1 --output-dir /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/res/report/raw --quiet
+store amplification:1.152
+weight_buf utilization:0.9375
+input_buf utilization:0.999023
+output_buf utilization:0.83252
+store amplification:1
+weight_buf utilization:1
+input_buf utilization:0.5
+output_buf utilization:1
+
+returncode=0
+
+$ /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/build-report/hygcntest --engine legacy --profile legacy --model gs --dataset citeseer --seed 1 --output-dir /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/res/report/raw --quiet
+store amplification:1.037
+weight_buf utilization:1
+input_buf utilization:1
+output_buf utilization:0.5
+store amplification:2.66667
+weight_buf utilization:0.0625
+input_buf utilization:1
+output_buf utilization:0.125
+
+returncode=0
+
+$ /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/build-report/hygcntest --engine legacy --profile legacy --model gs --dataset cora --seed 1 --output-dir /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/res/report/raw --quiet
+store amplification:1.07188
+weight_buf utilization:1
+input_buf utilization:1
+output_buf utilization:0.5
+store amplification:2.28571
+weight_buf utilization:0.0625
+input_buf utilization:1
+output_buf utilization:0.125
+
+returncode=0
+
+$ /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/build-report/hygcntest --engine legacy --profile legacy --model gs --dataset dblp --seed 1 --output-dir /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/res/report/raw --quiet
+store amplification:1.09335
+weight_buf utilization:1
+input_buf utilization:1
+output_buf utilization:0.5
+store amplification:4
+weight_buf utilization:0.0625
+input_buf utilization:1
+output_buf utilization:0.125
+
+returncode=0
+
+$ /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/build-report/hygcntest --engine legacy --profile legacy --model gs --dataset pubmed --seed 1 --output-dir /train08_data/user4/code/HyGCN-A-GCN-Accelerator-with-Hybrid-Architecture/res/report/raw --quiet
+store amplification:1.024
+weight_buf utilization:1
+input_buf utilization:1
+output_buf utilization:0.5
+store amplification:5.33333
+weight_buf utilization:0.0625
+input_buf utilization:1
+output_buf utilization:0.125
+
+returncode=0

@@ -1,0 +1,44 @@
+{
+  "layers": [
+    {
+      "cycles": 3749190,
+      "dram_dynamic_energy_pj": 2659680552.0,
+      "dram_edge_read": 10223616,
+      "dram_energy_pj": 4328998284.0,
+      "dram_input_read": 142518272,
+      "dram_output_write": 20056576,
+      "dram_standby_energy_pj": 1669317732.0,
+      "dram_weight_read": 10223616,
+      "layer": 0
+    },
+    {
+      "cycles": 677504,
+      "dram_dynamic_energy_pj": 422769198.0,
+      "dram_edge_read": 81920,
+      "dram_energy_pj": 718075752.0,
+      "dram_input_read": 26446848,
+      "dram_output_write": 1261888,
+      "dram_standby_energy_pj": 295306554.0,
+      "dram_weight_read": 163840,
+      "layer": 1
+    }
+  ],
+  "manifest": {
+    "binary_digest": "768b719645bfdfea",
+    "dataset": "pubmed",
+    "engine": "legacy",
+    "git_commit": "7acde52c9c73",
+    "graph_digest": "9c267b828be1afa5-493eb2bc9df25ae3",
+    "graphsage_sample_source": "deterministic-neighbor-sample-v1",
+    "model": "gs",
+    "seed": 1,
+    "selected_layer": "all"
+  },
+  "schema_version": 1,
+  "summary": {
+    "total_cycles": 4426694,
+    "total_dram_dynamic_energy_pj": 3082449750.0,
+    "total_dram_energy_pj": 5047074036.0,
+    "total_dram_standby_energy_pj": 1964624286.0
+  }
+}

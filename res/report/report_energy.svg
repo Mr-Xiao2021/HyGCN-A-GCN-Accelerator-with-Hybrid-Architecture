@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="720" viewBox="0 0 1600 720">
+<rect x="0" y="0" width="1600" height="720" fill="#FFFFFF"/>
+<text x="126" y="38" font-size="27" font-family="DejaVu Sans, sans-serif" font-weight="700" fill="#1F2933">Normalized Energy</text>
+<text x="126" y="66" font-size="15" font-family="DejaVu Sans, sans-serif" fill="#52606D">HyGCN normalized to 1; PyG-CPU uses digitized Figure 8 values</text>
+<text x="1540" y="42" text-anchor="end" font-size="16" font-family="DejaVu Sans, sans-serif" font-weight="700" fill="#1F2933">Arithmetic mean reduction: 4112x</text>
+<line x1="126" y1="565.00" x2="1540" y2="565.00" stroke="#D9E0E6" stroke-width="1"/>
+<text x="112" y="570.00" text-anchor="end" font-size="14" font-family="DejaVu Sans, sans-serif" fill="#52606D">10^0</text>
+<line x1="126" y1="470.40" x2="1540" y2="470.40" stroke="#D9E0E6" stroke-width="1"/>
+<text x="112" y="475.40" text-anchor="end" font-size="14" font-family="DejaVu Sans, sans-serif" fill="#52606D">10^1</text>
+<line x1="126" y1="375.80" x2="1540" y2="375.80" stroke="#D9E0E6" stroke-width="1"/>
+<text x="112" y="380.80" text-anchor="end" font-size="14" font-family="DejaVu Sans, sans-serif" fill="#52606D">10^2</text>
+<line x1="126" y1="281.20" x2="1540" y2="281.20" stroke="#D9E0E6" stroke-width="1"/>
+<text x="112" y="286.20" text-anchor="end" font-size="14" font-family="DejaVu Sans, sans-serif" fill="#52606D">10^3</text>
+<line x1="126" y1="186.60" x2="1540" y2="186.60" stroke="#D9E0E6" stroke-width="1"/>
+<text x="112" y="191.60" text-anchor="end" font-size="14" font-family="DejaVu Sans, sans-serif" fill="#52606D">10^4</text>
+<line x1="126" y1="92.00" x2="1540" y2="92.00" stroke="#D9E0E6" stroke-width="1"/>
+<text x="112" y="97.00" text-anchor="end" font-size="14" font-family="DejaVu Sans, sans-serif" fill="#52606D">10^5</text>
+<line x1="126" y1="92" x2="126" y2="565" stroke="#1F2933" stroke-width="1.5"/>
+<line x1="126" y1="565" x2="1540" y2="565" stroke="#1F2933" stroke-width="1.5"/>
+<rect x="143.13" y="270.69" width="28.00" height="294.31" fill="#B7D9DF" stroke="#FFFFFF" stroke-width="0.6"/>
+<rect x="175.13" y="561.00" width="28.00" height="4.00" fill="#315E8A" stroke="#FFFFFF" stroke-width="0.6"/>
+<text x="178.13" y="583" transform="rotate(90 178.13 583)" font-size="13" font-family="DejaVu Sans, sans-serif" fill="#1F2933">GCN-CS</text>
+<rect x="237.40" y="222.20" width="28.00" height="342.80" fill="#B7D9DF" stroke="#FFFFFF" stroke-width="0.6"/>
+<rect x="269.40" y="561.00" width="28.00" height="4.00" fill="#315E8A" stroke="#FFFFFF" stroke-width="0.6"/>
+<text x="272.40" y="583" transform="rotate(90 272.40 583)" font-size="13" font-family="DejaVu Sans, sans-serif" fill="#1F2933">GCN-CR</text>
+<rect x="331.67" y="281.60" width="28.00" height="283.40" fill="#B7D9DF" stroke="#FFFFFF" stroke-width="0.6"/>
+<rect x="363.67" y="561.00" width="28.00" height="4.00" fill="#315E8A" stroke="#FFFFFF" stroke-width="0.6"/>
+<text x="366.67" y="583" transform="rotate(90 366.67 583)" font-size="13" font-family="DejaVu Sans, sans-serif" fill="#1F2933">GCN-DBLP</text>
+<rect x="425.93" y="247.46" width="28.00" height="317.54" fill="#B7D9DF" stroke="#FFFFFF" stroke-width="0.6"/>
+<rect x="457.93" y="561.00" width="28.00" height="4.00" fill="#315E8A" stroke="#FFFFFF" stroke-width="0.6"/>
+<text x="460.93" y="583" transform="rotate(90 460.93 583)" font-size="13" font-family="DejaVu Sans, sans-serif" fill="#1F2933">GCN-PB</text>
+<rect x="520.20" y="249.52" width="28.00" height="315.48" fill="#B7D9DF" stroke="#FFFFFF" stroke-width="0.6"/>
+<rect x="552.20" y="561.00" width="28.00" height="4.00" fill="#315E8A" stroke="#FFFFFF" stroke-width="0.6"/>
+<text x="555.20" y="583" transform="rotate(90 555.20 583)" font-size="13" font-family="DejaVu Sans, sans-serif" fill="#1F2933">GCN-RD</text>
+<rect x="614.47" y="249.52" width="28.00" height="315.48" fill="#B7D9DF" stroke="#FFFFFF" stroke-width="0.6"/>
+<rect x="646.47" y="561.00" width="28.00" height="4.00" fill="#315E8A" stroke="#FFFFFF" stroke-width="0.6"/>
+<text x="649.47" y="583" transform="rotate(90 649.47 583)" font-size="13" font-family="DejaVu Sans, sans-serif" fill="#1F2933">GIN-CS</text>
+<rect x="708.73" y="212.60" width="28.00" height="352.40" fill="#B7D9DF" stroke="#FFFFFF" stroke-width="0.6"/>
+<rect x="740.73" y="561.00" width="28.00" height="4.00" fill="#315E8A" stroke="#FFFFFF" stroke-width="0.6"/>
+<text x="743.73" y="583" transform="rotate(90 743.73 583)" font-size="13" font-family="DejaVu Sans, sans-serif" fill="#1F2933">GIN-CR</text>
+<rect x="803.00" y="231.72" width="28.00" height="333.28" fill="#B7D9DF" stroke="#FFFFFF" stroke-width="0.6"/>
+<rect x="835.00" y="561.00" width="28.00" height="4.00" fill="#315E8A" stroke="#FFFFFF" stroke-width="0.6"/>
+<text x="838.00" y="583" transform="rotate(90 838.00 583)" font-size="13" font-family="DejaVu Sans, sans-serif" fill="#1F2933">GIN-DBLP</text>
+<rect x="897.27" y="232.46" width="28.00" height="332.54" fill="#B7D9DF" stroke="#FFFFFF" stroke-width="0.6"/>
+<rect x="929.27" y="561.00" width="28.00" height="4.00" fill="#315E8A" stroke="#FFFFFF" stroke-width="0.6"/>
+<text x="932.27" y="583" transform="rotate(90 932.27 583)" font-size="13" font-family="DejaVu Sans, sans-serif" fill="#1F2933">GIN-PB</text>
+<rect x="991.53" y="170.27" width="28.00" height="394.73" fill="#B7D9DF" stroke="#FFFFFF" stroke-width="0.6"/>
+<rect x="1023.53" y="561.00" width="28.00" height="4.00" fill="#315E8A" stroke="#FFFFFF" stroke-width="0.6"/>
+<text x="1026.53" y="583" transform="rotate(90 1026.53 583)" font-size="13" font-family="DejaVu Sans, sans-serif" fill="#1F2933">GIN-RD</text>
+<rect x="1085.80" y="241.97" width="28.00" height="323.03" fill="#B7D9DF" stroke="#FFFFFF" stroke-width="0.6"/>
+<rect x="1117.80" y="561.00" width="28.00" height="4.00" fill="#315E8A" stroke="#FFFFFF" stroke-width="0.6"/>
+<text x="1120.80" y="583" transform="rotate(90 1120.80 583)" font-size="13" font-family="DejaVu Sans, sans-serif" fill="#1F2933">GS-CS</text>
+<rect x="1180.07" y="211.29" width="28.00" height="353.71" fill="#B7D9DF" stroke="#FFFFFF" stroke-width="0.6"/>
+<rect x="1212.07" y="561.00" width="28.00" height="4.00" fill="#315E8A" stroke="#FFFFFF" stroke-width="0.6"/>
+<text x="1215.07" y="583" transform="rotate(90 1215.07 583)" font-size="13" font-family="DejaVu Sans, sans-serif" fill="#1F2933">GS-CR</text>
+<rect x="1274.33" y="229.01" width="28.00" height="335.99" fill="#B7D9DF" stroke="#FFFFFF" stroke-width="0.6"/>
+<rect x="1306.33" y="561.00" width="28.00" height="4.00" fill="#315E8A" stroke="#FFFFFF" stroke-width="0.6"/>
+<text x="1309.33" y="583" transform="rotate(90 1309.33 583)" font-size="13" font-family="DejaVu Sans, sans-serif" fill="#1F2933">GS-DBLP</text>
+<rect x="1368.60" y="231.72" width="28.00" height="333.28" fill="#B7D9DF" stroke="#FFFFFF" stroke-width="0.6"/>
+<rect x="1400.60" y="561.00" width="28.00" height="4.00" fill="#315E8A" stroke="#FFFFFF" stroke-width="0.6"/>
+<text x="1403.60" y="583" transform="rotate(90 1403.60 583)" font-size="13" font-family="DejaVu Sans, sans-serif" fill="#1F2933">GS-PB</text>
+<rect x="1462.87" y="202.35" width="28.00" height="362.65" fill="#B7D9DF" stroke="#FFFFFF" stroke-width="0.6"/>
+<rect x="1494.87" y="561.00" width="28.00" height="4.00" fill="#315E8A" stroke="#FFFFFF" stroke-width="0.6"/>
+<text x="1497.87" y="583" transform="rotate(90 1497.87 583)" font-size="13" font-family="DejaVu Sans, sans-serif" fill="#1F2933">GS-RD</text>
+<rect x="126" y="672" width="19" height="14" fill="#B7D9DF"/>
+<text x="153" y="684" font-size="15" font-family="DejaVu Sans, sans-serif" fill="#1F2933">PyG-CPU</text>
+<rect x="248" y="672" width="19" height="14" fill="#315E8A"/>
+<text x="275" y="684" font-size="15" font-family="DejaVu Sans, sans-serif" fill="#1F2933">HyGCN</text>
+</svg>
