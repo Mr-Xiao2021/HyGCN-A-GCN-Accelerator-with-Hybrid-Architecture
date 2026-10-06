@@ -75,3 +75,20 @@ cmake --build build --target report_figures
 邻居 fallback；Reddit 因仓库缺少图文件只保留报告数字化柱值。当前能耗证据仅覆盖
 DRAMSim3 的 DRAM 能耗，CPU、RTL 综合和 CACTI 数据仍属于报告校准输入，而非本地
 独立实测。完整边界见 [docs/report-figures.md](docs/report-figures.md)。
+
+### 本地 PyG-CPU 实测 speedup
+
+安装与当前环境匹配的 PyG 后，可复跑 12 个具备图数据的 CPU inference 基线：
+
+```bash
+python3 -m pip install -r requirements-pyg-cpu.txt
+python3 tools/pyg_cpu_benchmark.py \
+  --threads 20 \
+  --output-dir res/pyg-cpu
+```
+
+该测试使用 PyG 的 `GCNConv`、`GINConv` 和 `SAGEConv`，固定两层、hidden=128，默认
+绑定 20 个 CPU 核，warmup 后以 7 次推理的中位 wall-clock 延迟作为 CPU 基线。
+speedup 为本机 PyG-CPU 延迟除以 0.5 GHz HyGCN legacy simulator 延迟。它是项目
+真实执行结果，但会记录并披露当前 CPU 型号；若主机不是报告中的双路 Xeon 4210R，
+不得把结果当成原报告平台的严格复现。

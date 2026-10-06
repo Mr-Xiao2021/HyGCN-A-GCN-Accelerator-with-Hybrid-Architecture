@@ -51,10 +51,17 @@ The generated CSV also computes report-calibrated PyG-CPU equivalents by multipl
 latency/DRAM energy by the digitized normalized ratios. Those equivalents are useful for chart
 reconstruction only; they are not local CPU measurements.
 
+An independent local CPU timing path is available through `tools/pyg_cpu_benchmark.py`. It runs
+two-layer PyG GCN, GIN, and GraphSAGE inference, pins the process to 20 CPUs by default, excludes
+graph and feature setup from the timed interval, and compares the median CPU wall-clock latency
+with the committed 0.5 GHz HyGCN legacy-simulator latency. Its outputs are written to
+`res/pyg-cpu/` and are separate from the PDF-digitized report reproduction.
+
 ## Limits
 
 - Reddit graph files are absent, so its three local simulator points are unavailable.
-- The repository contains no captured PyG-CPU benchmark from the dual Xeon 4210R system.
+- The repository still has no captured PyG-CPU benchmark from the report's dual Xeon 4210R system;
+  local PyG results record the actual host CPU instead.
 - The repository contains no RTL synthesis or CACTI output for compute/SRAM energy.
 - Legacy energy is DRAMSim3 DRAM energy, not total accelerator energy.
 - Therefore the charts are a high-fidelity report reproduction, not an independent confirmation of

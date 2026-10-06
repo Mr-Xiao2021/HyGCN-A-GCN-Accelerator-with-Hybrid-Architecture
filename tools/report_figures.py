@@ -166,7 +166,7 @@ def run_legacy(binary, root, output_dir, manifest, points):
     )
 
 
-def svg_chart(points, metric, y_offset=0, height=720):
+def svg_chart(points, metric, y_offset=0, height=720, chart_text=None):
     if metric == "speedup":
         title = "Processing Speedup"
         subtitle = "PyG-CPU normalized to 1; HyGCN uses digitized Figure 7 values"
@@ -183,6 +183,12 @@ def svg_chart(points, metric, y_offset=0, height=720):
         right_values = [1.0] * len(points)
         mean_value = sum(left_values) / len(left_values)
         mean_text = f"Arithmetic mean reduction: {mean_value:.0f}x"
+
+    text_override = (chart_text or {}).get(metric, {})
+    title = text_override.get("title", title)
+    subtitle = text_override.get("subtitle", subtitle)
+    mean_text = text_override.get("mean_text", mean_text)
+    max_exponent = int(text_override.get("max_exponent", max_exponent))
 
     width = 1600
     left = 126
@@ -239,12 +245,14 @@ def svg_chart(points, metric, y_offset=0, height=720):
     return output
 
 
-def write_svg(path, points, metrics):
+def write_svg(path, points, metrics, chart_text=None):
     chart_height = 720
     total_height = chart_height * len(metrics)
     body = []
     for index, metric in enumerate(metrics):
-        body.extend(svg_chart(points, metric, index * chart_height, chart_height))
+        body.extend(svg_chart(
+            points, metric, index * chart_height, chart_height, chart_text
+        ))
     document = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         f'<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="{total_height}" viewBox="0 0 1600 {total_height}">',
@@ -277,7 +285,7 @@ def draw_rotated_label(image, position, text, font, fill):
     image.alpha_composite(rotated, position)
 
 
-def draw_raster_chart(image, points, metric, y_offset, height):
+def draw_raster_chart(image, points, metric, y_offset, height, chart_text=None):
     from PIL import ImageDraw
     draw = ImageDraw.Draw(image)
     axis_color = COLORS["axis"]
@@ -304,6 +312,12 @@ def draw_raster_chart(image, points, metric, y_offset, height):
         mean_text = (
             f"Arithmetic mean reduction: {sum(left_values) / len(left_values):.0f}x"
         )
+
+    text_override = (chart_text or {}).get(metric, {})
+    title = text_override.get("title", title)
+    subtitle = text_override.get("subtitle", subtitle)
+    mean_text = text_override.get("mean_text", mean_text)
+    max_exponent = int(text_override.get("max_exponent", max_exponent))
 
     left = 126
     right = 1540
@@ -350,30 +364,34 @@ def draw_raster_chart(image, points, metric, y_offset, height):
     draw.text((left + 150, legend_y - 3), "HyGCN", font=body_font, fill=axis_color)
 
 
-def write_raster(output_dir, points):
+def write_raster(output_dir, points, prefix="report", metrics=None, chart_text=None):
     try:
         from PIL import Image
     except ImportError:
         return []
+    metrics = metrics or ["speedup", "energy_reduction"]
     artifacts = []
-    for metric, filename in (
-        ("speedup", "report_speedup.png"),
-        ("energy_reduction", "report_energy.png"),
-    ):
+    metric_names = {"speedup": "speedup", "energy_reduction": "energy"}
+    for metric in metrics:
         image = Image.new("RGBA", (1600, 720), COLORS["background"])
-        draw_raster_chart(image, points, metric, 0, 720)
-        path = output_dir / filename
+        draw_raster_chart(image, points, metric, 0, 720, chart_text)
+        path = output_dir / f"{prefix}_{metric_names[metric]}.png"
         image.convert("RGB").save(path, "PNG", optimize=True)
         artifacts.append(path)
-    combined = Image.new("RGBA", (1600, 1440), COLORS["background"])
-    draw_raster_chart(combined, points, "speedup", 0, 720)
-    draw_raster_chart(combined, points, "energy_reduction", 720, 720)
-    png_path = output_dir / "report_comparison.png"
-    pdf_path = output_dir / "report_comparison.pdf"
+    combined = Image.new("RGBA", (1600, 720 * len(metrics)), COLORS["background"])
+    for index, metric in enumerate(metrics):
+        draw_raster_chart(
+            combined, points, metric, index * 720, 720, chart_text
+        )
+    suffix = "comparison" if len(metrics) > 1 else metric_names[metrics[0]]
+    png_path = output_dir / f"{prefix}_{suffix}.png"
+    pdf_path = output_dir / f"{prefix}_{suffix}.pdf"
     combined_rgb = combined.convert("RGB")
-    combined_rgb.save(png_path, "PNG", optimize=True)
+    if png_path not in artifacts:
+        combined_rgb.save(png_path, "PNG", optimize=True)
+        artifacts.append(png_path)
     combined_rgb.save(pdf_path, "PDF", resolution=144.0)
-    artifacts.extend([png_path, pdf_path])
+    artifacts.append(pdf_path)
     return artifacts
 
 

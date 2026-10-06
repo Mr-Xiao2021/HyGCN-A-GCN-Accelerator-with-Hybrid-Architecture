@@ -106,6 +106,10 @@ if(Python3_Interpreter_FOUND)
                     --binary $<TARGET_FILE:hygcntest>)
     set_tests_properties(report_legacy_evidence PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
+    add_test(NAME pyg_cpu_helpers
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/test_pyg_cpu_benchmark.py)
+    set_tests_properties(pyg_cpu_helpers PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
     add_custom_target(legacy_regression
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/check_legacy_snapshot.py
                     --binary $<TARGET_FILE:hygcntest>
@@ -132,6 +136,16 @@ if(Python3_Interpreter_FOUND)
                     --binary $<TARGET_FILE:hygcntest>
                     --output-dir ${CMAKE_SOURCE_DIR}/res/report
             DEPENDS hygcntest
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            USES_TERMINAL)
+
+    add_custom_target(pyg_cpu_benchmark
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/pyg_cpu_benchmark.py
+                    --graph-dir ${CMAKE_SOURCE_DIR}/gcn_dataset
+                    --hygcn-dir ${CMAKE_SOURCE_DIR}/res/report/raw
+                    --report-summary ${CMAKE_SOURCE_DIR}/res/report/report_summary.json
+                    --output-dir ${CMAKE_SOURCE_DIR}/res/pyg-cpu
+                    --threads 20
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
             USES_TERMINAL)
 endif()
