@@ -1,0 +1,183 @@
+`timescale 1ns/1ps
+`default_nettype none
+
+module hygcn_rtl_smoke_top (
+    input  logic             clk,
+    input  logic             rst_n,
+    input  logic [1:0]       ae_s_valid,
+    output logic [1:0]       ae_s_ready,
+    input  logic [15:0]      ae_s_batch_id,
+    input  logic [31:0]      ae_s_vertex_id,
+    input  logic [1:0]       ae_s_first,
+    input  logic [1:0]       ae_s_last,
+    input  logic [1:0]       ae_s_op_max,
+    input  logic [127:0]     ae_s_data,
+    output logic [1:0]       ae_m_valid,
+    input  logic [1:0]       ae_m_ready,
+    output logic [15:0]      ae_m_batch_id,
+    output logic [31:0]      ae_m_vertex_id,
+    output logic [255:0]     ae_m_data,
+    output logic [1:0]       ae_active,
+    output logic [1:0]       ae_error,
+
+    input  logic             ce_s_valid,
+    output logic             ce_s_ready,
+    input  logic [7:0]       ce_s_batch_id,
+    input  logic [15:0]      ce_s_vertex_id,
+    input  logic             ce_s_first,
+    input  logic             ce_s_last,
+    input  logic [63:0]      ce_s_activation,
+    input  logic [255:0]     ce_s_weight,
+    input  logic [127:0]     ce_s_bias,
+    output logic             ce_m_valid,
+    input  logic             ce_m_ready,
+    output logic [7:0]       ce_m_batch_id,
+    output logic [15:0]      ce_m_vertex_id,
+    output logic [127:0]     ce_m_data,
+    output logic             ce_active,
+    output logic             ce_error,
+
+    input  logic             arb_mode_batch_class,
+    input  logic [3:0]       arb_s_valid,
+    output logic [3:0]       arb_s_ready,
+    input  logic [31:0]      arb_s_batch_id,
+    input  logic [63:0]      arb_s_sequence,
+    input  logic [127:0]     arb_s_address,
+    input  logic [31:0]      arb_s_length,
+    input  logic [3:0]       arb_s_write,
+    output logic             arb_m_valid,
+    input  logic             arb_m_ready,
+    output logic [1:0]       arb_m_class,
+    output logic [7:0]       arb_m_batch_id,
+    output logic [15:0]      arb_m_sequence,
+    output logic [31:0]      arb_m_address,
+    output logic [7:0]       arb_m_length,
+    output logic             arb_m_write,
+
+    input  logic             buf_alloc_valid,
+    output logic             buf_alloc_ready,
+    input  logic [7:0]       buf_alloc_batch_id,
+    input  logic [15:0]      buf_alloc_bytes,
+    output logic             buf_alloc_bank_id,
+    input  logic             buf_ae_done_valid,
+    input  logic             buf_ae_done_bank_id,
+    output logic             buf_ce_valid,
+    input  logic             buf_ce_ready,
+    output logic             buf_ce_bank_id,
+    output logic [7:0]       buf_ce_batch_id,
+    output logic [15:0]      buf_ce_bytes,
+    input  logic             buf_ce_done_valid,
+    input  logic             buf_ce_done_bank_id,
+    output logic [5:0]       buf_bank_state,
+    output logic             buf_error
+);
+    hygcn_aggregation_cluster #(
+        .CORES(2),
+        .DATA_WIDTH(16),
+        .ACC_WIDTH(32),
+        .LANES(4),
+        .BATCH_ID_WIDTH(8),
+        .VERTEX_ID_WIDTH(16)
+    ) aggregation_cluster (
+        .clk,
+        .rst_n,
+        .s_valid(ae_s_valid),
+        .s_ready(ae_s_ready),
+        .s_batch_id(ae_s_batch_id),
+        .s_vertex_id(ae_s_vertex_id),
+        .s_first(ae_s_first),
+        .s_last(ae_s_last),
+        .s_op_max(ae_s_op_max),
+        .s_data(ae_s_data),
+        .m_valid(ae_m_valid),
+        .m_ready(ae_m_ready),
+        .m_batch_id(ae_m_batch_id),
+        .m_vertex_id(ae_m_vertex_id),
+        .m_data(ae_m_data),
+        .active(ae_active),
+        .protocol_error(ae_error)
+    );
+
+    hygcn_combination_cluster #(
+        .MODULES(2),
+        .ARRAYS_PER_MODULE(2),
+        .LANES(4),
+        .DATA_WIDTH(16),
+        .WEIGHT_WIDTH(16),
+        .ACC_WIDTH(32),
+        .BATCH_ID_WIDTH(8),
+        .VERTEX_ID_WIDTH(16)
+    ) combination_cluster (
+        .clk,
+        .rst_n,
+        .s_valid(ce_s_valid),
+        .s_ready(ce_s_ready),
+        .s_batch_id(ce_s_batch_id),
+        .s_vertex_id(ce_s_vertex_id),
+        .s_first(ce_s_first),
+        .s_last(ce_s_last),
+        .s_activation(ce_s_activation),
+        .s_weight(ce_s_weight),
+        .s_bias(ce_s_bias),
+        .m_valid(ce_m_valid),
+        .m_ready(ce_m_ready),
+        .m_batch_id(ce_m_batch_id),
+        .m_vertex_id(ce_m_vertex_id),
+        .m_data(ce_m_data),
+        .active(ce_active),
+        .protocol_error(ce_error)
+    );
+
+    hygcn_request_arbiter #(
+        .REQUEST_CLASSES(4),
+        .BATCH_ID_WIDTH(8),
+        .SEQUENCE_WIDTH(16),
+        .ADDRESS_WIDTH(32),
+        .LENGTH_WIDTH(8)
+    ) request_arbiter (
+        .mode_batch_class(arb_mode_batch_class),
+        .s_valid(arb_s_valid),
+        .s_ready(arb_s_ready),
+        .s_batch_id(arb_s_batch_id),
+        .s_sequence(arb_s_sequence),
+        .s_address(arb_s_address),
+        .s_length(arb_s_length),
+        .s_write(arb_s_write),
+        .m_valid(arb_m_valid),
+        .m_ready(arb_m_ready),
+        .m_class(arb_m_class),
+        .m_batch_id(arb_m_batch_id),
+        .m_sequence(arb_m_sequence),
+        .m_address(arb_m_address),
+        .m_length(arb_m_length),
+        .m_write(arb_m_write)
+    );
+
+    hygcn_aggregation_buffer_ctrl #(
+        .BANKS(2),
+        .BANK_BYTES(1024),
+        .BATCH_ID_WIDTH(8),
+        .BYTE_COUNT_WIDTH(16)
+    ) aggregation_buffer_ctrl (
+        .clk,
+        .rst_n,
+        .alloc_valid(buf_alloc_valid),
+        .alloc_ready(buf_alloc_ready),
+        .alloc_batch_id(buf_alloc_batch_id),
+        .alloc_bytes(buf_alloc_bytes),
+        .alloc_bank_id(buf_alloc_bank_id),
+        .ae_done_valid(buf_ae_done_valid),
+        .ae_done_bank_id(buf_ae_done_bank_id),
+        .ce_valid(buf_ce_valid),
+        .ce_ready(buf_ce_ready),
+        .ce_bank_id(buf_ce_bank_id),
+        .ce_batch_id(buf_ce_batch_id),
+        .ce_bytes(buf_ce_bytes),
+        .ce_done_valid(buf_ce_done_valid),
+        .ce_done_bank_id(buf_ce_done_bank_id),
+        .bank_state(buf_bank_state),
+        .protocol_error(buf_error)
+    );
+endmodule
+
+`default_nettype wire

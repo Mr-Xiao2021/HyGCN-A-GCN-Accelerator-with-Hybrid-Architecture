@@ -1,0 +1,11 @@
+name: hygcn-rtl
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - verilator=5.030
+  - make
+  - cxx-compiler
+  - pip
+  - pip:
+      - yowasp-yosys==0.69.0.0.post1233

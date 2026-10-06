@@ -64,6 +64,10 @@ set_tests_properties(hygcn_missing_dataset PROPERTIES
 
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
+    add_test(NAME rtl_parameter_alignment
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/test_rtl_config.py)
+    set_tests_properties(rtl_parameter_alignment PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
     add_test(NAME paper_reference_manifest
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/validate_reference_metrics.py)
     set_tests_properties(paper_reference_manifest PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -148,4 +152,37 @@ if(Python3_Interpreter_FOUND)
                     --threads 20
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
             USES_TERMINAL)
+endif()
+
+set(HYGCN_RTL_TOOL_ROOT "$ENV{HYGCN_RTL_TOOL_ROOT}" CACHE PATH
+        "Directory containing Verilator and Yosys binaries")
+find_program(HYGCN_VERILATOR_EXECUTABLE verilator
+        HINTS
+        "${HYGCN_RTL_TOOL_ROOT}/bin"
+        "$ENV{HOME}/.cache/conda-envs/hygcn-rtl/bin")
+find_program(HYGCN_YOSYS_EXECUTABLE NAMES yosys yowasp-yosys
+        HINTS
+        "${HYGCN_RTL_TOOL_ROOT}/bin"
+        "$ENV{HOME}/.cache/conda-envs/hygcn-rtl/bin")
+find_program(HYGCN_MAKE_EXECUTABLE NAMES make gmake)
+
+if(HYGCN_VERILATOR_EXECUTABLE AND HYGCN_MAKE_EXECUTABLE)
+    add_test(NAME rtl_verilator_sim
+            COMMAND ${HYGCN_MAKE_EXECUTABLE} -C ${CMAKE_SOURCE_DIR}/rtl sim
+                    VERILATOR=${HYGCN_VERILATOR_EXECUTABLE}
+                    BUILD_DIR=${CMAKE_BINARY_DIR}/rtl)
+    set_tests_properties(rtl_verilator_sim PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endif()
+
+if(HYGCN_VERILATOR_EXECUTABLE AND HYGCN_YOSYS_EXECUTABLE AND HYGCN_MAKE_EXECUTABLE)
+    add_custom_target(rtl_verify
+            COMMAND ${HYGCN_MAKE_EXECUTABLE} -C ${CMAKE_SOURCE_DIR}/rtl all
+                    VERILATOR=${HYGCN_VERILATOR_EXECUTABLE}
+                    YOSYS=${HYGCN_YOSYS_EXECUTABLE}
+                    BUILD_DIR=${CMAKE_BINARY_DIR}/rtl
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            USES_TERMINAL)
+else()
+    message(STATUS
+            "RTL tools not found; set HYGCN_RTL_TOOL_ROOT to enable the rtl_verify target")
 endif()

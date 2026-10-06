@@ -1,0 +1,16 @@
+read_verilog -defer -sv rtl/hygcn_aggregation_engine.sv
+read_verilog -defer -sv rtl/hygcn_aggregation_cluster.sv
+read_verilog -defer -sv rtl/hygcn_combination_cluster.sv
+read_verilog -defer -sv rtl/hygcn_request_arbiter.sv
+read_verilog -defer -sv rtl/hygcn_aggregation_buffer_ctrl.sv
+read_verilog -defer -sv rtl/synth/hygcn_rtl_smoke_top.sv
+hierarchy -check -top hygcn_rtl_smoke_top
+proc
+opt
+memory
+opt
+techmap
+opt
+check
+tee -o build-rtl/hygcn_rtl_smoke_stat.json stat -json
+write_json build-rtl/hygcn_rtl_smoke_netlist.json

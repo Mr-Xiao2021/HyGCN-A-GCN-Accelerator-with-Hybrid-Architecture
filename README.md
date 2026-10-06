@@ -92,3 +92,19 @@ python3 tools/pyg_cpu_benchmark.py \
 speedup 为本机 PyG-CPU 延迟除以 0.5 GHz HyGCN legacy simulator 延迟。它是项目
 真实执行结果，但会记录并披露当前 CPU 型号；若主机不是报告中的双路 Xeon 4210R，
 不得把结果当成原报告平台的严格复现。
+
+## 可综合 RTL 原型
+
+`rtl/` 提供 SystemVerilog 功能原型，默认结构参数对应 32×SIMD16 聚合集群、
+8 个组合模块 × 每模块 4 个 array × 128 inner lanes、四类请求仲裁和双区
+Aggregation Buffer。安装 `rtl/environment.yml` 中的 Verilator/Yosys 工具链后运行：
+
+```bash
+export HYGCN_RTL_TOOL_ROOT="$HOME/.cache/conda-envs/hygcn-rtl"
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target rtl_verify
+```
+
+该目标执行 lint、确定性功能仿真和 smoke 综合。它证明核心模块可综合，但不包含
+HBM PHY、SRAM macro、PDK、STA 或布局布线，不能替代论文 12 nm 面积和功耗签核。
+模块和验证边界见 [docs/rtl-prototype.md](docs/rtl-prototype.md)。
