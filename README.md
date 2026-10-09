@@ -108,3 +108,20 @@ cmake --build build --target rtl_verify
 该目标执行 lint、确定性功能仿真和 smoke 综合。它证明核心模块可综合，但不包含
 HBM PHY、SRAM macro、PDK、STA 或布局布线，不能替代论文 12 nm 面积和功耗签核。
 模块和验证边界见 [docs/rtl-prototype.md](docs/rtl-prototype.md)。
+
+## MEGA 内存效率开发
+
+`dev/mega` 分支基于当前 `report` 提交，引入 MEGA 论文的 Degree-Aware 混合精度、
+Adaptive-Package 和 Condense-Edge 技术路线。开发目标是基于完整请求流同时降低
+DRAM access 与总时钟数，并通过固定 M0-M3 消融区分量化、格式和调度贡献。
+
+当前阶段已完成 OpenSpec 行为契约、技术设计、任务分解和机器可读论文 reference：
+
+```bash
+python3 tools/validate_mega_reference.py
+openspec validate develop-mega-memory-efficiency --strict --no-interactive
+```
+
+技术方案见 [docs/mega-development-plan.md](docs/mega-development-plan.md)，完整规范位于
+`openspec/changes/develop-mega-memory-efficiency/`。在逐节点量化来源和论文完整 workload
+齐备前，论文平均 speedup/DRAM reduction 仅作为 reference，不作为完整复现声明。

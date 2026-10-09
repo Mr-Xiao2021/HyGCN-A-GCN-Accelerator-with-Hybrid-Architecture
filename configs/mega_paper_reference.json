@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "reference_version": "mega-arxiv-2311.09775v1-planning-v1",
+  "paper": {
+    "title": "MEGA: A Memory-Efficient GNN Accelerator Exploiting Degree-Aware Mixed-Precision Quantization",
+    "arxiv_id": "2311.09775v1",
+    "source_url": "https://arxiv.org/html/2311.09775v1",
+    "accessed_on": "2026-10-09"
+  },
+  "datasets": {
+    "cora": {
+      "nodes": 2708,
+      "edges": 10556,
+      "feature_length": 1433,
+      "average_degree": 3.90
+    },
+    "citeseer": {
+      "nodes": 3327,
+      "edges": 9104,
+      "feature_length": 3703,
+      "average_degree": 2.74
+    },
+    "pubmed": {
+      "nodes": 19717,
+      "edges": 88648,
+      "feature_length": 500,
+      "average_degree": 4.50
+    },
+    "nell": {
+      "nodes": 65755,
+      "edges": 251550,
+      "feature_length": 61278,
+      "average_degree": 3.83
+    },
+    "reddit": {
+      "nodes": 232965,
+      "edges": 114615892,
+      "feature_length": 602,
+      "average_degree": 491.99
+    }
+  },
+  "models": {
+    "gcn": {
+      "layers": 2,
+      "hidden_units": 128,
+      "aggregation": "add"
+    },
+    "gin": {
+      "layers": 2,
+      "hidden_units": 128,
+      "aggregation": "add"
+    },
+    "graphsage": {
+      "layers": 2,
+      "hidden_units": 256,
+      "sample_nodes": 25,
+      "aggregation": "mean"
+    }
+  },
+  "architecture": {
+    "technology_nm": 28,
+    "frequency_ghz": 1.0,
+    "hbm_bandwidth_gbps": 256,
+    "dram_access_granularity_bytes": 128,
+    "processing": {
+      "combination_tiles": 4,
+      "cpes_per_tile": 8,
+      "bses_per_cpe": 32,
+      "aggregation_units": 256,
+      "weight_bits": 4,
+      "partial_sum_bits": 16,
+      "eid_fifos": 16,
+      "eid_fifo_entries": 8
+    },
+    "buffers_kib": {
+      "input": 64,
+      "edge": 24,
+      "weight": 48,
+      "combination": 96,
+      "aggregation": 128,
+      "sparse": 32,
+      "total": 392
+    },
+    "adaptive_package_bits": {
+      "short": 64,
+      "medium": 128,
+      "long": 192,
+      "mode_bits": 2,
+      "bitwidth_bits": 3,
+      "supported_value_bits": [1, 2, 3, 4, 5, 6, 7, 8]
+    }
+  },
+  "paper_reference_metrics": {
+    "overall_speedup_arithmetic_mean": {
+      "hygcn": 38.3,
+      "gcnax": 7.1,
+      "grow": 4.0,
+      "sgcn": 3.6
+    },
+    "original_configuration_speedup_arithmetic_mean": {
+      "gcnax": 4.68,
+      "grow": 2.53
+    },
+    "dram_access_reduction_arithmetic_mean": {
+      "hygcn": 108.1,
+      "gcnax": 10.5,
+      "grow": 8.4,
+      "sgcn": 7.3
+    },
+    "energy_saving_arithmetic_mean": {
+      "hygcn": 47.6,
+      "gcnax": 7.2,
+      "grow": 5.4,
+      "sgcn": 4.5
+    },
+    "ablation_speedup": {
+      "degree_aware_vs_hygcn_c": 4.8,
+      "adaptive_package_vs_bitmap": 4.7,
+      "condense_edge_incremental": 1.1
+    },
+    "ablation_dram_access_reduction": {
+      "degree_aware": 5.8,
+      "adaptive_package_incremental": 2.5,
+      "condense_edge_incremental": 4.4
+    }
+  },
+  "evaluation_policy": {
+    "primary_metrics": [
+      "dram_bytes",
+      "dram_transactions",
+      "total_cycles"
+    ],
+    "required_local_workloads": [
+      "cora",
+      "citeseer",
+      "pubmed"
+    ],
+    "ablation_order": [
+      "m0_fp32_axw",
+      "m1_degree_aware_bitmap",
+      "m2_adaptive_package",
+      "m3_condense_edge"
+    ],
+    "local_mechanism_gate": {
+      "m3_dram_bytes_less_than_m0": true,
+      "m3_total_cycles_less_than_m0": true,
+      "validation": "per_workload"
+    },
+    "paper_metrics_are_reference_only_until_full_workload_and_quantization_provenance": true,
+    "forbid_target_fitted_baseline_throttle": true
+  }
+}

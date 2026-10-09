@@ -1,0 +1,3 @@
+schema: spec-driven
+created: 2026-10-09
+goal: 以可审计的基线、消融和逐数据集指标验证 MEGA 机制对 DRAM access 与 total cycles 的改善。

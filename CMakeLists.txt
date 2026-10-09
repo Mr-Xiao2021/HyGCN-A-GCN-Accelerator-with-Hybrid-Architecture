@@ -64,6 +64,10 @@ set_tests_properties(hygcn_missing_dataset PROPERTIES
 
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
+    add_test(NAME mega_reference_manifest
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/validate_mega_reference.py)
+    set_tests_properties(mega_reference_manifest PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
     add_test(NAME rtl_parameter_alignment
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/test_rtl_config.py)
     set_tests_properties(rtl_parameter_alignment PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
