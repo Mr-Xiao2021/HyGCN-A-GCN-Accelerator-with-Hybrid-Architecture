@@ -125,3 +125,8 @@ openspec validate develop-mega-memory-efficiency --strict --no-interactive
 技术方案见 [docs/mega-development-plan.md](docs/mega-development-plan.md)，完整规范位于
 `openspec/changes/develop-mega-memory-efficiency/`。在逐节点量化来源和论文完整 workload
 齐备前，论文平均 speedup/DRAM reduction 仅作为 reference，不作为完整复现声明。
+
+Degree-Aware manifest 与 Adaptive-Package codec 的格式、来源分级和运行方式见
+[docs/mega-quantization-and-package.md](docs/mega-quantization-and-package.md)。
+请求级周期/流量口径、Condense-Edge 语义和 M0-M3 一键复跑入口见
+[docs/mega-request-model.md](docs/mega-request-model.md)。

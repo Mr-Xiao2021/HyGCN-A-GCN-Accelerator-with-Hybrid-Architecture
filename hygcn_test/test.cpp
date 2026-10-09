@@ -10,6 +10,7 @@
 #include "config.h"
 #include "hygcn.h"
 #include "json.hpp"
+#include "mega_sim.h"
 #include "paper_sim.h"
 
 #ifndef HYGCN_GIT_COMMIT
@@ -28,16 +29,20 @@ struct Options {
     std::string dataset = "test";
     std::string graph_dir = "gcn_dataset";
     std::string output_dir = "res";
+    std::string quantization_manifest;
+    std::string partition_manifest;
+    mega::MegaVariant mega_variant = mega::MegaVariant::M3_CONDENSE_EDGE;
     uint64_t seed = 1;
     int layer = -1;
     FeatureFlags flags;
     bool quiet = false;
+    bool required = false;
 };
 
 void PrintUsage(const char* program) {
     std::cout
         << "Usage: " << program << " [options]\n"
-        << "  --engine paper|legacy\n"
+        << "  --engine paper|legacy|mega\n"
         << "  --profile paper|legacy|smoke\n"
         << "  --profile-path PATH\n"
         << "  --model gcn|gin|gs\n"
@@ -53,6 +58,10 @@ void PrintUsage(const char* program) {
         << "  --mapping row-first|low-bits\n"
         << "  --seed N\n"
         << "  --output-dir PATH\n"
+        << "  --quantization-manifest PATH (MEGA)\n"
+        << "  --partition-manifest PATH (MEGA, optional)\n"
+        << "  --mega-variant m0|m1|m2|m3\n"
+        << "  --required (reject diagnostic MEGA inputs)\n"
         << "  --quiet\n";
 }
 
@@ -135,13 +144,22 @@ Options ParseOptions(int argc, char** argv) {
             options.seed = std::stoull(RequireValue(argc, argv, i));
         } else if (argument == "--output-dir") {
             options.output_dir = RequireValue(argc, argv, i);
+        } else if (argument == "--quantization-manifest") {
+            options.quantization_manifest = RequireValue(argc, argv, i);
+        } else if (argument == "--partition-manifest") {
+            options.partition_manifest = RequireValue(argc, argv, i);
+        } else if (argument == "--mega-variant") {
+            options.mega_variant = mega::ParseMegaVariant(RequireValue(argc, argv, i));
+        } else if (argument == "--required") {
+            options.required = true;
         } else if (argument == "--quiet") {
             options.quiet = true;
         } else {
             throw std::runtime_error("unknown option: " + argument);
         }
     }
-    if (options.engine != "paper" && options.engine != "legacy") {
+    if (options.engine != "paper" && options.engine != "legacy" &&
+        options.engine != "mega") {
         throw std::runtime_error("invalid engine: " + options.engine);
     }
     return options;
@@ -150,6 +168,12 @@ Options ParseOptions(int argc, char** argv) {
 std::string ProfilePath(const Options& options) {
     if (!options.profile_path.empty()) {
         return options.profile_path;
+    }
+    if (options.engine == "mega" && options.profile == "paper") {
+        return "configs/MEGA_PAPER.ini";
+    }
+    if (options.engine == "mega" && options.profile == "smoke") {
+        return "configs/MEGA_SMOKE.ini";
     }
     if (options.profile == "paper") {
         return "configs/HYGCN_PAPER.ini";
@@ -177,12 +201,20 @@ void ValidateInputs(const Options& options) {
     if (options.model != "gcn" && options.model != "gin" && options.model != "gs") {
         throw std::runtime_error("unsupported model: " + options.model);
     }
-    if (options.engine == "legacy" && options.flags.aggregation_only) {
+    if (options.engine != "paper" && options.flags.aggregation_only) {
         throw std::runtime_error("aggregation scope is supported only by the paper engine");
+    }
+    if (options.engine == "mega" && options.quantization_manifest.empty()) {
+        throw std::runtime_error("MEGA engine requires --quantization-manifest");
     }
 }
 
 std::string ResultStem(const Options& options) {
+    if (options.engine == "mega") {
+        return "mega_" + options.profile + "_" + options.model + "_" +
+               options.dataset + "_" + mega::ToString(options.mega_variant) +
+               (options.layer < 0 ? "" : "_layer-" + std::to_string(options.layer));
+    }
     return options.engine + "_" + options.profile + "_" + options.model + "_" +
            options.dataset + "_" + ToString(options.flags.pipeline) + "_" +
            ToString(options.flags.combination) + "_sparse-" +
@@ -192,6 +224,13 @@ std::string ResultStem(const Options& options) {
            std::to_string(options.seed) +
            (options.flags.aggregation_only ? "_scope-aggregation" : "") +
            (options.layer < 0 ? "" : "_layer-" + std::to_string(options.layer));
+}
+
+std::string GraphDigest(const Options& options) {
+    return DigestFile((std::filesystem::path(options.graph_dir) /
+                       (options.dataset + ".txt")).string()) + "-" +
+           DigestFile((std::filesystem::path(options.graph_dir) /
+                       (options.dataset + "_edge.csv")).string());
 }
 
 Graph LoadGraph(const Options& options) {
@@ -234,6 +273,41 @@ int RunPaper(const Options& options) {
                   << "total_cycles=" << result.TotalCycles() << '\n'
                   << "total_dram_bytes=" << result.TotalDramBytes() << '\n'
                   << "bandwidth_utilization=" << result.BandwidthUtilization() << '\n';
+    }
+    return 0;
+}
+
+int RunMega(const Options& options) {
+    const auto config_path = ProfilePath(options);
+    const auto architecture = mega::MegaArchitectureConfig::Load(config_path);
+    auto graph = LoadGraph(options);
+    const auto graph_digest = GraphDigest(options);
+    const auto quantization = mega::QuantizationManifest::Load(
+        options.quantization_manifest);
+    const auto partition = options.partition_manifest.empty()
+        ? mega::PartitionManifest::BuildContiguous(
+              graph, architecture.partition_vertices, graph_digest)
+        : mega::PartitionManifest::Load(options.partition_manifest);
+    mega::MegaSimulator simulator(architecture);
+    auto result = simulator.Run(
+        graph, options.model, options.dataset, graph_digest, quantization,
+        partition, options.mega_variant, options.required, options.layer);
+    result.binary_digest = DigestFile(std::filesystem::canonical("/proc/self/exe").string());
+    result.config_digest = DigestFile(config_path);
+    result.quantization_digest = DigestFile(options.quantization_manifest);
+    const auto stem = ResultStem(options);
+    const auto json_path = (std::filesystem::path(options.output_dir) /
+                            (stem + ".json")).string();
+    const auto csv_path = (std::filesystem::path(options.output_dir) /
+                           (stem + ".csv")).string();
+    mega::WriteMegaJson(result, json_path);
+    mega::WriteMegaCsv(result, csv_path);
+    if (!options.quiet) {
+        std::cout << "result_json=" << json_path << '\n'
+                  << "result_csv=" << csv_path << '\n'
+                  << "total_cycles=" << result.TotalCycles() << '\n'
+                  << "total_dram_bytes=" << result.TotalDramBytes() << '\n'
+                  << "required_eligible=" << result.required_eligible << '\n';
     }
     return 0;
 }
@@ -351,7 +425,13 @@ int main(int argc, char** argv) {
     try {
         const auto options = ParseOptions(argc, argv);
         ValidateInputs(options);
-        return options.engine == "paper" ? RunPaper(options) : RunLegacy(options);
+        if (options.engine == "paper") {
+            return RunPaper(options);
+        }
+        if (options.engine == "mega") {
+            return RunMega(options);
+        }
+        return RunLegacy(options);
     } catch (const std::exception& error) {
         std::cerr << "error: " << error.what() << '\n';
         return 2;

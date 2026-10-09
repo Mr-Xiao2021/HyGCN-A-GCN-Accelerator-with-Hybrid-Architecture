@@ -24,7 +24,8 @@ target_compile_definitions(HyGCN PRIVATE HYGCN_GIT_COMMIT="${HYGCN_GIT_COMMIT}")
 
 add_executable(hygcntest hygcn_test/test.cpp)
 target_include_directories(hygcntest PRIVATE hygcn dramsim3/src dramsim3/ext/)
-target_link_libraries(hygcntest PRIVATE dramsim3 HyGCN args)
+target_include_directories(hygcntest PRIVATE mega)
+target_link_libraries(hygcntest PRIVATE dramsim3 HyGCN MEGA args)
 target_compile_definitions(hygcntest PRIVATE HYGCN_GIT_COMMIT="${HYGCN_GIT_COMMIT}")
 target_compile_options(hygcntest PRIVATE)
 set_target_properties(hygcntest PROPERTIES
@@ -47,13 +48,40 @@ set_target_properties(hygcn_trace_validator PROPERTIES
         CXX_EXTENSIONS NO
         )
 
+file(GLOB_RECURSE mega_src CONFIGURE_DEPENDS
+        "mega/*.cc" "mega/*.cpp" "mega/*.c" "mega/*.h")
+add_library(MEGA STATIC ${mega_src})
+target_link_libraries(MEGA PUBLIC HyGCN)
+target_include_directories(MEGA PUBLIC mega hygcn dramsim3/ext/headers)
+set_target_properties(MEGA PROPERTIES
+        CXX_STANDARD_REQUIRED YES
+        CXX_EXTENSIONS NO
+        )
+
+add_executable(mega_unit_tests mega_test/unit.cpp)
+target_link_libraries(mega_unit_tests PRIVATE MEGA)
+target_include_directories(mega_unit_tests PRIVATE mega hygcn dramsim3/ext/headers)
+set_target_properties(mega_unit_tests PROPERTIES
+        CXX_STANDARD_REQUIRED YES
+        CXX_EXTENSIONS NO
+        )
+
 add_test(NAME hygcn_unit COMMAND hygcn_unit_tests)
 set_tests_properties(hygcn_unit PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_test(NAME mega_unit COMMAND mega_unit_tests)
+set_tests_properties(mega_unit PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_test(NAME hygcn_smoke
         COMMAND hygcntest --engine paper --profile smoke --model gcn --dataset test
                 --output-dir ${CMAKE_BINARY_DIR}/test-output --quiet)
 set_tests_properties(hygcn_smoke PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_test(NAME mega_smoke
+        COMMAND hygcntest --engine mega --profile smoke --model gcn --dataset test
+                --quantization-manifest ${CMAKE_SOURCE_DIR}/configs/MEGA_TEST_QUANTIZATION.json
+                --mega-variant m3 --output-dir ${CMAKE_BINARY_DIR}/mega-test-output --quiet)
+set_tests_properties(mega_smoke PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_test(NAME hygcn_missing_dataset
         COMMAND hygcntest --engine paper --profile smoke --model gcn --dataset missing
@@ -67,6 +95,11 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME mega_reference_manifest
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/validate_mega_reference.py)
     set_tests_properties(mega_reference_manifest PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+    add_test(NAME mega_benchmark_validator
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/test_mega_benchmark.py
+                    --binary $<TARGET_FILE:hygcntest>)
+    set_tests_properties(mega_benchmark_validator PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
     add_test(NAME rtl_parameter_alignment
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/test_rtl_config.py)
@@ -136,6 +169,19 @@ if(Python3_Interpreter_FOUND)
                     --report ${CMAKE_SOURCE_DIR}/res/paper/benchmark_report.json
                     --output ${CMAKE_SOURCE_DIR}/res/paper/validation_report.md
             DEPENDS hygcntest hygcn_trace_validator
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            USES_TERMINAL)
+
+    add_custom_target(mega_benchmark
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/mega_benchmark.py
+                    --binary $<TARGET_FILE:hygcntest>
+                    --output-dir ${CMAKE_SOURCE_DIR}/res/mega
+                    --force
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/validate_mega_metrics.py
+                    --report ${CMAKE_SOURCE_DIR}/res/mega/benchmark_report.json
+                    --output ${CMAKE_SOURCE_DIR}/res/mega/validation_report.md
+                    --require-local-gate
+            DEPENDS hygcntest
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
             USES_TERMINAL)
 
