@@ -53,6 +53,7 @@ file(GLOB_RECURSE mega_src CONFIGURE_DEPENDS
 add_library(MEGA STATIC ${mega_src})
 target_link_libraries(MEGA PUBLIC HyGCN)
 target_include_directories(MEGA PUBLIC mega hygcn dramsim3/ext/headers)
+target_compile_definitions(MEGA PRIVATE HYGCN_GIT_COMMIT="${HYGCN_GIT_COMMIT}")
 set_target_properties(MEGA PROPERTIES
         CXX_STANDARD_REQUIRED YES
         CXX_EXTENSIONS NO
