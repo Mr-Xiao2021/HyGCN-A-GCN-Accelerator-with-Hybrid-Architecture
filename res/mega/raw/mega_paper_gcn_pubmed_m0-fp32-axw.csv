@@ -1,0 +1,3 @@
+model,dataset,profile,variant,required_eligible,layer,input_features,output_features,nonzero_features,average_feature_bits,total_logical_bytes,input_dram_bytes,weight_dram_bytes,edge_dram_bytes,cross_partition_dram_bytes,output_dram_bytes,total_dram_bytes,memory_service_cycles,decoder_cycles,combination_cycles,condense_cycles,aggregation_cycles,encoder_cycles,total_cycles
+gcn,pubmed,mega-paper,m0-fp32-axw,0,0,500,128,987079,2.46325,87528824,39434112,256000,866944,36876800,10095104,87528960,343892,0,315472628,0,433460,0,316249980
+gcn,pubmed,mega-paper,m0-fp32-axw,0,1,128,3,1766426,2.46347,12064464,10095104,1536,866944,9219200,236672,20419456,80288,0,1892963,0,10160,0,1983411

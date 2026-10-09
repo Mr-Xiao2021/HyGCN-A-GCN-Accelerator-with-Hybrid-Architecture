@@ -1,0 +1,307 @@
+{
+  "schema_version": 1,
+  "benchmark": "mega-m0-m3-local-mechanism-v1",
+  "conclusion_level": "diagnostic-local-mechanism",
+  "model": "gcn",
+  "profile": "paper",
+  "datasets": {
+    "cora": {
+      "variants": {
+        "m0": {
+          "total_cycles": 124931230,
+          "total_dram_bytes": 22585344,
+          "total_dram_transactions": 176448
+        },
+        "m1": {
+          "total_cycles": 173661,
+          "total_dram_bytes": 2772480,
+          "total_dram_transactions": 21660
+        },
+        "m2": {
+          "total_cycles": 181724,
+          "total_dram_bytes": 2377216,
+          "total_dram_transactions": 18572
+        },
+        "m3": {
+          "total_cycles": 194739,
+          "total_dram_bytes": 1738112,
+          "total_dram_transactions": 13579
+        }
+      },
+      "comparisons": {
+        "m1_vs_m0": {
+          "speedup": 719.3971588324379,
+          "dram_reduction": 8.146260387811635,
+          "transaction_reduction": 8.146260387811635
+        },
+        "m2_vs_m1": {
+          "speedup": 0.9556305166076028,
+          "dram_reduction": 1.1662718070213225,
+          "transaction_reduction": 1.1662718070213225
+        },
+        "m3_vs_m2": {
+          "speedup": 0.9331669567985869,
+          "dram_reduction": 1.3677001251933132,
+          "transaction_reduction": 1.3677001251933132
+        },
+        "m3_vs_m0": {
+          "speedup": 641.5316397845321,
+          "dram_reduction": 12.994182193092275,
+          "transaction_reduction": 12.994182193092275
+        }
+      },
+      "local_mechanism_gate": {
+        "dram_bytes_reduced": true,
+        "total_cycles_reduced": true,
+        "pass": true
+      },
+      "runs": {
+        "m0": "raw/mega_paper_gcn_cora_m0-fp32-axw.json",
+        "m1": "raw/mega_paper_gcn_cora_m1-degree-aware-bitmap.json",
+        "m2": "raw/mega_paper_gcn_cora_m2-adaptive-package.json",
+        "m3": "raw/mega_paper_gcn_cora_m3-condense-edge.json"
+      },
+      "quantization_manifest": "manifests/gcn_cora_diagnostic_quantization.json",
+      "quantization_sha256": "446d062ec9d421be5c0cd654e62812a61ff9ea8ab6dcb360774659654c743652"
+    },
+    "citeseer": {
+      "variants": {
+        "m0": {
+          "total_cycles": 395160627,
+          "total_dram_bytes": 58420736,
+          "total_dram_transactions": 456412
+        },
+        "m1": {
+          "total_cycles": 464686,
+          "total_dram_bytes": 5010304,
+          "total_dram_transactions": 39143
+        },
+        "m2": {
+          "total_cycles": 481939,
+          "total_dram_bytes": 3998848,
+          "total_dram_transactions": 31241
+        },
+        "m3": {
+          "total_cycles": 496835,
+          "total_dram_bytes": 3294848,
+          "total_dram_transactions": 25741
+        }
+      },
+      "comparisons": {
+        "m1_vs_m0": {
+          "speedup": 850.3820364719402,
+          "dram_reduction": 11.660118028766318,
+          "transaction_reduction": 11.660118028766318
+        },
+        "m2_vs_m1": {
+          "speedup": 0.9642008635947703,
+          "dram_reduction": 1.2529368458115937,
+          "transaction_reduction": 1.2529368458115937
+        },
+        "m3_vs_m2": {
+          "speedup": 0.9700182153028671,
+          "dram_reduction": 1.213666912707354,
+          "transaction_reduction": 1.213666912707354
+        },
+        "m3_vs_m0": {
+          "speedup": 795.3558565721014,
+          "dram_reduction": 17.730935084107067,
+          "transaction_reduction": 17.730935084107067
+        }
+      },
+      "local_mechanism_gate": {
+        "dram_bytes_reduced": true,
+        "total_cycles_reduced": true,
+        "pass": true
+      },
+      "runs": {
+        "m0": "raw/mega_paper_gcn_citeseer_m0-fp32-axw.json",
+        "m1": "raw/mega_paper_gcn_citeseer_m1-degree-aware-bitmap.json",
+        "m2": "raw/mega_paper_gcn_citeseer_m2-adaptive-package.json",
+        "m3": "raw/mega_paper_gcn_citeseer_m3-condense-edge.json"
+      },
+      "quantization_manifest": "manifests/gcn_citeseer_diagnostic_quantization.json",
+      "quantization_sha256": "c3e45ec19339988ca124b0a60f0286099a49e03164701ca05b7e459ffa8ef69d"
+    },
+    "pubmed": {
+      "variants": {
+        "m0": {
+          "total_cycles": 318233391,
+          "total_dram_bytes": 107948416,
+          "total_dram_transactions": 843347
+        },
+        "m1": {
+          "total_cycles": 634970,
+          "total_dram_bytes": 24365696,
+          "total_dram_transactions": 190357
+        },
+        "m2": {
+          "total_cycles": 673292,
+          "total_dram_bytes": 22785280,
+          "total_dram_transactions": 178010
+        },
+        "m3": {
+          "total_cycles": 899670,
+          "total_dram_bytes": 13755904,
+          "total_dram_transactions": 107468
+        }
+      },
+      "comparisons": {
+        "m1_vs_m0": {
+          "speedup": 501.17862418696944,
+          "dram_reduction": 4.430344037781642,
+          "transaction_reduction": 4.430344037781642
+        },
+        "m2_vs_m1": {
+          "speedup": 0.943082644677198,
+          "dram_reduction": 1.0693612718386607,
+          "transaction_reduction": 1.0693612718386607
+        },
+        "m3_vs_m2": {
+          "speedup": 0.7483766269854503,
+          "dram_reduction": 1.6564000446644582,
+          "transaction_reduction": 1.6564000446644582
+        },
+        "m3_vs_m0": {
+          "speedup": 353.72235486344994,
+          "dram_reduction": 7.847424349573827,
+          "transaction_reduction": 7.847424349573827
+        }
+      },
+      "local_mechanism_gate": {
+        "dram_bytes_reduced": true,
+        "total_cycles_reduced": true,
+        "pass": true
+      },
+      "runs": {
+        "m0": "raw/mega_paper_gcn_pubmed_m0-fp32-axw.json",
+        "m1": "raw/mega_paper_gcn_pubmed_m1-degree-aware-bitmap.json",
+        "m2": "raw/mega_paper_gcn_pubmed_m2-adaptive-package.json",
+        "m3": "raw/mega_paper_gcn_pubmed_m3-condense-edge.json"
+      },
+      "quantization_manifest": "manifests/gcn_pubmed_diagnostic_quantization.json",
+      "quantization_sha256": "4c9ac7912f16c6c5a19614ac9048f5ecedd11b4feb21e39aab1913515a998dfd"
+    }
+  },
+  "artifacts": [
+    {
+      "path": "raw/mega_paper_gcn_cora_m0-fp32-axw.json",
+      "sha256": "65f2733b0d144dd6e385ddc8a44877efb239f1da03e43ebb123e156108bb4e90"
+    },
+    {
+      "path": "raw/mega_paper_gcn_cora_m0-fp32-axw.csv",
+      "sha256": "fcfb6a1a0696e902a2a20fcf83de9057af13d39454f64c3826f8a38da8d7ab63"
+    },
+    {
+      "path": "raw/mega_paper_gcn_cora_m1-degree-aware-bitmap.json",
+      "sha256": "0dba62b7834c91843d1010ee98bcd2a0ff1d3a94b8fed3357de2b89048211ca2"
+    },
+    {
+      "path": "raw/mega_paper_gcn_cora_m1-degree-aware-bitmap.csv",
+      "sha256": "16b5194b3f485dd5f292a3a7f0abef5c6be04d0c123063e90323626e5ae117f2"
+    },
+    {
+      "path": "raw/mega_paper_gcn_cora_m2-adaptive-package.json",
+      "sha256": "5f1d99c48042ce3dfab4eaaacffc364d45548fcd55ff90596e0a9cd9f7901d73"
+    },
+    {
+      "path": "raw/mega_paper_gcn_cora_m2-adaptive-package.csv",
+      "sha256": "da62b60eaa4a459af4250675eab11b96605f03b411203ff6cf1905a8618f0d3c"
+    },
+    {
+      "path": "raw/mega_paper_gcn_cora_m3-condense-edge.json",
+      "sha256": "cf3e73a200e50857c118d988f1fc5b7ba60bf8c89ee04633af6ac0c802d4537d"
+    },
+    {
+      "path": "raw/mega_paper_gcn_cora_m3-condense-edge.csv",
+      "sha256": "0865612ba3c8f74a3d22c0155665d6d653e67d9ca4befc357f30600cb5b20f05"
+    },
+    {
+      "path": "manifests/gcn_cora_diagnostic_quantization.json",
+      "sha256": "446d062ec9d421be5c0cd654e62812a61ff9ea8ab6dcb360774659654c743652"
+    },
+    {
+      "path": "raw/mega_paper_gcn_citeseer_m0-fp32-axw.json",
+      "sha256": "dd2a33b03c6350a6563d22a712b10e68901c5eb8a85bb2afd0e389901ecf005f"
+    },
+    {
+      "path": "raw/mega_paper_gcn_citeseer_m0-fp32-axw.csv",
+      "sha256": "039767c756f07530f75444b8facb8110c7a8fb6062f4630d7477e07c01e589b4"
+    },
+    {
+      "path": "raw/mega_paper_gcn_citeseer_m1-degree-aware-bitmap.json",
+      "sha256": "138b2a11ea8ad6067b4de04878414ea2483c0a85e7261d4087253e897f7c1a65"
+    },
+    {
+      "path": "raw/mega_paper_gcn_citeseer_m1-degree-aware-bitmap.csv",
+      "sha256": "f410393f602546f7348f5018046fe46615dca80b4a1655b7b8feb6814001889c"
+    },
+    {
+      "path": "raw/mega_paper_gcn_citeseer_m2-adaptive-package.json",
+      "sha256": "be558728031b7221693d118d50398ba2e285d6eccb4c01b9f7e0dde9bfa48a7e"
+    },
+    {
+      "path": "raw/mega_paper_gcn_citeseer_m2-adaptive-package.csv",
+      "sha256": "a004be83e754c5d1520041e2b94ccba4e28c69b610e9032e7b56359499ce4b9f"
+    },
+    {
+      "path": "raw/mega_paper_gcn_citeseer_m3-condense-edge.json",
+      "sha256": "b0a175bbfafde7d387145ab3d037cc4e754e266c88578d8407a93cf5ebaa05d4"
+    },
+    {
+      "path": "raw/mega_paper_gcn_citeseer_m3-condense-edge.csv",
+      "sha256": "cdd6eb673a576093a51606a6538c3ec46808cfa159550d1ce55375a79932a510"
+    },
+    {
+      "path": "manifests/gcn_citeseer_diagnostic_quantization.json",
+      "sha256": "c3e45ec19339988ca124b0a60f0286099a49e03164701ca05b7e459ffa8ef69d"
+    },
+    {
+      "path": "raw/mega_paper_gcn_pubmed_m0-fp32-axw.json",
+      "sha256": "6b061bbc1a7b751a685e5c5ad8413c5bedd8b6facad4e3861355861e78e15fbd"
+    },
+    {
+      "path": "raw/mega_paper_gcn_pubmed_m0-fp32-axw.csv",
+      "sha256": "408f672947a28cc73ca39a88eee238a827f926e198e9bfce6a341d439c93afb3"
+    },
+    {
+      "path": "raw/mega_paper_gcn_pubmed_m1-degree-aware-bitmap.json",
+      "sha256": "376ccd1040a2dfed31bf67ff5623a589e3aa108c66f36f5344ea08d8ab8b1964"
+    },
+    {
+      "path": "raw/mega_paper_gcn_pubmed_m1-degree-aware-bitmap.csv",
+      "sha256": "09b9799f1a3540c8dedef159745a766c4f81253e27af03838c12c6a7258db02f"
+    },
+    {
+      "path": "raw/mega_paper_gcn_pubmed_m2-adaptive-package.json",
+      "sha256": "b4c01e14528ccae813af2ce93cb29667103a09572d5dffdb4533d746f14ddc51"
+    },
+    {
+      "path": "raw/mega_paper_gcn_pubmed_m2-adaptive-package.csv",
+      "sha256": "e5d18116832cadb236b73cbdc70ba9082e854cce33760ef21e5009fb08b70cf7"
+    },
+    {
+      "path": "raw/mega_paper_gcn_pubmed_m3-condense-edge.json",
+      "sha256": "5897fbdbe0eb89b8f87685b014c7aefb5e7cffa4f519a036e13951812462cbc7"
+    },
+    {
+      "path": "raw/mega_paper_gcn_pubmed_m3-condense-edge.csv",
+      "sha256": "cfa6620aba01188d56497821ca49e71cce2d43295fb9d6ef64cbf32de36e1cf0"
+    },
+    {
+      "path": "manifests/gcn_pubmed_diagnostic_quantization.json",
+      "sha256": "4c9ac7912f16c6c5a19614ac9048f5ecedd11b4feb21e39aab1913515a998dfd"
+    }
+  ],
+  "paper_reference": {
+    "speedup_vs_hygcn_arithmetic_mean": 38.3,
+    "dram_reduction_vs_hygcn_arithmetic_mean": 108.1,
+    "eligible_for_paper_numeric_claim": false,
+    "reason": "diagnostic quantization and three exposed workloads"
+  },
+  "aggregate": {
+    "mean_speedup": 596.8699504066944,
+    "mean_dram_reduction": 12.857513875591055,
+    "all_local_gates_pass": true
+  }
+}

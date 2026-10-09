@@ -1,0 +1,3 @@
+model,dataset,profile,variant,required_eligible,layer,input_features,output_features,nonzero_features,average_feature_bits,total_logical_bytes,input_dram_bytes,weight_dram_bytes,edge_dram_bytes,cross_partition_dram_bytes,output_dram_bytes,total_dram_bytes,memory_service_cycles,decoder_cycles,combination_cycles,condense_cycles,aggregation_cycles,encoder_cycles,total_cycles
+gcn,citeseer,mega-paper,m2-adaptive-package,0,0,3703,128,1232847,2.41503,2679646,1944576,237568,56064,711296,86528,3036032,12051,55295,372299,0,6216,13308,459169
+gcn,citeseer,mega-paper,m2-adaptive-package,0,1,128,6,297776,2.4159,267635,165760,512,56064,711296,29184,962816,3877,13755,4222,0,292,624,22770

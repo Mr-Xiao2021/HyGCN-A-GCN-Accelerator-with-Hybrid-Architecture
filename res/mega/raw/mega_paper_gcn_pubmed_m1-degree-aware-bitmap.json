@@ -1,0 +1,238 @@
+{
+  "architecture": {
+    "adaptive_package_bits": [
+      64,
+      128,
+      192
+    ],
+    "aggregation_units": 256,
+    "bses_per_cpe": 32,
+    "buffers": {
+      "aggregation": 131072,
+      "combination": 98304,
+      "edge": 24576,
+      "input": 65536,
+      "sparse": 32768,
+      "weight": 49152
+    },
+    "combination_tiles": 4,
+    "cpes_per_tile": 8,
+    "decoder_values_per_cycle": 32,
+    "encoder_qn_units": 32,
+    "fifo_entries": 8,
+    "frequency_ghz": 1.0,
+    "hbm": {
+      "banks_per_channel": 16,
+      "block_size": 64,
+      "channels": 16,
+      "read_queue_entries_per_channel": 32,
+      "row_bytes": 2048,
+      "write_buffer_entries_per_channel": 32
+    },
+    "hbm_bandwidth_gbps": 256.0,
+    "parallel_fifos": 16,
+    "partition_vertices": 512,
+    "total_bses": 1024,
+    "total_buffer_bytes": 401408,
+    "transaction_bytes": 128
+  },
+  "layers": [
+    {
+      "average_feature_bits": 2.4632476225307194,
+      "condense": {
+        "baseline_cross_read_bytes": 9219200,
+        "baseline_cross_read_transactions": 72025,
+        "combination_buffer_write_bytes": 1261888,
+        "compare_cycles": 59151,
+        "condense_cycles": 130888,
+        "condensed_cross_read_bytes": 4610688,
+        "condensed_cross_read_transactions": 36021,
+        "cross_edges": 86202,
+        "fifo_refill_cycles": 71737,
+        "fifo_refill_entries": 72025,
+        "matched_sources": 72025,
+        "sparse_buffer_write_bytes": 4609600,
+        "sparse_spill_write_bytes": 4577408,
+        "sparse_spill_write_transactions": 35761,
+        "unique_source_references": 72025
+      },
+      "cycles": {
+        "aggregation": 54183,
+        "combination": 304056,
+        "condense": 0,
+        "cross_partition_memory": 36242,
+        "decoder": 30847,
+        "encoder": 78868,
+        "memory_service": 49342,
+        "output_memory": 2271,
+        "preload_memory": 10829,
+        "total": 517296
+      },
+      "dram_bytes": {
+        "cross_partition": 9219200,
+        "edge": 487680,
+        "input": 2219648,
+        "output": 568192,
+        "total": 12527232,
+        "weight": 32512
+      },
+      "dram_transactions": {
+        "cross_partition": 72025,
+        "edge": 3810,
+        "input": 17341,
+        "output": 4439,
+        "total": 97869,
+        "weight": 254
+      },
+      "edges": 108365,
+      "feature_bit_work": 2431420,
+      "input_features": 500,
+      "input_format": {
+        "bitmap_bits": 9858500,
+        "boundary_bits": 0,
+        "dram_bytes": 2219648,
+        "dram_transactions": 17341,
+        "header_bits": 0,
+        "logical_bytes": 2219404,
+        "padding_bits": 0,
+        "payload_bits": 7896632,
+        "scale_bits": 96
+      },
+      "layer": 0,
+      "logical_bytes": {
+        "cross_partition": 4609600,
+        "edge": 487643,
+        "input": 2219404,
+        "output": 567991,
+        "total": 7917150,
+        "weight": 32512
+      },
+      "nonzero_features": 987079,
+      "output_features": 128,
+      "output_format": {
+        "bitmap_bits": 2523776,
+        "boundary_bits": 0,
+        "dram_bytes": 568192,
+        "dram_transactions": 4439,
+        "header_bits": 0,
+        "logical_bytes": 567991,
+        "padding_bits": 0,
+        "payload_bits": 2020056,
+        "scale_bits": 96
+      },
+      "vertices": 19717
+    },
+    {
+      "average_feature_bits": 2.463471438939418,
+      "condense": {
+        "baseline_cross_read_bytes": 9219200,
+        "baseline_cross_read_transactions": 72025,
+        "combination_buffer_write_bytes": 39434,
+        "compare_cycles": 59151,
+        "condense_cycles": 130888,
+        "condensed_cross_read_bytes": 146560,
+        "condensed_cross_read_transactions": 1145,
+        "cross_edges": 86202,
+        "fifo_refill_cycles": 71737,
+        "fifo_refill_entries": 72025,
+        "matched_sources": 72025,
+        "sparse_buffer_write_bytes": 144050,
+        "sparse_spill_write_bytes": 74368,
+        "sparse_spill_write_transactions": 581,
+        "unique_source_references": 72025
+      },
+      "cycles": {
+        "aggregation": 1270,
+        "combination": 12752,
+        "condense": 0,
+        "cross_partition_memory": 36242,
+        "decoder": 55201,
+        "encoder": 1849,
+        "memory_service": 46602,
+        "output_memory": 213,
+        "preload_memory": 10147,
+        "total": 117674
+      },
+      "dram_bytes": {
+        "cross_partition": 9219200,
+        "edge": 487680,
+        "input": 2082176,
+        "output": 49024,
+        "total": 11838464,
+        "weight": 384
+      },
+      "dram_transactions": {
+        "cross_partition": 72025,
+        "edge": 3810,
+        "input": 16267,
+        "output": 383,
+        "total": 92488,
+        "weight": 3
+      },
+      "edges": 108365,
+      "feature_bit_work": 4351540,
+      "input_features": 128,
+      "input_format": {
+        "bitmap_bits": 2523776,
+        "boundary_bits": 0,
+        "dram_bytes": 2082176,
+        "dram_transactions": 16267,
+        "header_bits": 0,
+        "logical_bytes": 2081910,
+        "padding_bits": 0,
+        "payload_bits": 14131408,
+        "scale_bits": 96
+      },
+      "layer": 1,
+      "logical_bytes": {
+        "cross_partition": 144050,
+        "edge": 487643,
+        "input": 2081910,
+        "output": 48814,
+        "total": 2762621,
+        "weight": 204
+      },
+      "nonzero_features": 1766426,
+      "output_features": 3,
+      "output_format": {
+        "bitmap_bits": 59151,
+        "boundary_bits": 0,
+        "dram_bytes": 49024,
+        "dram_transactions": 383,
+        "header_bits": 0,
+        "logical_bytes": 48814,
+        "padding_bits": 0,
+        "payload_bits": 331264,
+        "scale_bits": 96
+      },
+      "vertices": 19717
+    }
+  ],
+  "manifest": {
+    "binary_digest": "d8b8b96d7865eade",
+    "config_digest": "3a942fd284282fda",
+    "dataset": "pubmed",
+    "engine": "mega",
+    "feature_value_source": "deterministic-density-surrogate-v1",
+    "git_commit": "ca1486b1eb3d",
+    "graph_digest": "9c267b828be1afa5-493eb2bc9df25ae3",
+    "model": "gcn",
+    "partition_digest": "5e21da1057a3bef9",
+    "partition_manifest_version": "diagnostic-contiguous-v1",
+    "partition_parameters": "vertices_per_subgraph=512",
+    "partition_source": "deterministic-contiguous",
+    "profile": "mega-paper",
+    "quantization_digest": "4a4d5c7946047071",
+    "quantization_manifest_version": "diagnostic-degree-quantiles-v1",
+    "quantization_provenance": "diagnostic-heuristic",
+    "required_eligible": false,
+    "variant": "m1-degree-aware-bitmap"
+  },
+  "schema_version": 1,
+  "summary": {
+    "conclusion_level": "diagnostic-mechanism",
+    "total_cycles": 634970,
+    "total_dram_bytes": 24365696,
+    "total_dram_transactions": 190357
+  }
+}

@@ -1,0 +1,238 @@
+{
+  "architecture": {
+    "adaptive_package_bits": [
+      64,
+      128,
+      192
+    ],
+    "aggregation_units": 256,
+    "bses_per_cpe": 32,
+    "buffers": {
+      "aggregation": 131072,
+      "combination": 98304,
+      "edge": 24576,
+      "input": 65536,
+      "sparse": 32768,
+      "weight": 49152
+    },
+    "combination_tiles": 4,
+    "cpes_per_tile": 8,
+    "decoder_values_per_cycle": 32,
+    "encoder_qn_units": 32,
+    "fifo_entries": 8,
+    "frequency_ghz": 1.0,
+    "hbm": {
+      "banks_per_channel": 16,
+      "block_size": 64,
+      "channels": 16,
+      "read_queue_entries_per_channel": 32,
+      "row_bytes": 2048,
+      "write_buffer_entries_per_channel": 32
+    },
+    "hbm_bandwidth_gbps": 256.0,
+    "parallel_fifos": 16,
+    "partition_vertices": 512,
+    "total_bses": 1024,
+    "total_buffer_bytes": 401408,
+    "transaction_bytes": 128
+  },
+  "layers": [
+    {
+      "average_feature_bits": 2.4150304133440725,
+      "condense": {
+        "baseline_cross_read_bytes": 711296,
+        "baseline_cross_read_transactions": 5557,
+        "combination_buffer_write_bytes": 212928,
+        "compare_cycles": 3327,
+        "condense_cycles": 8836,
+        "condensed_cross_read_bytes": 355840,
+        "condensed_cross_read_transactions": 2780,
+        "cross_edges": 7558,
+        "fifo_refill_cycles": 5509,
+        "fifo_refill_entries": 5557,
+        "matched_sources": 5557,
+        "sparse_buffer_write_bytes": 355648,
+        "sparse_spill_write_bytes": 345728,
+        "sparse_spill_write_transactions": 2701,
+        "unique_source_references": 5557
+      },
+      "cycles": {
+        "aggregation": 6216,
+        "combination": 372299,
+        "condense": 0,
+        "cross_partition_memory": 2840,
+        "decoder": 55295,
+        "encoder": 13308,
+        "memory_service": 12051,
+        "output_memory": 359,
+        "preload_memory": 8852,
+        "total": 459169
+      },
+      "dram_bytes": {
+        "cross_partition": 711296,
+        "edge": 56064,
+        "input": 1944576,
+        "output": 86528,
+        "total": 3036032,
+        "weight": 237568
+      },
+      "dram_transactions": {
+        "cross_partition": 5557,
+        "edge": 438,
+        "input": 15192,
+        "output": 676,
+        "total": 23719,
+        "weight": 1856
+      },
+      "edges": 12431,
+      "feature_bit_work": 2977363,
+      "input_features": 3703,
+      "input_format": {
+        "bitmap_bits": 12319881,
+        "boundary_bits": 106496,
+        "dram_bytes": 1944576,
+        "dram_transactions": 15192,
+        "header_bits": 83840,
+        "logical_bytes": 1944262,
+        "padding_bits": 66413,
+        "payload_bits": 2977363,
+        "scale_bits": 96
+      },
+      "layer": 0,
+      "logical_bytes": {
+        "cross_partition": 355648,
+        "edge": 55940,
+        "input": 1944262,
+        "output": 86292,
+        "total": 2679646,
+        "weight": 237504
+      },
+      "nonzero_features": 1232847,
+      "output_features": 128,
+      "output_format": {
+        "bitmap_bits": 425856,
+        "boundary_bits": 106496,
+        "dram_bytes": 86528,
+        "dram_transactions": 676,
+        "header_bits": 8210,
+        "logical_bytes": 86292,
+        "padding_bits": 45953,
+        "payload_bits": 103725,
+        "scale_bits": 96
+      },
+      "vertices": 3327
+    },
+    {
+      "average_feature_bits": 2.4159032292730105,
+      "condense": {
+        "baseline_cross_read_bytes": 711296,
+        "baseline_cross_read_transactions": 5557,
+        "combination_buffer_write_bytes": 9981,
+        "compare_cycles": 3327,
+        "condense_cycles": 8836,
+        "condensed_cross_read_bytes": 17024,
+        "condensed_cross_read_transactions": 133,
+        "cross_edges": 7558,
+        "fifo_refill_cycles": 5509,
+        "fifo_refill_entries": 5557,
+        "matched_sources": 5557,
+        "sparse_buffer_write_bytes": 16671,
+        "sparse_spill_write_bytes": 0,
+        "sparse_spill_write_transactions": 0,
+        "unique_source_references": 5557
+      },
+      "cycles": {
+        "aggregation": 292,
+        "combination": 4222,
+        "condense": 0,
+        "cross_partition_memory": 2840,
+        "decoder": 13755,
+        "encoder": 624,
+        "memory_service": 3877,
+        "output_memory": 135,
+        "preload_memory": 902,
+        "total": 22770
+      },
+      "dram_bytes": {
+        "cross_partition": 711296,
+        "edge": 56064,
+        "input": 165760,
+        "output": 29184,
+        "total": 962816,
+        "weight": 512
+      },
+      "dram_transactions": {
+        "cross_partition": 5557,
+        "edge": 438,
+        "input": 1295,
+        "output": 228,
+        "total": 7522,
+        "weight": 4
+      },
+      "edges": 12431,
+      "feature_bit_work": 719398,
+      "input_features": 128,
+      "input_format": {
+        "bitmap_bits": 425856,
+        "boundary_bits": 106496,
+        "dram_bytes": 165760,
+        "dram_transactions": 1295,
+        "header_bits": 22245,
+        "logical_bytes": 165620,
+        "padding_bits": 50869,
+        "payload_bits": 719398,
+        "scale_bits": 96
+      },
+      "layer": 1,
+      "logical_bytes": {
+        "cross_partition": 16671,
+        "edge": 55940,
+        "input": 165620,
+        "output": 28996,
+        "total": 267635,
+        "weight": 408
+      },
+      "nonzero_features": 297776,
+      "output_features": 6,
+      "output_format": {
+        "bitmap_bits": 19962,
+        "boundary_bits": 106496,
+        "dram_bytes": 29184,
+        "dram_transactions": 228,
+        "header_bits": 7905,
+        "logical_bytes": 28996,
+        "padding_bits": 63704,
+        "payload_bits": 33799,
+        "scale_bits": 96
+      },
+      "vertices": 3327
+    }
+  ],
+  "manifest": {
+    "binary_digest": "d8b8b96d7865eade",
+    "config_digest": "3a942fd284282fda",
+    "dataset": "citeseer",
+    "engine": "mega",
+    "feature_value_source": "deterministic-density-surrogate-v1",
+    "git_commit": "ca1486b1eb3d",
+    "graph_digest": "8827bcf0be0d62bc-4ac17c28037a8809",
+    "model": "gcn",
+    "partition_digest": "6c28e5bbe3c187f8",
+    "partition_manifest_version": "diagnostic-contiguous-v1",
+    "partition_parameters": "vertices_per_subgraph=512",
+    "partition_source": "deterministic-contiguous",
+    "profile": "mega-paper",
+    "quantization_digest": "32c3109caf5b2fa7",
+    "quantization_manifest_version": "diagnostic-degree-quantiles-v1",
+    "quantization_provenance": "diagnostic-heuristic",
+    "required_eligible": false,
+    "variant": "m2-adaptive-package"
+  },
+  "schema_version": 1,
+  "summary": {
+    "conclusion_level": "diagnostic-mechanism",
+    "total_cycles": 481939,
+    "total_dram_bytes": 3998848,
+    "total_dram_transactions": 31241
+  }
+}
